@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /* eslint-disable react/prop-types */
 import React, {
@@ -28,7 +28,6 @@ import {
   computeStepDiff,
   exportEdgeListText,
   forceDirectedLayout,
-  getSelectionBounds,
   normalizeTimelinePayload,
   parseEdgeListText,
   runScriptTrace,
@@ -40,18 +39,21 @@ import {
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
 } from "./graphStudio/constants";
+import { GRAPH_PRESETS } from "./graphStudio/data/graphPresets";
+import { exportTimelineVideo } from "./graphStudio/lib/exportTimelineVideo";
+import {
+  splitEdgePatch,
+  splitNodePatch,
+} from "./graphStudio/lib/graphPropertyRouting";
+import { createInitialViewState } from "./graphStudio/lib/viewStateUtils";
 import "./graphStudio/graphStudio.css";
-import * as Mp4Muxer from "mp4-muxer";
 const DEFAULT_SCRIPT = `// Use api.graph (base graph), then call helper events.
 // Example BFS-style trace:
 api.active(0);
 api.queued(1);
 api.push({ type: 'edge', id: 'e0', color: '#f59e0b', description: 'Explore e0' });
 api.visited(1);
-`; // Properties that are structural (shared across all frames — live in base graph)
-// vs. animation properties that are per-frame (live in step overrides).
-const STEP_NODE_PROPS = new Set(["status", "color"]);
-const STEP_EDGE_PROPS = new Set(["color"]);
+`;
 const HISTORY_LIMIT = 120;
 const cloneJson = (value) => JSON.parse(JSON.stringify(value));
 const snapshotTimelineState = ({ baseGraph, steps, currentFrame }) => ({
@@ -61,64 +63,6 @@ const snapshotTimelineState = ({ baseGraph, steps, currentFrame }) => ({
     ? Number(currentFrame)
     : 0,
 });
-const computeMinGridZoomForViewport = (viewportWidth, viewportHeight) =>
-  Math.max(
-    0.1,
-    Math.min(viewportWidth / VIEWBOX_WIDTH, viewportHeight / VIEWBOX_HEIGHT),
-  );
-const createCenteredViewState = (
-  nodes = [],
-  zoom = 1,
-  viewportWidth = 1280,
-  viewportHeight = 760,
-) => {
-  const bounds = getSelectionBounds(nodes);
-  if (!bounds) {
-    return {
-      zoom,
-      x: (viewportWidth - VIEWBOX_WIDTH * zoom) / 2,
-      y: (viewportHeight - VIEWBOX_HEIGHT * zoom) / 2,
-    };
-  }
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerY = (bounds.minY + bounds.maxY) / 2;
-  return {
-    zoom,
-    x: viewportWidth / 2 - centerX * zoom,
-    y: viewportHeight / 2 - centerY * zoom,
-  };
-};
-const createInitialViewState = (
-  nodes = [],
-  viewportWidth = 1280,
-  viewportHeight = 760,
-) => {
-  const bounds = getSelectionBounds(nodes);
-  if (!bounds) {
-    const minGridZoom = computeMinGridZoomForViewport(
-      viewportWidth,
-      viewportHeight,
-    );
-    return createCenteredViewState(
-      [],
-      minGridZoom,
-      viewportWidth,
-      viewportHeight,
-    );
-  }
-  const padding = 42;
-  const fitWidth = bounds.width + padding * 2;
-  const fitHeight = bounds.height + padding * 2;
-  const fitZoomX = viewportWidth / Math.max(1, fitWidth);
-  const fitZoomY = viewportHeight / Math.max(1, fitHeight);
-  const fitZoom = Math.min(fitZoomX, fitZoomY, 1);
-  const minGridZoom = computeMinGridZoomForViewport(
-    viewportWidth,
-    viewportHeight,
-  );
-  const zoom = Math.max(minGridZoom, fitZoom);
-  return createCenteredViewState(nodes, zoom, viewportWidth, viewportHeight);
-};
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
     () =>
@@ -529,26 +473,18 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   };
   const updateSelectedNode = (patch) => {
     if (!selectedNode) return;
-    const basePatch = {};
-    Object.entries(patch).forEach(([key, value]) => {
-      if (STEP_NODE_PROPS.has(key)) {
-        setStepProperty(`nodeOverrides.${selectedNode.id}.${key}`, value);
-      } else {
-        basePatch[key] = value;
-      }
+    const { basePatch, stepUpdates } = splitNodePatch(patch);
+    stepUpdates.forEach(({ key, value }) => {
+      setStepProperty(`nodeOverrides.${selectedNode.id}.${key}`, value);
     });
     if (Object.keys(basePatch).length > 0)
       updateBaseNode(selectedNode.id, basePatch);
   };
   const updateSelectedEdge = (patch) => {
     if (!selectedEdge) return;
-    const basePatch = {};
-    Object.entries(patch).forEach(([key, value]) => {
-      if (STEP_EDGE_PROPS.has(key)) {
-        setStepProperty(`edgeOverrides.${selectedEdge.id}.${key}`, value);
-      } else {
-        basePatch[key] = value;
-      }
+    const { basePatch, stepUpdates } = splitEdgePatch(patch);
+    stepUpdates.forEach(({ key, value }) => {
+      setStepProperty(`edgeOverrides.${selectedEdge.id}.${key}`, value);
     });
     if (Object.keys(basePatch).length > 0)
       updateBaseEdge(selectedEdge.id, basePatch);
@@ -653,128 +589,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     }
   };
   const exportVideo = async (labelPos) => {
-    if (typeof VideoEncoder === "undefined") {
-      setStatus(
-        "Export failed: VideoEncoder API is not supported in this browser.",
-      );
-      return;
-    }
     setStatus("Exporting video...");
     try {
-      const canvas = document.createElement("canvas");
-      const svgEl = document.getElementById("graph-studio-canvas-svg") || document.querySelector("svg");
-      if (!svgEl) throw new Error("SVG not found");
-      const rect = svgEl.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width / 2) * 2;
-      canvas.height = Math.floor(rect.height / 2) * 2;
-      const ctx = canvas.getContext("2d");
-      const muxer = new Mp4Muxer.Muxer({
-        target: new Mp4Muxer.ArrayBufferTarget(),
-        video: { codec: "avc", width: canvas.width, height: canvas.height },
-        fastStart: "in-memory",
-      });
-      const videoEncoder = new VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-        error: (e) => console.error(e),
-      });
-      videoEncoder.configure({
-        codec: "avc1.42E01F",
-        width: canvas.width,
-        height: canvas.height,
-        bitrate: 5_000_000,
-        framerate: 30,
-      });
-      const fps = 30;
-      let frameIndex = 0;
-      for (let i = 0; i < steps.length; i++) {
-        setCurrentFrame(i);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        // Store original width/height
-        const origWidth = svgEl.getAttribute("width");
-        const origHeight = svgEl.getAttribute("height");
-        
-        // Set canvas width/height explicitly before serializing
-        svgEl.setAttribute("width", canvas.width);
-        svgEl.setAttribute("height", canvas.height);
-
-        let svgData = new XMLSerializer().serializeToString(svgEl);
-        
-        // Restore
-        if (origWidth === null) svgEl.removeAttribute("width");
-        else svgEl.setAttribute("width", origWidth);
-        
-        if (origHeight === null) svgEl.removeAttribute("height");
-        else svgEl.setAttribute("height", origHeight);
-
-        // Ensure xmlns is present
-        if (!svgData.includes('xmlns=')) {
-          svgData = svgData.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
-        }
-
-        const img = new Image();
-        const svgBlob = new Blob([svgData], {
-          type: "image/svg+xml;charset=utf-8",
-        });
-        const url = URL.createObjectURL(svgBlob);
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () =>
-            reject(
-              new Error("Failed to load SVG image. Check console for details."),
-            );
-          img.src = url;
-        });
-        const stepDurationMs = steps[i].durationMs || 600;
-        const framesForStep = Math.round((stepDurationMs / 1000) * fps);
-        for (let f = 0; f < framesForStep; f++) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          const desc = steps[i].description;
-          if (desc) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-            ctx.font = "24px sans-serif";
-            const textMetrics = ctx.measureText(desc);
-            const padding = 10;
-            const textWidth = textMetrics.width;
-            const textHeight = 24;
-            let x, y;
-            if (labelPos.includes("left")) x = 20;
-            else if (labelPos.includes("right"))
-              x = canvas.width - textWidth - 20 - padding * 2;
-            else x = (canvas.width - textWidth) / 2 - padding;
-            if (labelPos.includes("top")) y = 20;
-            else if (labelPos.includes("bottom"))
-              y = canvas.height - textHeight - 20 - padding * 2;
-            else y = (canvas.height - textHeight) / 2 - padding;
-            ctx.fillRect(
-              x,
-              y,
-              textWidth + padding * 2,
-              textHeight + padding * 2,
-            );
-            ctx.fillStyle = "#000000";
-            ctx.fillText(desc, x + padding, y + textHeight + padding - 4);
-          }
-          const frame = new VideoFrame(canvas, {
-            timestamp: (frameIndex * 1000000) / fps,
-          });
-          videoEncoder.encode(frame, { keyFrame: frameIndex % 30 === 0 });
-          frame.close();
-          frameIndex++;
-        }
-        URL.revokeObjectURL(url);
-      }
-      await videoEncoder.flush();
-      muxer.finalize();
-      const buffer = muxer.target.buffer;
-      const blob = new Blob([buffer], { type: "video/mp4" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "graph-export.mp4";
-      a.click();
-      URL.revokeObjectURL(url);
+      await exportTimelineVideo({ steps, setCurrentFrame, labelPos });
       setStatus("Video exported successfully");
     } catch (error) {
       console.error(error);
@@ -792,503 +609,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     }
   };
   const applyPreset = (presetName) => {
-    let presetGraph = { nodes: [], edges: [] };
-    let presetSteps = [];
-    if (presetName === "bfs") {
-      presetGraph = {
-        nodes: [
-          { id: 0, label: "A", x: 400, y: 200, visible: true },
-          { id: 1, label: "B", x: 300, y: 300, visible: true },
-          { id: 2, label: "C", x: 500, y: 300, visible: true },
-          { id: 3, label: "D", x: 200, y: 400, visible: true },
-          { id: 4, label: "E", x: 400, y: 400, visible: true },
-          { id: 5, label: "F", x: 600, y: 400, visible: true },
-        ],
-        edges: [
-          { id: "e0", from: 0, to: 1, directed: false, visible: true },
-          { id: "e1", from: 0, to: 2, directed: false, visible: true },
-          { id: "e2", from: 1, to: 3, directed: false, visible: true },
-          { id: "e3", from: 1, to: 4, directed: false, visible: true },
-          { id: "e4", from: 2, to: 5, directed: false, visible: true },
-        ],
-      };
-      presetSteps = [
-        {
-          id: "s0",
-          description: "Start BFS at A",
-          durationMs: 600,
-          nodeOverrides: { 0: { status: "active", color: "#3b82f6" } },
-          edgeOverrides: {},
-        },
-        {
-          id: "s1",
-          description: "Queue B and C",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "queued", color: "#eab308" },
-            2: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: { e0: { color: "#3b82f6" }, e1: { color: "#3b82f6" } },
-        },
-        {
-          id: "s2",
-          description: "Visit B, Queue D and E",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "queued", color: "#eab308" },
-            3: { status: "queued", color: "#eab308" },
-            4: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e1: { color: "#3b82f6" },
-            e2: { color: "#3b82f6" },
-            e3: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s3",
-          description: "Visit C, Queue F",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "queued", color: "#eab308" },
-            4: { status: "queued", color: "#eab308" },
-            5: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e1: { color: "#22c55e" },
-            e2: { color: "#3b82f6" },
-            e3: { color: "#3b82f6" },
-            e4: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s4",
-          description: "Visit D, E, F",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "visited", color: "#22c55e" },
-            4: { status: "visited", color: "#22c55e" },
-            5: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e1: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-            e4: { color: "#22c55e" },
-          },
-        },
-      ];
-    } else if (presetName === "dfs") {
-      presetGraph = {
-        nodes: [
-          { id: 0, label: "A", x: 400, y: 200, visible: true },
-          { id: 1, label: "B", x: 300, y: 300, visible: true },
-          { id: 2, label: "C", x: 500, y: 300, visible: true },
-          { id: 3, label: "D", x: 200, y: 400, visible: true },
-          { id: 4, label: "E", x: 400, y: 400, visible: true },
-        ],
-        edges: [
-          { id: "e0", from: 0, to: 1, directed: true, visible: true },
-          { id: "e1", from: 0, to: 2, directed: true, visible: true },
-          { id: "e2", from: 1, to: 3, directed: true, visible: true },
-          { id: "e3", from: 1, to: 4, directed: true, visible: true },
-        ],
-      };
-      presetSteps = [
-        {
-          id: "s0",
-          description: "Start DFS at A",
-          durationMs: 600,
-          nodeOverrides: { 0: { status: "active", color: "#3b82f6" } },
-          edgeOverrides: {},
-        },
-        {
-          id: "s1",
-          description: "Explore B",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: { e0: { color: "#3b82f6" } },
-        },
-        {
-          id: "s2",
-          description: "Explore D",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "active", color: "#3b82f6" },
-            3: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: { e0: { color: "#3b82f6" }, e2: { color: "#3b82f6" } },
-        },
-        {
-          id: "s3",
-          description: "Backtrack from D",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "active", color: "#3b82f6" },
-            3: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: { e0: { color: "#3b82f6" }, e2: { color: "#22c55e" } },
-        },
-        {
-          id: "s4",
-          description: "Explore E",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "active", color: "#3b82f6" },
-            3: { status: "visited", color: "#22c55e" },
-            4: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: {
-            e0: { color: "#3b82f6" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s5",
-          description: "Backtrack from E, B",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "visited", color: "#22c55e" },
-            3: { status: "visited", color: "#22c55e" },
-            4: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-          },
-        },
-        {
-          id: "s6",
-          description: "Explore C",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "active", color: "#3b82f6" },
-            3: { status: "visited", color: "#22c55e" },
-            4: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e1: { color: "#3b82f6" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-          },
-        },
-        {
-          id: "s7",
-          description: "Finish DFS",
-          durationMs: 600,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "visited", color: "#22c55e" },
-            4: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e0: { color: "#22c55e" },
-            e1: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-          },
-        },
-      ];
-    } else if (presetName === "dijkstra") {
-      presetGraph = {
-        nodes: [
-          { id: 0, label: "A", x: 200, y: 300, visible: true },
-          { id: 1, label: "B", x: 400, y: 200, visible: true },
-          { id: 2, label: "C", x: 400, y: 400, visible: true },
-          { id: 3, label: "D", x: 600, y: 300, visible: true },
-        ],
-        edges: [
-          {
-            id: "e0",
-            from: 0,
-            to: 1,
-            directed: true,
-            label: "4",
-            visible: true,
-          },
-          {
-            id: "e1",
-            from: 0,
-            to: 2,
-            directed: true,
-            label: "1",
-            visible: true,
-          },
-          {
-            id: "e2",
-            from: 2,
-            to: 1,
-            directed: true,
-            label: "2",
-            visible: true,
-          },
-          {
-            id: "e3",
-            from: 1,
-            to: 3,
-            directed: true,
-            label: "1",
-            visible: true,
-          },
-          {
-            id: "e4",
-            from: 2,
-            to: 3,
-            directed: true,
-            label: "5",
-            visible: true,
-          },
-        ],
-      };
-      presetSteps = [
-        {
-          id: "s0",
-          description: "Init distances: A=0, others=∞",
-          durationMs: 800,
-          nodeOverrides: { 0: { status: "active", color: "#3b82f6" } },
-          edgeOverrides: {},
-        },
-        {
-          id: "s1",
-          description: "Relax A→B (4), A→C (1)",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "queued", color: "#eab308" },
-            2: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: { e0: { color: "#3b82f6" }, e1: { color: "#3b82f6" } },
-        },
-        {
-          id: "s2",
-          description: "Pick C (min dist 1), Relax C→B (1+2=3 < 4)",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "queued", color: "#eab308" },
-            2: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: {
-            e0: { color: "#64748b" },
-            e1: { color: "#22c55e" },
-            e2: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s3",
-          description: "Relax C→D (1+5=6)",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "queued", color: "#eab308" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: {
-            e1: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e4: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s4",
-          description: "Pick B (min dist 3), Relax B→D (3+1=4 < 6)",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "active", color: "#3b82f6" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: {
-            e1: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#3b82f6" },
-            e4: { color: "#64748b" },
-          },
-        },
-        {
-          id: "s5",
-          description: "Pick D (min dist 4), Done",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "visited", color: "#22c55e" },
-            3: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e1: { color: "#22c55e" },
-            e2: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-          },
-        },
-      ];
-    } else if (presetName === "multigraph") {
-      presetGraph = {
-        nodes: [
-          { id: 0, label: "A", x: 200, y: 300, visible: true },
-          { id: 1, label: "B", x: 500, y: 300, visible: true },
-          { id: 2, label: "C", x: 350, y: 500, visible: true },
-        ],
-        edges: [
-          {
-            id: "e0",
-            from: 0,
-            to: 1,
-            directed: true,
-            label: "Path 1",
-            visible: true,
-          },
-          {
-            id: "e1",
-            from: 0,
-            to: 1,
-            directed: true,
-            label: "Path 2",
-            visible: true,
-          },
-          {
-            id: "e2",
-            from: 0,
-            to: 1,
-            directed: true,
-            label: "Path 3",
-            visible: true,
-          },
-          {
-            id: "e3",
-            from: 1,
-            to: 1,
-            directed: true,
-            label: "Loop",
-            visible: true,
-          },
-          {
-            id: "e4",
-            from: 1,
-            to: 2,
-            directed: true,
-            label: "To C",
-            visible: true,
-          },
-          {
-            id: "e5",
-            from: 2,
-            to: 0,
-            directed: true,
-            label: "Back to A",
-            visible: true,
-          },
-        ],
-      };
-      presetSteps = [
-        {
-          id: "s0",
-          description: "Start at A",
-          durationMs: 800,
-          nodeOverrides: { 0: { status: "active", color: "#3b82f6" } },
-          edgeOverrides: {},
-        },
-        {
-          id: "s1",
-          description: "Explore multiple paths to B",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "queued", color: "#eab308" },
-          },
-          edgeOverrides: {
-            e0: { color: "#3b82f6" },
-            e1: { color: "#3b82f6" },
-            e2: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s2",
-          description: "Select Path 2 as optimal",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: {
-            e0: { color: "#64748b" },
-            e1: { color: "#22c55e" },
-            e2: { color: "#64748b" },
-          },
-        },
-        {
-          id: "s3",
-          description: "Process self-loop on B",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: { e1: { color: "#22c55e" }, e3: { color: "#3b82f6" } },
-        },
-        {
-          id: "s4",
-          description: "Move to C",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "visited", color: "#22c55e" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "active", color: "#3b82f6" },
-          },
-          edgeOverrides: {
-            e1: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-            e4: { color: "#3b82f6" },
-          },
-        },
-        {
-          id: "s5",
-          description: "Return to A (Cycle complete)",
-          durationMs: 800,
-          nodeOverrides: {
-            0: { status: "active", color: "#3b82f6" },
-            1: { status: "visited", color: "#22c55e" },
-            2: { status: "visited", color: "#22c55e" },
-          },
-          edgeOverrides: {
-            e1: { color: "#22c55e" },
-            e3: { color: "#22c55e" },
-            e4: { color: "#22c55e" },
-            e5: { color: "#3b82f6" },
-          },
-        },
-      ];
-    }
-    replaceTimeline(presetGraph, presetSteps);
-    setViewState(createInitialViewState(presetGraph.nodes));
+    const preset = GRAPH_PRESETS[presetName];
+    if (!preset) return;
+    replaceTimeline(preset.graph, preset.steps);
+    setViewState(createInitialViewState(preset.graph.nodes));
     setStatus(`Applied ${presetName.toUpperCase()} preset`);
   };
   return (
