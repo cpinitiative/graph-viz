@@ -611,8 +611,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const applyPreset = (presetName) => {
     const preset = GRAPH_PRESETS[presetName];
     if (!preset) return;
-    replaceTimeline(preset.graph, preset.steps);
-    setViewState(createInitialViewState(preset.graph.nodes));
+    const nextGraph = cloneJson(preset.graph);
+    const nextSteps = cloneJson(preset.steps);
+    replaceTimeline(nextGraph, nextSteps);
+    setViewState(createInitialViewState(nextGraph.nodes));
     setStatus(`Applied ${presetName.toUpperCase()} preset`);
   };
   return (
