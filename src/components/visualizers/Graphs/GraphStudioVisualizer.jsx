@@ -39,21 +39,18 @@ import {
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
 } from "./graphStudio/constants";
+import { DEFAULT_SCRIPT } from "./graphStudio/data/defaultScript";
 import { GRAPH_PRESETS } from "./graphStudio/data/graphPresets";
 import { exportTimelineVideo } from "./graphStudio/lib/exportTimelineVideo";
+import ExportVideoModal from "./graphStudio/modals/ExportVideoModal";
+import ParserModal from "./graphStudio/modals/ParserModal";
+import ScriptModal from "./graphStudio/modals/ScriptModal";
 import {
   splitEdgePatch,
   splitNodePatch,
 } from "./graphStudio/lib/graphPropertyRouting";
 import { createInitialViewState } from "./graphStudio/lib/viewStateUtils";
 import "./graphStudio/graphStudio.css";
-const DEFAULT_SCRIPT = `// Use api.graph (base graph), then call helper events.
-// Example BFS-style trace:
-api.active(0);
-api.queued(1);
-api.push({ type: 'edge', id: 'e0', color: '#f59e0b', description: 'Explore e0' });
-api.visited(1);
-`;
 const HISTORY_LIMIT = 120;
 const cloneJson = (value) => JSON.parse(JSON.stringify(value));
 const snapshotTimelineState = ({ baseGraph, steps, currentFrame }) => ({
@@ -753,204 +750,32 @@ const GraphStudioVisualizer = ({ snapshot }) => {
             isPlaying={isPlaying}
           />{" "}
         </Panel>{" "}
-      </PanelGroup>{" "}
-      {isParserOpen && (
-        <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-[20px] flex items-center justify-center z-50 p-4">
-          {" "}
-          <div className="w-full max-w-2xl bg-surface-container-low rounded-md shadow-ambient-lg flex flex-col max-h-[90vh]">
-            {" "}
-            <div className="p-4 flex justify-between items-center">
-              {" "}
-              <h3 className="text-sm font-semibold text-on-surface">
-                Text-to-Graph Parser
-              </h3>{" "}
-              <button
-                className="text-outline hover:text-on-surface"
-                onClick={() => setIsParserOpen(false)}
-              >
-                {" "}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>{" "}
-              </button>{" "}
-            </div>{" "}
-            <div className="p-4 flex-1 overflow-auto">
-              {" "}
-              <p className="text-xs text-on-surface mb-3">
-                Supports competitive programming input: first line `N M`, then
-                `u v w` rows.
-              </p>{" "}
-              <textarea
-                value={parserText}
-                onChange={(event) => setParserText(event.target.value)}
-                className="w-full h-64 bg-white rounded-md text-sm text-on-surface p-3 font-mono focus:outline-none focus:-primary resize-none"
-                placeholder={"5 6\n0 1 2\n1 2 4\n2 3 1\n3 4 3\n0 4 8\n1 4 6"}
-              />{" "}
-            </div>{" "}
-            <div className="p-4 flex justify-end gap-2 bg-white/50 rounded-b-xl">
-              {" "}
-              <button
-                className="py-2 px-4 bg-surface-container hover:bg-surface-container-high rounded-md text-xs font-medium text-on-surface transition-colors"
-                onClick={() => setIsParserOpen(false)}
-              >
-                Cancel
-              </button>{" "}
-              <button
-                className="py-2 px-4 bg-primary text-on-primary hover:bg-blue-500 rounded-md text-xs font-medium transition-colors "
-                onClick={applyParserText}
-              >
-                Generate graph
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
-        </div>
-      )}{" "}
-      {isScriptOpen && (
-        <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-[20px] flex items-center justify-center z-50 p-4">
-          {" "}
-          <div className="w-full max-w-3xl bg-surface-container-low rounded-md shadow-ambient-lg flex flex-col max-h-[90vh]">
-            {" "}
-            <div className="p-4 flex justify-between items-center">
-              {" "}
-              <h3 className="text-sm font-semibold text-on-surface">
-                Script Mode (Trace Recorder)
-              </h3>{" "}
-              <button
-                className="text-outline hover:text-on-surface"
-                onClick={() => setIsScriptOpen(false)}
-              >
-                {" "}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>{" "}
-              </button>{" "}
-            </div>{" "}
-            <div className="p-4 flex-1 overflow-auto">
-              {" "}
-              <p className="text-xs text-on-surface mb-3">
-                Write JS using `api.active(id)`, `api.visited(id)`,
-                `api.edge(id, color)` or `api.push(patch)`.
-              </p>{" "}
-              <textarea
-                value={scriptText}
-                onChange={(event) => setScriptText(event.target.value)}
-                className="w-full h-80 bg-white rounded-md text-sm text-on-surface p-3 font-mono focus:outline-none focus:-primary resize-none"
-              />{" "}
-            </div>{" "}
-            <div className="p-4 flex justify-end gap-2 bg-white/50 rounded-b-xl">
-              {" "}
-              <button
-                className="py-2 px-4 bg-surface-container hover:bg-surface-container-high rounded-md text-xs font-medium text-on-surface transition-colors"
-                onClick={() => setIsScriptOpen(false)}
-              >
-                Cancel
-              </button>{" "}
-              <button
-                className="py-2 px-4 bg-primary text-on-primary hover:bg-blue-500 rounded-md text-xs font-medium transition-colors "
-                onClick={runScript}
-              >
-                Generate timeline
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
-        </div>
-      )}{" "}
-      {isExportVideoOpen && (
-        <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-[20px] flex items-center justify-center z-50 p-4">
-          {" "}
-          <div className="w-full max-w-md bg-surface-container-low rounded-md shadow-ambient-lg flex flex-col">
-            {" "}
-            <div className="p-4 flex justify-between items-center">
-              {" "}
-              <h3 className="text-sm font-semibold text-on-surface">
-                Export MP4 Video
-              </h3>{" "}
-              <button
-                className="text-outline hover:text-on-surface"
-                onClick={() => setIsExportVideoOpen(false)}
-              >
-                {" "}
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>{" "}
-              </button>{" "}
-            </div>{" "}
-            <div className="p-4">
-              {" "}
-              <p className="text-xs text-on-surface mb-4">
-                This will generate a static video of the timeline steps.
-              </p>{" "}
-              <div className="space-y-2">
-                {" "}
-                <label className="block text-xs font-medium text-on-surface">
-                  Label Position
-                </label>{" "}
-                <select
-                  value={exportVideoLabelPos}
-                  onChange={(e) => setExportVideoLabelPos(e.target.value)}
-                  className="w-full bg-white rounded-md text-sm text-on-surface py-2.5 px-3 focus:outline-none focus:-primary"
-                >
-                  {" "}
-                  <option value="top-left">Top Left</option>{" "}
-                  <option value="top-center">Top Center</option>{" "}
-                  <option value="top-right">Top Right</option>{" "}
-                  <option value="bottom-left">Bottom Left</option>{" "}
-                  <option value="bottom-center">Bottom Center</option>{" "}
-                  <option value="bottom-right">Bottom Right</option>{" "}
-                </select>{" "}
-              </div>{" "}
-            </div>{" "}
-            <div className="p-4 flex justify-end gap-2 bg-white/50 rounded-b-xl">
-              {" "}
-              <button
-                className="py-2 px-4 bg-surface-container hover:bg-surface-container-high rounded-md text-xs font-medium text-on-surface transition-colors"
-                onClick={() => setIsExportVideoOpen(false)}
-              >
-                Cancel
-              </button>{" "}
-              <button
-                className="py-2 px-4 bg-primary text-on-primary hover:bg-blue-500 rounded-md text-xs font-medium transition-colors "
-                onClick={() => {
-                  setIsExportVideoOpen(false);
-                  exportVideo(exportVideoLabelPos);
-                }}
-              >
-                Export
-              </button>{" "}
-            </div>{" "}
-          </div>{" "}
-        </div>
-      )}{" "}
+      </PanelGroup>
+      <ParserModal
+        open={isParserOpen}
+        text={parserText}
+        onTextChange={setParserText}
+        onClose={() => setIsParserOpen(false)}
+        onSubmit={applyParserText}
+      />
+      <ScriptModal
+        open={isScriptOpen}
+        text={scriptText}
+        onTextChange={setScriptText}
+        onClose={() => setIsScriptOpen(false)}
+        onSubmit={runScript}
+        defaultScript={DEFAULT_SCRIPT}
+      />
+      <ExportVideoModal
+        open={isExportVideoOpen}
+        labelPos={exportVideoLabelPos}
+        onLabelPosChange={setExportVideoLabelPos}
+        onClose={() => setIsExportVideoOpen(false)}
+        onExport={() => {
+          setIsExportVideoOpen(false);
+          exportVideo(exportVideoLabelPos);
+        }}
+      />
     </div>
   );
 };
