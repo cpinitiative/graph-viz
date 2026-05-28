@@ -43,6 +43,7 @@ import {
   splitEdgePatch,
   splitNodePatch,
 } from "./graphStudio/lib/graphPropertyRouting";
+import { useGraphStudioPlayback } from "./graphStudio/hooks/useGraphStudioPlayback";
 import { useGraphStudioUndo } from "./graphStudio/hooks/useGraphStudioUndo";
 import { useGraphStudioView } from "./graphStudio/hooks/useGraphStudioView";
 import { cloneJson } from "./graphStudio/lib/undoUtils";
@@ -93,7 +94,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [selectedObject, setSelectedObject] = useState(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const [drawFrom, setDrawFrom] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState("Ready");
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
@@ -108,7 +108,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
     useState("bottom-center");
-  const timelineRef = useRef(null);
   const dragStateRef = useRef(null);
   const nextNodeIdRef = useRef(0);
   const nextEdgeIdRef = useRef(0);
@@ -117,6 +116,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     steps,
     currentFrame,
     replaceTimeline,
+    setCurrentFrame,
+    setStatus,
+  });
+  const { isPlaying, togglePlayback } = useGraphStudioPlayback({
+    steps,
+    frameCount,
+    currentFrame,
     setCurrentFrame,
     setStatus,
   });
@@ -141,11 +147,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     nextEdgeIdRef.current = seedTimeline.baseGraph.edges.length;
     bumpViewReset();
   }, [seedTimeline, replaceTimeline, resetUndoHistory, setViewFromNodes, bumpViewReset]);
-  useEffect(() => {
-    return () => {
-      if (timelineRef.current) window.clearTimeout(timelineRef.current);
-    };
-  }, []);
   useEffect(() => {
     if (!selectedObject) return;
     if (selectedObject.type === "node") {
@@ -229,38 +230,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   };
   const setStepProperty = (path, value) => {
     updateStep(currentFrame, path, value);
-  };
-  const stopTimeline = () => {
-    if (timelineRef.current) {
-      window.clearTimeout(timelineRef.current);
-      timelineRef.current = null;
-    }
-    setIsPlaying(false);
-  };
-  const playTimeline = () => {
-    stopTimeline();
-    if (frameCount <= 1) {
-      setStatus("Add more keyframes to play timeline");
-      return;
-    }
-    setIsPlaying(true);
-    let cursor = currentFrame;
-    const tick = () => {
-      if (cursor >= frameCount) {
-        setIsPlaying(false);
-        setStatus("Playback complete");
-        return;
-      }
-      setCurrentFrame(cursor);
-      const stepDuration = clamp(
-        Number(steps[cursor]?.durationMs ?? 600),
-        80,
-        8000,
-      );
-      cursor += 1;
-      timelineRef.current = window.setTimeout(tick, stepDuration);
-    };
-    tick();
   };
   const addNodeAt = (point) => {
     const id = nextNodeIdRef.current;
@@ -564,7 +533,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
                 onApplyPreset={applyPreset}
                 currentFrame={currentFrame}
                 totalFrames={frameCount}
-                onPlay={isPlaying ? stopTimeline : playTimeline}
+                onPlay={togglePlayback}
                 isPlaying={isPlaying}
                 onCenterView={centerViewOnContent}
                 zoomPercent={zoomPercent}
@@ -664,7 +633,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
               setCurrentFrame(Math.max(0, currentFrame - 1));
             }}
             onMoveStep={moveStep}
-            onPlay={isPlaying ? stopTimeline : playTimeline}
+            onPlay={togglePlayback}
             isPlaying={isPlaying}
           />{" "}
         </Panel>{" "}
