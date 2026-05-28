@@ -16,23 +16,16 @@ import PropertyPanel from "./graphStudio/PropertyPanel";
 // HUDPalette moved into the left Tools sidebar (controls relocated)
 // import HUDPalette from './graphStudio/HUDPalette';
 import {
-  circularLayout,
   clamp,
   clampNodePosition,
   computeStepDiff,
   exportEdgeListText,
-  forceDirectedLayout,
   normalizeTimelinePayload,
   parseEdgeListText,
   runScriptTrace,
   snapToGrid,
-  treeLayout,
 } from "./graphStudio/graphStudioUtils";
-import {
-  EDGE_ROUTING,
-  VIEWBOX_HEIGHT,
-  VIEWBOX_WIDTH,
-} from "./graphStudio/constants";
+import { EDGE_ROUTING } from "./graphStudio/constants";
 import { DEFAULT_SCRIPT } from "./graphStudio/data/defaultScript";
 import { GRAPH_PRESETS } from "./graphStudio/data/graphPresets";
 import { exportTimelineVideo } from "./graphStudio/lib/exportTimelineVideo";
@@ -43,6 +36,7 @@ import {
   splitEdgePatch,
   splitNodePatch,
 } from "./graphStudio/lib/graphPropertyRouting";
+import { useGraphStudioGraphModel } from "./graphStudio/hooks/useGraphStudioGraphModel";
 import { useGraphStudioPlayback } from "./graphStudio/hooks/useGraphStudioPlayback";
 import { useGraphStudioUndo } from "./graphStudio/hooks/useGraphStudioUndo";
 import { useGraphStudioView } from "./graphStudio/hooks/useGraphStudioView";
@@ -109,8 +103,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [exportVideoLabelPos, setExportVideoLabelPos] =
     useState("bottom-center");
   const dragStateRef = useRef(null);
-  const nextNodeIdRef = useRef(0);
-  const nextEdgeIdRef = useRef(0);
   const { resetUndoHistory } = useGraphStudioUndo({
     baseGraph,
     steps,
@@ -130,6 +122,48 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () => new Set(selectedNodeIds.map(String)),
     [selectedNodeIds],
   );
+  const selectedNode = useMemo(() => {
+    if (!selectedObject || selectedObject.type !== "node") return null;
+    return (
+      computedGraph.nodes.find(
+        (node) => String(node.id) === String(selectedObject.id),
+      ) ?? null
+    );
+  }, [selectedObject, computedGraph.nodes]);
+  const selectedEdge = useMemo(() => {
+    if (!selectedObject || selectedObject.type !== "edge") return null;
+    return (
+      computedGraph.edges.find(
+        (edge) => String(edge.id) === String(selectedObject.id),
+      ) ?? null
+    );
+  }, [selectedObject, computedGraph.edges]);
+  const {
+    updateBaseNode,
+    updateBaseNodesBulk,
+    updateBaseEdge,
+    setStepProperty,
+    addNodeAt,
+    addNode,
+    addEdge,
+    deleteSelection,
+    applyLayout,
+  } = useGraphStudioGraphModel({
+    baseGraph,
+    setBaseGraph,
+    steps,
+    currentFrame,
+    updateStep,
+    replaceTimeline,
+    snapEnabled,
+    forceStrength: globalSettings.forceStrength,
+    setStatus,
+    seedBaseGraph: seedTimeline.baseGraph,
+    selectedNodeIds,
+    selectedEdge,
+    setSelectedObject,
+    setSelectedNodeIds,
+  });
   useEffect(() => {
     replaceTimeline(seedTimeline.baseGraph, seedTimeline.steps);
     setViewFromNodes(seedTimeline.baseGraph.nodes);
@@ -137,14 +171,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedNodeIds([]);
     setDrawFrom(null);
     resetUndoHistory();
-    nextNodeIdRef.current =
-      Math.max(
-        -1,
-        ...seedTimeline.baseGraph.nodes.map((node) =>
-          Number.isFinite(Number(node.id)) ? Number(node.id) : -1,
-        ),
-      ) + 1;
-    nextEdgeIdRef.current = seedTimeline.baseGraph.edges.length;
     bumpViewReset();
   }, [seedTimeline, replaceTimeline, resetUndoHistory, setViewFromNodes, bumpViewReset]);
   useEffect(() => {
@@ -163,22 +189,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       if (!exists) setSelectedObject(null);
     }
   }, [selectedObject, computedGraph]);
-  const selectedNode = useMemo(() => {
-    if (!selectedObject || selectedObject.type !== "node") return null;
-    return (
-      computedGraph.nodes.find(
-        (node) => String(node.id) === String(selectedObject.id),
-      ) ?? null
-    );
-  }, [selectedObject, computedGraph.nodes]);
-  const selectedEdge = useMemo(() => {
-    if (!selectedObject || selectedObject.type !== "edge") return null;
-    return (
-      computedGraph.edges.find(
-        (edge) => String(edge.id) === String(selectedObject.id),
-      ) ?? null
-    );
-  }, [selectedObject, computedGraph.edges]);
   const nodeConnectedEdges = useMemo(() => {
     if (!selectedNode) return [];
     const nodeId = String(selectedNode.id);
@@ -203,85 +213,43 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () => computeStepDiff(previousGraph, computedGraph),
     [previousGraph, computedGraph],
   );
-  const updateBaseNode = (nodeId, patch) => {
-    setBaseGraph((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((node) =>
-        String(node.id) === String(nodeId) ? { ...node, ...patch } : node,
-      ),
-    }));
-  };
-  const updateBaseNodesBulk = (patchById) => {
-    setBaseGraph((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((node) => {
-        const patch = patchById[String(node.id)];
-        return patch ? { ...node, ...patch } : node;
-      }),
-    }));
-  };
-  const updateBaseEdge = (edgeId, patch) => {
-    setBaseGraph((prev) => ({
-      ...prev,
-      edges: prev.edges.map((edge) =>
-        String(edge.id) === String(edgeId) ? { ...edge, ...patch } : edge,
-      ),
-    }));
-  };
-  const setStepProperty = (path, value) => {
-    updateStep(currentFrame, path, value);
-  };
-  const addNodeAt = (point) => {
-    const id = nextNodeIdRef.current;
-    nextNodeIdRef.current += 1;
-    const position = clampNodePosition({
-      x: snapEnabled ? snapToGrid(point.x) : point.x,
-      y: snapEnabled ? snapToGrid(point.y) : point.y,
-    });
-    setBaseGraph((prev) => ({
-      ...prev,
-      nodes: [
-        ...prev.nodes,
-        { id, label: String(id), x: position.x, y: position.y, visible: true },
-      ],
-    }));
-    setSelectedObject({ type: "node", id });
-    setSelectedNodeIds([String(id)]);
-    setStatus(`Node ${id} added`);
-  };
-  const addNode = () => {
-    addNodeAt({ x: VIEWBOX_WIDTH / 2, y: VIEWBOX_HEIGHT / 2 });
-  };
-  const addEdge = (from, to) => {
-    const id = `e${nextEdgeIdRef.current}`;
-    nextEdgeIdRef.current += 1;
-    setBaseGraph((prev) => ({
-      ...prev,
-      edges: [
-        ...prev.edges,
-        {
-          id,
-          from,
-          to,
-          directed: false,
-          label: "",
-          color: "#64748b",
-          duration: 450,
-          visible: true,
-        },
-      ],
-    }));
-    setSelectedObject({ type: "edge", id });
-    setStatus(`Edge ${from} → ${to} added`);
-  };
   const onNodeClickForDraw = (nodeId) => {
     if (drawFrom === null || drawFrom === undefined) {
       setDrawFrom(nodeId);
-      setStatus(`Draw mode: source ${nodeId}`);
+      setStatus(`Draw mode: click target node (source is ${nodeId})`);
+      return;
+    }
+    if (String(drawFrom) === String(nodeId)) {
+      setStatus("Pick a different target node");
       return;
     }
     addEdge(drawFrom, nodeId);
     setDrawFrom(null);
+    setMode("select");
+  };
+  const handleSetMode = (nextMode) => {
+    if (nextMode !== "draw") setDrawFrom(null);
+    else if (drawFrom === null || drawFrom === undefined) {
+      setStatus("Draw mode: click source node, then target node");
+    }
+    setMode(nextMode);
+  };
+  const startDrawEdge = () => {
+    if (selectedNodeIds.length === 2) {
+      const [from, to] = selectedNodeIds;
+      addEdge(from, to);
+      handleSetMode("select");
+      return;
+    }
+    if (selectedNodeIds.length === 1) {
+      const sourceId = selectedNodeIds[0];
+      setDrawFrom(sourceId);
+      setMode("draw");
+      setStatus(`Draw mode: click target node (source is ${sourceId})`);
+      return;
+    }
+    setDrawFrom(null);
+    handleSetMode("draw");
   };
   const onSelectNode = (nodeId, additive = false) => {
     const idText = String(nodeId);
@@ -381,68 +349,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       });
     });
   };
-  const deleteSelection = () => {
-    if (selectedNodeIds.length > 0) {
-      const selectedSet = new Set(selectedNodeIds.map(String));
-      const nextBaseGraph = {
-        nodes: baseGraph.nodes.filter(
-          (node) => !selectedSet.has(String(node.id)),
-        ),
-        edges: baseGraph.edges.filter(
-          (edge) =>
-            !selectedSet.has(String(edge.from)) &&
-            !selectedSet.has(String(edge.to)),
-        ),
-      };
-      const nextSteps = steps.map((step) => {
-        const nodeOverrides = { ...(step.nodeOverrides ?? {}) };
-        const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
-        selectedSet.forEach((nodeId) => {
-          delete nodeOverrides[nodeId];
-        });
-        Object.keys(edgeOverrides).forEach((edgeId) => {
-          const stillExists = nextBaseGraph.edges.some(
-            (edge) => String(edge.id) === String(edgeId),
-          );
-          if (!stillExists) delete edgeOverrides[edgeId];
-        });
-        return { ...step, nodeOverrides, edgeOverrides };
-      });
-      replaceTimeline(nextBaseGraph, nextSteps);
-      setSelectedNodeIds([]);
-      setSelectedObject(null);
-      setStatus("Selection deleted");
-      return;
-    }
-    if (selectedEdge) {
-      const nextBaseGraph = {
-        ...baseGraph,
-        edges: baseGraph.edges.filter(
-          (edge) => String(edge.id) !== String(selectedEdge.id),
-        ),
-      };
-      const nextSteps = steps.map((step) => {
-        const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
-        delete edgeOverrides[String(selectedEdge.id)];
-        return { ...step, edgeOverrides };
-      });
-      replaceTimeline(nextBaseGraph, nextSteps);
-      setSelectedObject(null);
-      setStatus(`Edge ${selectedEdge.id} deleted`);
-    }
-  };
-  const applyLayout = (type) => {
-    let nextGraph = baseGraph;
-    if (type === "circle") nextGraph = circularLayout(baseGraph);
-    if (type === "tree")
-      nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
-    if (type === "force") {
-      const iterations = Math.round(100 * globalSettings.forceStrength);
-      nextGraph = forceDirectedLayout(baseGraph, iterations);
-    }
-    setBaseGraph(nextGraph);
-    setStatus(`Applied ${type} layout`);
-  };
   const applyParserText = () => {
     try {
       const { graph, meta } = parseEdgeListText(parserText);
@@ -514,7 +420,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
               {" "}
               <LeftSidebar
                 mode={mode}
-                setMode={setMode}
+                setMode={handleSetMode}
+                drawFrom={drawFrom}
+                onDrawEdge={startDrawEdge}
                 routing={edgeRouting}
                 setRouting={setEdgeRouting}
                 snapEnabled={snapEnabled}

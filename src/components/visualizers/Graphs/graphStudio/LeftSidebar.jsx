@@ -12,6 +12,8 @@ const LeftSidebar = ({
   lockCanvas,
   setLockCanvas,
   onAddNode,
+  onDrawEdge,
+  drawFrom,
   onAutoLayout,
   onOpenParser,
   onExportText,
@@ -50,6 +52,33 @@ const LeftSidebar = ({
             </button>
           ))}{" "}
         </div>{" "}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className="py-2 bg-surface-container hover:bg-surface-container-high rounded-md text-xs font-medium text-on-surface transition-colors"
+            onClick={onAddNode}
+          >
+            Add Node
+          </button>
+          <button
+            type="button"
+            className={`py-2 rounded-md text-xs font-medium transition-colors ${
+              mode === "draw"
+                ? "bg-primary text-on-primary"
+                : "bg-surface-container hover:bg-surface-container-high text-on-surface"
+            }`}
+            onClick={onDrawEdge}
+          >
+            Draw Edge
+          </button>
+        </div>
+        {mode === "draw" && (
+          <p className="text-[10px] text-outline leading-snug">
+            {drawFrom !== null && drawFrom !== undefined
+              ? `Source: node ${drawFrom}. Click the target node.`
+              : "Click the source node, then the target node. Select two nodes first to connect them instantly."}
+          </p>
+        )}
       </div>{" "}
       {/* View Controls */}{" "}
       <div className="space-y-3">
