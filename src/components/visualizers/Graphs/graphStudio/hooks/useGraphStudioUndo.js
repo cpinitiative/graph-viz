@@ -56,9 +56,7 @@ export const useGraphStudioUndo = ({
     }
     applyingUndoRef.current = true;
     replaceTimeline(previousSnapshot.baseGraph, previousSnapshot.steps);
-    window.setTimeout(() => {
-      setCurrentFrame(previousSnapshot.currentFrame);
-    }, 0);
+    setCurrentFrame(previousSnapshot.currentFrame);
     setStatus("Undid last action");
   }, [replaceTimeline, setCurrentFrame, setStatus]);
 
