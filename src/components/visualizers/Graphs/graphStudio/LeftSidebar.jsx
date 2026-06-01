@@ -279,6 +279,12 @@ const LeftSidebar = ({
           >
             Export MP4
           </button>
+          <button
+            className="py-2 md:py-1.5 bg-surface-container hover:bg-surface-container-high rounded text-[10px] md:text-[10px] text-on-surface transition-colors col-span-2 dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
+            onClick={onOpenScript}
+          >
+            Script Mode
+          </button>
         </div>
       </div>
       {/* Presets */}{" "}
