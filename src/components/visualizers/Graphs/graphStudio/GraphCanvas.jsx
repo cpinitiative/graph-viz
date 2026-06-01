@@ -343,7 +343,10 @@ const GraphCanvas = ({
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
   const handleNodePointerDown = (event, nodeId) => {
-    if (mode === "draw") return;
+    if (mode === "draw") {
+      event.stopPropagation();
+      return;
+    }
     event.stopPropagation();
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
