@@ -21,7 +21,7 @@ const ExportVideoModal = ({
 
   return (
     <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-[20px] flex items-center justify-center z-50 p-4 dark:bg-black/60">
-      <div className="w-full max-w-md bg-surface-container-low rounded-md shadow-ambient-lg flex flex-col dark:bg-black">
+      <div className="w-full max-w-md bg-surface-container-low rounded-md shadow-ambient-lg flex flex-col dark:bg-black mx-4">
         <div className="p-4 flex justify-between items-center">
           <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
             Export MP4 Video
@@ -39,7 +39,7 @@ const ExportVideoModal = ({
             <select
               value={labelPos}
               onChange={(event) => onLabelPosChange(event.target.value)}
-              className="w-full bg-white rounded-md text-sm text-on-surface py-2.5 px-3 focus:outline-none focus:-primary dark:bg-gray-800 dark:text-dark-on-surface"
+              className="w-full bg-white rounded-md text-sm text-on-surface py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
             >
               {LABEL_POSITIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -49,7 +49,7 @@ const ExportVideoModal = ({
             </select>
           </div>
         </div>
-        <div className="p-4 flex justify-end gap-2 bg-white/50 rounded-b-xl dark:bg-gray-900">
+        <div className="p-4 flex justify-end gap-2 bg-white/50 rounded-b-xl dark:bg-gray-900 flex-col sm:flex-row">
           <button
             type="button"
             className="py-2 px-4 bg-surface-container hover:bg-surface-container-high rounded-md text-xs font-medium text-on-surface transition-colors dark:bg-gray-800 dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"

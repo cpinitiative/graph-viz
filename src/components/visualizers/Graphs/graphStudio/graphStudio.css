@@ -1,23 +1,15 @@
 .graphstudio-resize {
-    width: 4px;
-    background: #0f172a;
-    border-left: 1px solid #1e293b;
-    border-right: 1px solid #1e293b;
-    transition: background-color 0.2s;
-}
-
-.graphstudio-resize:hover, .graphstudio-resize:active {
-    background: #3b82f6;
+  width: 4px;
+  background: #0f172a;
+  border-left: 1px solid #1e293b;
+  border-right: 1px solid #1e293b;
+  transition: background-color 0.2s;
 }
 
 .graphstudio-resize-horizontal {
-    height: 4px;
-    background: #0f172a;
-    border-top: 1px solid #1e293b;
-    border-bottom: 1px solid #1e293b;
-    transition: background-color 0.2s;
-}
-
-.graphstudio-resize-horizontal:hover, .graphstudio-resize-horizontal:active {
-    background: #3b82f6;
+  height: 4px;
+  background: #0f172a;
+  border-top: 1px solid #1e293b;
+  border-bottom: 1px solid #1e293b;
+  transition: background-color 0.2s;
 }
