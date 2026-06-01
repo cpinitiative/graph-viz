@@ -16,7 +16,15 @@ const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
         Number.isFinite(Number(node.id)) ? Number(node.id) : -1,
       ),
     ) + 1;
-  nextEdgeIdRef.current = graph?.edges?.length ?? 0;
+
+  nextEdgeIdRef.current =
+    Math.max(
+      -1,
+      ...(graph?.edges ?? []).map((edge) => {
+        const match = String(edge.id).match(/^e(\d+)$/);
+        return match ? Number(match[1]) : -1;
+      }),
+    ) + 1;
 };
 
 export const useGraphStudioGraphModel = ({
