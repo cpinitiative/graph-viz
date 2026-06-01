@@ -1,10 +1,9 @@
 /* eslint-disable react/prop-types */
-import React from "react";
 
 const ModalCloseButton = ({ onClick }) => (
   <button
     type="button"
-    className="text-outline hover:text-on-surface"
+    className="text-outline hover:text-on-surface dark:text-dark-outline dark:hover:text-dark-on-surface"
     onClick={onClick}
     aria-label="Close"
   >
