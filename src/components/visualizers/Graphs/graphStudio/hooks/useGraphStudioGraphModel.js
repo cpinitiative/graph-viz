@@ -39,8 +39,8 @@ export const useGraphStudioGraphModel = ({
   const nextEdgeIdRef = useRef(0);
 
   useEffect(() => {
-    syncIdCounters(seedBaseGraph, nextNodeIdRef, nextEdgeIdRef);
-  }, [seedBaseGraph]);
+    syncIdCounters(baseGraph, nextNodeIdRef, nextEdgeIdRef);
+  }, [baseGraph]);
 
   const updateBaseNode = useCallback(
     (nodeId, patch) => {
