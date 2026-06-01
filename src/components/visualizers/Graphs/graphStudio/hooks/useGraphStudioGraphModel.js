@@ -29,7 +29,6 @@ export const useGraphStudioGraphModel = ({
   snapEnabled,
   forceStrength,
   setStatus,
-  seedBaseGraph,
   selectedNodeIds,
   selectedEdge,
   setSelectedObject,
