@@ -7,7 +7,9 @@ function App() {
     <ThemeProvider>
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
         <NavBar />
-        <GraphStudioVisualizer snapshot={{}} />
+        <main className="min-h-0 flex-1">
+          <GraphStudioVisualizer snapshot={{}} />
+        </main>
       </div>
     </ThemeProvider>
   );
