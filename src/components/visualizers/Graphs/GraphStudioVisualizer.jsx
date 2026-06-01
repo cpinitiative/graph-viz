@@ -118,7 +118,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     snapEnabled,
     forceStrength: globalSettings.forceStrength,
     setStatus,
-    seedBaseGraph: seedTimeline.baseGraph,
     selectedNodeIds,
     selectedEdge,
     setSelectedObject,
