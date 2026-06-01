@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React from "react";
+
 const PropertyPanel = ({
   selectedNode,
   selectedEdge,
@@ -17,38 +17,38 @@ const PropertyPanel = ({
 }) => {
   if (multiSelection.length > 1) {
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm">
+      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
-          <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+          <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
             Selection
           </div>{" "}
-          <p className="text-xs text-on-surface">
+          <p className="text-xs text-on-surface dark:text-dark-on-surface">
             {multiSelection.length} items selected
           </p>{" "}
           <div className="space-y-2">
             {" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left"
+              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
               onClick={() => onApplyToSelection({ status: "visited" })}
             >
               Set visited
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left"
+              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
               onClick={() => onApplyToSelection({ status: "active" })}
             >
               Set active
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left"
+              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
               onClick={() => onApplyToSelection({ color: "#22c55e" })}
             >
               Color green
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary text-primary rounded-md text-xs transition-colors text-left mt-4"
+              className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
               onClick={onDeleteSelection}
             >
               Delete selected
@@ -61,23 +61,25 @@ const PropertyPanel = ({
   if (selectedNode) {
     const nodeColor = selectedNode.color ?? "";
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm">
+      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
-          <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+          <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
             Node Inspector
           </div>{" "}
-          <p className="text-[10px] text-outline leading-tight">
+          <p className="text-[10px] text-outline leading-tight dark:text-dark-outline">
             Label is shared across all frames. Status/color are per-frame.
           </p>{" "}
           <div className="space-y-4">
             {" "}
             <label className="block space-y-1.5">
               {" "}
-              <span className="text-xs text-on-surface">Label</span>{" "}
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
+                Label
+              </span>{" "}
               <input
-                className="w-full bg-white text-xs text-on-surface focus:outline-none focus:-primary bg-surface-container-low border-b border-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                className="w-full text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={selectedNode.label ?? ""}
                 onChange={(event) =>
                   onUpdateNode({ label: event.target.value })
@@ -86,9 +88,11 @@ const PropertyPanel = ({
             </label>{" "}
             <label className="block space-y-1.5">
               {" "}
-              <span className="text-xs text-on-surface">Status</span>{" "}
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
+                Status
+              </span>{" "}
               <select
-                className="w-full bg-white text-xs text-on-surface focus:outline-none focus:-primary bg-surface-container-low border-b border-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                className="w-full text-xs text-on-surface bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={String(selectedNode.status ?? "default")}
                 onChange={(event) =>
                   onUpdateNode({ status: event.target.value })
@@ -104,7 +108,7 @@ const PropertyPanel = ({
             </label>{" "}
             <label className="block space-y-1.5">
               {" "}
-              <span className="text-xs text-on-surface">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Highlight color
               </span>{" "}
               <div className="flex items-center gap-2">
@@ -118,7 +122,7 @@ const PropertyPanel = ({
                   className="w-8 h-8 rounded cursor-pointer -0 bg-transparent p-0"
                 />{" "}
                 <input
-                  className="flex-1 bg-white text-xs text-on-surface focus:outline-none focus:-primary bg-surface-container-low border-b border-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                  className="flex-1 text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                   value={nodeColor}
                   onChange={(event) =>
                     onUpdateNode({ color: event.target.value })
@@ -131,7 +135,7 @@ const PropertyPanel = ({
         </div>{" "}
         <div className="space-y-3">
           {" "}
-          <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+          <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
             Connected Edges
           </div>{" "}
           {connectedEdges?.length ? (
@@ -143,7 +147,7 @@ const PropertyPanel = ({
                 return (
                   <button
                     key={edge.id}
-                    className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate"
+                    className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
                     onClick={() => onSelectEdge?.(edge.id)}
                   >
                     {" "}
@@ -154,13 +158,13 @@ const PropertyPanel = ({
               })}{" "}
             </div>
           ) : (
-            <div className="text-xs text-outline italic">
+            <div className="text-xs text-outline italic dark:text-dark-outline">
               No connected edges
             </div>
           )}{" "}
         </div>{" "}
         <button
-          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary text-primary rounded-md text-xs transition-colors text-left mt-4"
+          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
           onClick={onDeleteSelection}
         >
           Delete node
@@ -171,14 +175,14 @@ const PropertyPanel = ({
   if (selectedEdge) {
     const edgeColor = selectedEdge.color ?? "#64748b";
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm">
+      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
-          <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+          <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
             Edge Inspector
           </div>{" "}
-          <p className="text-[10px] text-outline leading-tight">
+          <p className="text-[10px] text-outline leading-tight dark:text-dark-outline">
             Weight &amp; direction are shared across all frames. Color is
             per-frame.
           </p>{" "}
@@ -186,11 +190,11 @@ const PropertyPanel = ({
             {" "}
             <label className="block space-y-1.5">
               {" "}
-              <span className="text-xs text-on-surface">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Weight / Label
               </span>{" "}
               <input
-                className="w-full bg-white text-xs text-on-surface focus:outline-none focus:-primary bg-surface-container-low border-b border-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                className="w-full text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={selectedEdge.label ?? ""}
                 onChange={(event) =>
                   onUpdateEdge({ label: event.target.value })
@@ -198,9 +202,11 @@ const PropertyPanel = ({
                 placeholder="e.g. 7"
               />{" "}
             </label>{" "}
-            <label className="flex items-center justify-between p-2 bg-surface-container rounded-md cursor-pointer hover:bg-surface-container-high transition-colors">
+            <label className="flex items-center justify-between p-2 bg-surface-container rounded-md cursor-pointer hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high">
               {" "}
-              <span className="text-xs text-on-surface">Directed</span>{" "}
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
+                Directed
+              </span>{" "}
               <input
                 type="checkbox"
                 checked={Boolean(selectedEdge.directed)}
@@ -212,7 +218,7 @@ const PropertyPanel = ({
             </label>{" "}
             <label className="block space-y-1.5">
               {" "}
-              <span className="text-xs text-on-surface">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Highlight color
               </span>{" "}
               <div className="flex items-center gap-2">
@@ -226,7 +232,7 @@ const PropertyPanel = ({
                   className="w-8 h-8 rounded cursor-pointer -0 bg-transparent p-0"
                 />{" "}
                 <input
-                  className="flex-1 bg-white text-xs text-on-surface focus:outline-none focus:-primary bg-surface-container-low border-b border-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                  className="flex-1 text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                   value={edgeColor}
                   onChange={(event) =>
                     onUpdateEdge({ color: event.target.value })
@@ -239,7 +245,7 @@ const PropertyPanel = ({
         </div>{" "}
         <div className="space-y-3">
           {" "}
-          <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+          <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
             Connected Nodes
           </div>{" "}
           {connectedNodes?.length ? (
@@ -248,7 +254,7 @@ const PropertyPanel = ({
               {connectedNodes.map((node) => (
                 <button
                   key={node.id}
-                  className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate"
+                  className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
                   onClick={() => onSelectNode?.(node.id)}
                 >
                   {" "}
@@ -257,13 +263,13 @@ const PropertyPanel = ({
               ))}{" "}
             </div>
           ) : (
-            <div className="text-xs text-outline italic">
+            <div className="text-xs text-outline italic dark:text-dark-outline">
               No connected nodes
             </div>
           )}{" "}
         </div>{" "}
         <button
-          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary text-primary rounded-md text-xs transition-colors text-left mt-4"
+          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
           onClick={onDeleteSelection}
         >
           Delete edge
@@ -272,11 +278,11 @@ const PropertyPanel = ({
     );
   }
   return (
-    <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm">
+    <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
       {" "}
       <div className="space-y-3">
         {" "}
-        <div className="text-xs font-semibold text-on-surface uppercase tracking-wider font-manrope font-semibold">
+        <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
           Global Settings
         </div>{" "}
         <div className="space-y-4">
@@ -285,10 +291,10 @@ const PropertyPanel = ({
             {" "}
             <div className="flex justify-between">
               {" "}
-              <span className="text-xs text-on-surface">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Gravity (force)
               </span>{" "}
-              <span className="text-xs text-outline">
+              <span className="text-xs text-outline dark:text-dark-outline">
                 {globalSettings.forceStrength}
               </span>{" "}
             </div>{" "}
@@ -308,10 +314,10 @@ const PropertyPanel = ({
             {" "}
             <div className="flex justify-between">
               {" "}
-              <span className="text-xs text-on-surface">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Edge curvature
               </span>{" "}
-              <span className="text-xs text-outline">
+              <span className="text-xs text-outline dark:text-dark-outline">
                 {globalSettings.edgeCurvature}
               </span>{" "}
             </div>{" "}
@@ -331,8 +337,10 @@ const PropertyPanel = ({
             {" "}
             <div className="flex justify-between">
               {" "}
-              <span className="text-xs text-on-surface">Node size</span>{" "}
-              <span className="text-xs text-outline">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
+                Node size
+              </span>{" "}
+              <span className="text-xs text-outline dark:text-dark-outline">
                 {globalSettings.nodeSize ?? 22}
               </span>{" "}
             </div>{" "}
@@ -352,8 +360,10 @@ const PropertyPanel = ({
             {" "}
             <div className="flex justify-between">
               {" "}
-              <span className="text-xs text-on-surface">Edge width</span>{" "}
-              <span className="text-xs text-outline">
+              <span className="text-xs text-on-surface dark:text-dark-on-surface">
+                Edge width
+              </span>{" "}
+              <span className="text-xs text-outline dark:text-dark-outline">
                 {globalSettings.edgeWidth ?? 2.2}
               </span>{" "}
             </div>{" "}
@@ -371,9 +381,9 @@ const PropertyPanel = ({
           </label>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="p-3 bg-surface-container rounded-md">
+      <div className="p-3 bg-surface-container rounded-md dark:bg-dark-surface-container">
         {" "}
-        <div className="text-xs text-on-surface text-center">
+        <div className="text-xs text-on-surface text-center dark:text-dark-on-surface">
           Select a node or edge to view its properties.
         </div>{" "}
       </div>{" "}

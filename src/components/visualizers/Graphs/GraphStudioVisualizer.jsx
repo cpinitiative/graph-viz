@@ -21,7 +21,6 @@ import {
 import { useGraphStudioUndo } from "./graphStudio/hooks/useGraphStudioUndo";
 import { useGraphStudioView } from "./graphStudio/hooks/useGraphStudioView";
 import GraphStudioLayout from "./graphStudio/GraphStudioLayout";
-import "./graphStudio/graphStudio.css";
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
     () =>

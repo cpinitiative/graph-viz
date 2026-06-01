@@ -31,7 +31,7 @@ const GraphStudioLayout = ({
             <Panel defaultSize="18%" minSize="14%">
               <LeftSidebar {...sidebar} />
             </Panel>
-            <PanelResizeHandle className="graphstudio-resize" />
+            <PanelResizeHandle className="w-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors" />
             <Panel minSize="40%" defaultSize="60%">
               <motion.div
                 className="relative h-full"
@@ -43,13 +43,13 @@ const GraphStudioLayout = ({
                 </div>
               </motion.div>
             </Panel>
-            <PanelResizeHandle className="graphstudio-resize" />
+            <PanelResizeHandle className="w-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors" />
             <Panel defaultSize="22%" minSize="16%">
               <PropertyPanel {...property} />
             </Panel>
           </PanelGroup>
         </Panel>
-        <PanelResizeHandle className="graphstudio-resize-horizontal" />
+        <PanelResizeHandle className="h-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors" />
         <Panel defaultSize="24%" minSize="14%">
           <TimelinePanel {...timeline} />
         </Panel>

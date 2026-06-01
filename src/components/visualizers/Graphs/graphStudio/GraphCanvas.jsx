@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import GraphNode from "./GraphNode";
 import GraphEdge from "./GraphEdge";
 import {
@@ -717,7 +717,7 @@ const GraphCanvas = ({
   };
   const markerId = "graphstudio-arrow";
   return (
-    <div className="relative h-full bg-white font-inter text-on-surface">
+    <div className="relative h-full bg-white font-inter text-on-surface dark:bg-gray-900 dark:text-dark-on-surface">
       {" "}
       <svg
         id="graph-studio-canvas-svg"
@@ -765,7 +765,12 @@ const GraphCanvas = ({
             <path d="M0,0 L0,12 L10,6 z" fill="#777777" />{" "}
           </marker>{" "}
         </defs>{" "}
-        <rect width="100%" height="100%" fill="#0b1220" />{" "}
+        <rect
+          width="100%"
+          height="100%"
+          fill="white"
+          className="dark:fill-[#121212]"
+        />{" "}
         <g
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
         >
