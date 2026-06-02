@@ -44,6 +44,8 @@ const GraphStudioLayout = ({
         {/* Mobile Header with Toggle Buttons */}
         <div className="flex items-center justify-between p-3 bg-surface-container-low border-b border-outline-variant/20 dark:bg-dark-surface-container-low dark:border-dark-outline-variant/20">
           <button
+            type="button"
+            aria-label={showSidebar ? "Close tools panel" : "Open tools panel"}
             onClick={() => setShowSidebar(!showSidebar)}
             className="p-2 rounded-md bg-surface-container hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high"
           >
