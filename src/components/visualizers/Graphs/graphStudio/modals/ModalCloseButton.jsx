@@ -3,7 +3,7 @@
 const ModalCloseButton = ({ onClick }) => (
   <button
     type="button"
-    className="text-outline hover:text-on-surface dark:text-dark-outline dark:hover:text-dark-on-surface"
+    className="text-outline hover:text-on-surface dark:text-dark-outline dark:hover:text-dark-on-surface p-2 -m-2 md:p-0 md:m-0"
     onClick={onClick}
     aria-label="Close"
   >

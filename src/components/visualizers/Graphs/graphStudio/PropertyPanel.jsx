@@ -17,7 +17,7 @@ const PropertyPanel = ({
 }) => {
   if (multiSelection.length > 1) {
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
+      <div className="h-full bg-surface-container-low p-4 md:p-4 space-y-4 md:space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
@@ -30,25 +30,25 @@ const PropertyPanel = ({
           <div className="space-y-2">
             {" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
+              className="w-full py-3 md:py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
               onClick={() => onApplyToSelection({ status: "visited" })}
             >
               Set visited
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
+              className="w-full py-3 md:py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
               onClick={() => onApplyToSelection({ status: "active" })}
             >
               Set active
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
+              className="w-full py-3 md:py-2 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors text-left dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
               onClick={() => onApplyToSelection({ color: "#22c55e" })}
             >
               Color green
             </button>{" "}
             <button
-              className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
+              className="w-full py-3 md:py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[44px] md:min-h-0"
               onClick={onDeleteSelection}
             >
               Delete selected
@@ -61,7 +61,7 @@ const PropertyPanel = ({
   if (selectedNode) {
     const nodeColor = selectedNode.color ?? "";
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
+      <div className="h-full bg-surface-container-low p-4 md:p-4 space-y-4 md:space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
@@ -79,7 +79,7 @@ const PropertyPanel = ({
                 Label
               </span>{" "}
               <input
-                className="w-full text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
+                className="w-full text-xs text-on-surface focus:ring-2 focus:ring-blue-500 bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary py-3 md:py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={selectedNode.label ?? ""}
                 onChange={(event) =>
                   onUpdateNode({ label: event.target.value })
@@ -92,7 +92,7 @@ const PropertyPanel = ({
                 Status
               </span>{" "}
               <select
-                className="w-full text-xs text-on-surface bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
+                className="w-full text-xs text-on-surface bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-3 md:py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={String(selectedNode.status ?? "default")}
                 onChange={(event) =>
                   onUpdateNode({ status: event.target.value })
@@ -119,10 +119,10 @@ const PropertyPanel = ({
                   onChange={(event) =>
                     onUpdateNode({ color: event.target.value })
                   }
-                  className="w-8 h-8 rounded cursor-pointer -0 bg-transparent p-0"
+                  className="w-10 h-10 md:w-8 md:h-8 rounded cursor-pointer bg-transparent p-0"
                 />{" "}
                 <input
-                  className="flex-1 text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
+                  className="flex-1 text-xs text-on-surface focus:ring-2 focus:ring-blue-500 bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary py-3 md:py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                   value={nodeColor}
                   onChange={(event) =>
                     onUpdateNode({ color: event.target.value })
@@ -147,7 +147,7 @@ const PropertyPanel = ({
                 return (
                   <button
                     key={edge.id}
-                    className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
+                    className="w-full py-2 md:py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
                     onClick={() => onSelectEdge?.(edge.id)}
                   >
                     {" "}
@@ -164,7 +164,7 @@ const PropertyPanel = ({
           )}{" "}
         </div>{" "}
         <button
-          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
+          className="w-full py-3 md:py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[44px] md:min-h-0"
           onClick={onDeleteSelection}
         >
           Delete node
@@ -175,7 +175,7 @@ const PropertyPanel = ({
   if (selectedEdge) {
     const edgeColor = selectedEdge.color ?? "#64748b";
     return (
-      <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
+      <div className="h-full bg-surface-container-low p-4 md:p-4 space-y-4 md:space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
         {" "}
         <div className="space-y-3">
           {" "}
@@ -194,7 +194,7 @@ const PropertyPanel = ({
                 Weight / Label
               </span>{" "}
               <input
-                className="w-full text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
+                className="w-full text-xs text-on-surface focus:ring-2 focus:ring-blue-500 bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary py-3 md:py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                 value={selectedEdge.label ?? ""}
                 onChange={(event) =>
                   onUpdateEdge({ label: event.target.value })
@@ -202,7 +202,7 @@ const PropertyPanel = ({
                 placeholder="e.g. 7"
               />{" "}
             </label>{" "}
-            <label className="flex items-center justify-between p-2 bg-surface-container rounded-md cursor-pointer hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high">
+            <label className="flex items-center justify-between p-3 md:p-2 bg-surface-container rounded-md cursor-pointer hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high">
               {" "}
               <span className="text-xs text-on-surface dark:text-dark-on-surface">
                 Directed
@@ -213,7 +213,7 @@ const PropertyPanel = ({
                 onChange={(event) =>
                   onUpdateEdge({ directed: event.target.checked })
                 }
-                className="rounded bg-surface-container-high text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800"
+                className="rounded bg-surface-container-high text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800 w-5 h-5"
               />{" "}
             </label>{" "}
             <label className="block space-y-1.5">
@@ -229,10 +229,10 @@ const PropertyPanel = ({
                   onChange={(event) =>
                     onUpdateEdge({ color: event.target.value })
                   }
-                  className="w-8 h-8 rounded cursor-pointer -0 bg-transparent p-0"
+                  className="w-10 h-10 md:w-8 md:h-8 rounded cursor-pointer bg-transparent p-0"
                 />{" "}
                 <input
-                  className="flex-1 text-xs text-on-surface focus:-primary bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
+                  className="flex-1 text-xs text-on-surface focus:ring-2 focus:ring-blue-500 bg-surface-container-low border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary py-3 md:py-2 px-0 transition-colors dark:bg-gray-800 dark:text-dark-on-surface"
                   value={edgeColor}
                   onChange={(event) =>
                     onUpdateEdge({ color: event.target.value })
@@ -254,7 +254,7 @@ const PropertyPanel = ({
               {connectedNodes.map((node) => (
                 <button
                   key={node.id}
-                  className="w-full py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface"
+                  className="w-full py-2 md:py-1.5 px-2 bg-surface-container hover:bg-surface-container-high rounded text-xs text-on-surface transition-colors text-left truncate dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[44px] md:min-h-0"
                   onClick={() => onSelectNode?.(node.id)}
                 >
                   {" "}
@@ -269,7 +269,7 @@ const PropertyPanel = ({
           )}{" "}
         </div>{" "}
         <button
-          className="w-full py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary"
+          className="w-full py-3 md:py-2 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors text-left mt-4 dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[44px] md:min-h-0"
           onClick={onDeleteSelection}
         >
           Delete edge
@@ -278,7 +278,7 @@ const PropertyPanel = ({
     );
   }
   return (
-    <div className="h-full bg-surface-container-low p-4 space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
+    <div className="h-full bg-surface-container-low p-4 md:p-4 space-y-4 md:space-y-6 overflow-y-auto text-sm dark:bg-dark-surface">
       {" "}
       <div className="space-y-3">
         {" "}
@@ -307,7 +307,7 @@ const PropertyPanel = ({
               onChange={(event) =>
                 onUpdateGlobal({ forceStrength: Number(event.target.value) })
               }
-              className="w-full accent-blue-500"
+              className="w-full accent-blue-500 h-2"
             />{" "}
           </label>{" "}
           <label className="block space-y-1.5">
@@ -330,7 +330,7 @@ const PropertyPanel = ({
               onChange={(event) =>
                 onUpdateGlobal({ edgeCurvature: Number(event.target.value) })
               }
-              className="w-full accent-blue-500"
+              className="w-full accent-blue-500 h-2"
             />{" "}
           </label>{" "}
           <label className="block space-y-1.5">
@@ -353,7 +353,7 @@ const PropertyPanel = ({
               onChange={(event) =>
                 onUpdateGlobal({ nodeSize: Number(event.target.value) })
               }
-              className="w-full accent-blue-500"
+              className="w-full accent-blue-500 h-2"
             />{" "}
           </label>{" "}
           <label className="block space-y-1.5">
@@ -376,7 +376,7 @@ const PropertyPanel = ({
               onChange={(event) =>
                 onUpdateGlobal({ edgeWidth: Number(event.target.value) })
               }
-              className="w-full accent-blue-500"
+              className="w-full accent-blue-500 h-2"
             />{" "}
           </label>{" "}
         </div>{" "}
