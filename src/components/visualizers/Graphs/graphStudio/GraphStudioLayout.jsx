@@ -66,6 +66,10 @@ const GraphStudioLayout = ({
             Graph Studio
           </span>
           <button
+            type="button"
+            aria-label={
+              showPropertyPanel ? "Close properties panel" : "Open properties panel"
+            }
             onClick={() => setShowPropertyPanel(!showPropertyPanel)}
             className="p-2 rounded-md bg-surface-container hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high"
           >
