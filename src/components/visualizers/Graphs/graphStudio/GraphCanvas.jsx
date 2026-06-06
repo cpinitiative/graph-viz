@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import GraphNode from "./GraphNode";
 import GraphEdge from "./GraphEdge";
-import { NODE_RADIUS } from "./constants";
+import { NODE_RADIUS, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "./constants";
 import { edgeBetweenSelected } from "./graphStudioUtils";
 import {
   computeMinZoom,

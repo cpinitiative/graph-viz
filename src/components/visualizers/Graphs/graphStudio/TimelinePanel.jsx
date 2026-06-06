@@ -14,7 +14,7 @@ const TimelinePanel = ({
   return (
     <div className="h-full flex flex-col bg-surface-container-low text-sm dark:bg-dark-surface-container-low">
       {" "}
-      <div className="px-3 md:px-4 py-2 md:py-3 flex items-center justify-between bg-surface-container-low dark:bg-dark-surface-container-low flex-wrap gap-2">
+      <div className="px-3 py-2 flex items-center justify-between bg-surface-container-low dark:bg-dark-surface-container-low flex-wrap gap-2">
         {" "}
         <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
           Timeline
@@ -22,26 +22,26 @@ const TimelinePanel = ({
         <div className="flex items-center gap-2 flex-wrap">
           {" "}
           <button
-            className="py-2 md:py-1.5 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[36px] md:min-h-0"
+            className="py-1.5 px-2.5 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[32px] md:min-h-0"
             onClick={onAddStep}
           >
             + Keyframe
           </button>{" "}
           <button
-            className="py-2 md:py-1.5 px-3 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[36px] md:min-h-0"
+            className="py-1.5 px-2.5 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[32px] md:min-h-0"
             onClick={onDuplicateStep}
           >
             Duplicate
           </button>{" "}
           <button
-            className="py-2 md:py-1.5 px-3 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[36px] md:min-h-0"
+            className="py-1.5 px-2.5 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[32px] md:min-h-0"
             onClick={onDeleteStep}
           >
             Delete
           </button>{" "}
           <div className="w-px h-4 bg-surface-container-high mx-1 dark:bg-dark-surface-container-high"></div>{" "}
           <button
-            className="p-2 md:p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[36px] md:min-w-0"
+            className="p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[32px] md:min-w-0"
             onClick={() =>
               onMoveStep(currentFrame, Math.max(0, currentFrame - 1))
             }
@@ -62,7 +62,7 @@ const TimelinePanel = ({
             </svg>{" "}
           </button>{" "}
           <button
-            className="p-2 md:p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[36px] md:min-w-0"
+            className="p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[32px] md:min-w-0"
             onClick={() =>
               onMoveStep(
                 currentFrame,
@@ -87,18 +87,18 @@ const TimelinePanel = ({
           </button>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-3 md:p-4 bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+      <div className="flex-1 min-h-[112px] overflow-x-auto overflow-y-hidden p-2 bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
         {" "}
-        <div className="min-w-max flex items-center gap-2 md:gap-3 h-full">
+        <div className="min-w-max flex items-center gap-2 h-full">
           {" "}
           {steps.map((step, index) => (
             <div
               key={`${step.id ?? "step"}-${index}`}
-              className={`flex flex-col rounded-md transition-all min-w-[140px] md:min-w-[160px] cursor-pointer ${index === currentFrame ? "bg-surface-container dark:bg-dark-surface-container shadow-ambient border-2 border-blue-500" : "bg-surface-container-low dark:bg-dark-surface-container-low hover:bg-surface-container-high dark:hover:bg-dark-surface-container-high"}`}
+              className={`flex flex-col rounded-md transition-all min-w-[112px] md:min-w-[128px] cursor-pointer ${index === currentFrame ? "bg-surface-container dark:bg-dark-surface-container shadow-ambient border-2 border-blue-500" : "bg-surface-container-low dark:bg-dark-surface-container-low hover:bg-surface-container-high dark:hover:bg-dark-surface-container-high"}`}
               onClick={() => onFrameChange(index)}
             >
               {" "}
-              <div className="p-2 md:p-3">
+              <div className="p-2">
                 {" "}
                 <div className="flex items-center justify-between mb-1">
                   {" "}
@@ -112,7 +112,7 @@ const TimelinePanel = ({
                   </div>{" "}
                 </div>{" "}
                 <div
-                  className="text-[11px] text-on-surface truncate max-w-[110px] md:max-w-[130px] dark:text-dark-on-surface"
+                  className="text-[10px] text-on-surface truncate max-w-[92px] md:max-w-[108px] dark:text-dark-on-surface"
                   title={step.description || "No description"}
                 >
                   {" "}
@@ -122,12 +122,12 @@ const TimelinePanel = ({
                 </div>{" "}
               </div>{" "}
               <div
-                className="px-2 md:px-3 py-2 bg-black/20 rounded-b-lg dark:bg-white/10"
+                className="px-2 py-1.5 bg-black/20 rounded-b-lg dark:bg-white/10"
                 onClick={(e) => e.stopPropagation()}
               >
                 {" "}
                 <input
-                  className="w-full accent-blue-500 h-2 bg-surface-container-high appearance-none cursor-pointer border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-2 px-0 transition-colors"
+                  className="w-full accent-blue-500 h-1.5 bg-surface-container-high appearance-none cursor-pointer border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-1 px-0 transition-colors"
                   type="range"
                   min="80"
                   max="2400"
@@ -142,7 +142,7 @@ const TimelinePanel = ({
           ))}{" "}
         </div>{" "}
       </div>{" "}
-      <div className="p-4 bg-surface-container-low dark:bg-dark-surface-container-low">
+      <div className="p-3 bg-surface-container-low dark:bg-dark-surface-container-low">
         {" "}
         <div className="flex items-center gap-3">
           {" "}
@@ -154,7 +154,7 @@ const TimelinePanel = ({
             onChange={(event) =>
               onDescriptionChange(currentFrame, event.target.value)
             }
-            className="flex-1 bg-white rounded-md text-xs text-on-surface py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
+            className="flex-1 bg-white rounded-md text-xs text-on-surface py-1.5 px-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
             placeholder="Enter a description for this frame..."
           />{" "}
         </div>{" "}
