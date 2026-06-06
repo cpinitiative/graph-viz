@@ -87,7 +87,7 @@ const TimelinePanel = ({
           </button>{" "}
         </div>{" "}
       </div>{" "}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+      <div className="flex-1 min-h-[112px] overflow-x-auto overflow-y-hidden p-2 bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
         {" "}
         <div className="min-w-max flex items-center gap-2 h-full">
           {" "}
