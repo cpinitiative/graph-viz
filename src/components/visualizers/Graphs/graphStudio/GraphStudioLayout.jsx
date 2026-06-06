@@ -131,7 +131,7 @@ const GraphStudioLayout = ({
         </div>
 
         {/* Mobile Timeline */}
-        <div className="h-48 min-h-[192px] border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
+        <div className="h-40 min-h-[160px] border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
           <TimelinePanel {...timeline} />
         </div>
 
@@ -189,7 +189,7 @@ const GraphStudioLayout = ({
           </PanelGroup>
         </Panel>
         <PanelResizeHandle className="h-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors graphstudio-resize-horizontal" />
-        <Panel defaultSize="24%" minSize="14%">
+        <Panel defaultSize="18%" minSize="10%">
           <TimelinePanel {...timeline} />
         </Panel>
       </PanelGroup>
