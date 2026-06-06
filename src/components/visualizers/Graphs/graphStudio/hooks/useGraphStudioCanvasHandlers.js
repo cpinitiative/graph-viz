@@ -76,9 +76,9 @@ export const useGraphStudioCanvasHandlers = ({
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
-      setMode("select");
+      setStatus(`Edge ${drawFrom} → ${nodeId} added. Draw mode: click source node`);
     },
-    [addEdge, drawFrom, setMode, setStatus],
+    [addEdge, drawFrom, setStatus],
   );
 
   const handleSetMode = useCallback(

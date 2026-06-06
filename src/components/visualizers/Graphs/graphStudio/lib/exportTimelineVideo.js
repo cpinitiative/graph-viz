@@ -1,6 +1,23 @@
 import * as Mp4Muxer from "mp4-muxer";
 
 const DEFAULT_SVG_ELEMENT_ID = "graph-studio-canvas-svg";
+const AVC_CODEC = "avc1.42E01F";
+
+const withDefaultColorSpace = (meta) => {
+  if (!meta?.decoderConfig) return meta;
+  return {
+    ...meta,
+    decoderConfig: {
+      ...meta.decoderConfig,
+      colorSpace: meta.decoderConfig.colorSpace ?? {
+        primaries: "bt709",
+        transfer: "bt709",
+        matrix: "bt709",
+        fullRange: false,
+      },
+    },
+  };
+};
 
 /**
  * Renders timeline steps to an MP4 download.
@@ -27,19 +44,27 @@ export async function exportTimelineVideo({
   canvas.width = Math.floor(rect.width / 2) * 2;
   canvas.height = Math.floor(rect.height / 2) * 2;
   const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas rendering context unavailable");
+
   const muxer = new Mp4Muxer.Muxer({
     target: new Mp4Muxer.ArrayBufferTarget(),
     video: { codec: "avc", width: canvas.width, height: canvas.height },
     fastStart: "in-memory",
   });
+  let receivedDecoderConfig = false;
   const videoEncoder = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    output: (chunk, meta) => {
+      const normalizedMeta = withDefaultColorSpace(meta);
+      if (normalizedMeta?.decoderConfig) receivedDecoderConfig = true;
+      muxer.addVideoChunk(chunk, normalizedMeta);
+    },
     error: (e) => console.error(e),
   });
   videoEncoder.configure({
-    codec: "avc1.42E01F",
+    codec: AVC_CODEC,
     width: canvas.width,
     height: canvas.height,
+    avc: { format: "avc" },
     bitrate: 5_000_000,
     framerate: 30,
   });
@@ -130,6 +155,9 @@ export async function exportTimelineVideo({
   }
 
   await videoEncoder.flush();
+  if (!receivedDecoderConfig) {
+    throw new Error("Video encoder did not provide AVC decoder configuration");
+  }
   muxer.finalize();
   const buffer = muxer.target.buffer;
   const blob = new Blob([buffer], { type: "video/mp4" });
