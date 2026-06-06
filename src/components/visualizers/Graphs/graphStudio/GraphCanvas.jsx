@@ -23,6 +23,9 @@ import {
   getRectSelection,
   EPSILON,
 } from "./graphCanvasUtils";
+
+const NODE_DRAG_THRESHOLD_PX = 4;
+
 const GraphCanvas = ({
   graph,
   diff,
@@ -313,6 +316,33 @@ const GraphCanvas = ({
       );
       return;
     }
+    if (state.type === "node-press") {
+      const dx = event.clientX - state.startClientX;
+      const dy = event.clientY - state.startClientY;
+      if (Math.hypot(dx, dy) < NODE_DRAG_THRESHOLD_PX) return;
+      const bounds = svgRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      const local = {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      };
+      const world = toWorld(local, viewState);
+      pointerStateRef.current = { ...state, type: "drag-node" };
+      onNodePointerDown({
+        pointerId: event.pointerId,
+        nodeId: state.nodeId,
+        worldX: state.startWorldX,
+        worldY: state.startWorldY,
+        snapEnabled,
+      });
+      onNodeMove({
+        pointerId: event.pointerId,
+        worldX: world.x,
+        worldY: world.y,
+        snapEnabled,
+      });
+      return;
+    }
     if (state.type === "drag-node") {
       const bounds = svgRef.current?.getBoundingClientRect();
       if (!bounds) return;
@@ -355,14 +385,15 @@ const GraphCanvas = ({
       y: event.clientY - bounds.top,
     };
     const world = toWorld(local, viewState);
-    pointerStateRef.current = { type: "drag-node", pointerId: event.pointerId };
-    onNodePointerDown({
+    pointerStateRef.current = {
+      type: "node-press",
       pointerId: event.pointerId,
       nodeId,
-      worldX: world.x,
-      worldY: world.y,
-      snapEnabled,
-    });
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startWorldX: world.x,
+      startWorldY: world.y,
+    };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const markerId = "graphstudio-arrow";
