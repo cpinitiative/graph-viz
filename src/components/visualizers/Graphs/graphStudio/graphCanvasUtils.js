@@ -3,7 +3,7 @@ import {
   NODE_RADIUS,
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
-} from "./constants";
+} from './constants';
 
 const MIN_ZOOM_FLOOR = 0.1;
 const MAX_ZOOM = 2.6;
@@ -13,7 +13,7 @@ export const computeMinZoom = (viewportW, viewportH) => {
   if (!viewportW || !viewportH) return MIN_ZOOM_FLOOR;
   return Math.max(
     MIN_ZOOM_FLOOR,
-    Math.min(viewportW / VIEWBOX_WIDTH, viewportH / VIEWBOX_HEIGHT),
+    Math.min(viewportW / VIEWBOX_WIDTH, viewportH / VIEWBOX_HEIGHT)
   );
 };
 
@@ -30,7 +30,7 @@ export const toWorld = ({ x, y }, viewState) => ({
 export const clampViewStateToPlayspace = (
   candidate,
   viewportWidth,
-  viewportHeight,
+  viewportHeight
 ) => {
   if (!viewportWidth || !viewportHeight) return candidate;
   // Enforce dynamic minimum zoom so grid always fills the viewport
@@ -90,12 +90,12 @@ export const getAvoidanceShift = (
   edge,
   nodes,
   baseShift,
-  nodeRadius = NODE_RADIUS,
+  nodeRadius = NODE_RADIUS
 ) => {
   const midX = (segment.x1 + segment.x2) / 2;
   const midY = (segment.y1 + segment.y2) / 2;
   let shift = baseShift;
-  nodes.forEach((node) => {
+  nodes.forEach(node => {
     const sameEndpoint =
       String(node.id) === String(edge.from) ||
       String(node.id) === String(edge.to);
@@ -140,7 +140,7 @@ export const cubicBezierTangent = (p0, p1, p2, p3, t) => {
 export const offsetFromTangent = (point, tangent, distance, side = 1) => {
   const length = Math.max(
     1e-6,
-    Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y),
+    Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y)
   );
   const nx = (-tangent.y / length) * side;
   const ny = (tangent.x / length) * side;
@@ -158,7 +158,7 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
   }
   const t = Math.max(
     0,
-    Math.min(1, ((pointX - x1) * dx + (pointY - y1) * dy) / lengthSq),
+    Math.min(1, ((pointX - x1) * dx + (pointY - y1) * dy) / lengthSq)
   );
   const projX = x1 + t * dx;
   const projY = y1 + t * dy;
@@ -168,7 +168,7 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
 };
 
 export const measureLabelRect = (point, labelText) => {
-  const text = String(labelText ?? "");
+  const text = String(labelText ?? '');
   const width = Math.max(22, text.length * 6.9 + 10);
   const height = 15;
   return {
@@ -184,11 +184,11 @@ export const measureLabelRect = (point, labelText) => {
 export const rectOverlapArea = (rectA, rectB) => {
   const overlapX = Math.max(
     0,
-    Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left),
+    Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left)
   );
   const overlapY = Math.max(
     0,
-    Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top),
+    Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top)
   );
   return overlapX * overlapY;
 };
@@ -213,11 +213,11 @@ export const scoreLabelCandidate = ({
   if (candidate.y > VIEWBOX_HEIGHT - margin)
     score -= (candidate.y - (VIEWBOX_HEIGHT - margin)) * 8;
   const rect = measureLabelRect(candidate, labelText);
-  placedLabelRects.forEach((placedRect) => {
+  placedLabelRects.forEach(placedRect => {
     const overlap = rectOverlapArea(rect, placedRect);
     if (overlap > 0) score -= 900 + overlap * 2.2;
   });
-  nodes.forEach((node) => {
+  nodes.forEach(node => {
     const isEndpoint =
       String(node.id) === String(edge.from) ||
       String(node.id) === String(edge.to);
@@ -236,7 +236,7 @@ export const scoreLabelCandidate = ({
       segment.x1,
       segment.y1,
       segment.x2,
-      segment.y2,
+      segment.y2
     );
     if (distance < 14) score -= (14 - distance) * 14;
     else score += Math.min(distance, 40) * 0.18;
@@ -305,7 +305,7 @@ export const buildEdgePath = ({
   }
   if (routing === EDGE_ROUTING.bezier || edgeCount > 1) {
     const seed = String(edge.id)
-      .split("")
+      .split('')
       .reduce((sum, part) => sum + part.charCodeAt(0), 0);
     const side = seed % 2 === 0 ? 1 : -1;
     const baseShift = Math.max(18, edgeCurvature) * side;
@@ -325,27 +325,27 @@ export const buildEdgePath = ({
       { x: c1x, y: c1y },
       { x: c2x, y: c2y },
       { x: segment.x2, y: segment.y2 },
-      0.5,
+      0.5
     );
     const tangent = cubicBezierTangent(
       { x: segment.x1, y: segment.y1 },
       { x: c1x, y: c1y },
       { x: c2x, y: c2y },
       { x: segment.x2, y: segment.y2 },
-      0.5,
+      0.5
     );
     const preferredSide = shift >= 0 ? 1 : -1;
     const labelPrimary = offsetFromTangent(
       midpoint,
       tangent,
       14,
-      preferredSide,
+      preferredSide
     );
     const labelSecondary = offsetFromTangent(
       midpoint,
       tangent,
       14,
-      -preferredSide,
+      -preferredSide
     );
     return {
       d: `M ${segment.x1} ${segment.y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${segment.x2} ${segment.y2}`,
@@ -353,7 +353,7 @@ export const buildEdgePath = ({
     };
   }
   const seed = String(edge.id)
-    .split("")
+    .split('')
     .reduce((sum, part) => sum + part.charCodeAt(0), 0);
   const side = seed % 2 === 0 ? 1 : -1;
   const straightMidpoint = {
@@ -383,10 +383,10 @@ export const getRectSelection = (rect, nodes) => {
   const maxY = Math.max(rect.startY, rect.endY);
   return nodes
     .filter(
-      (node) =>
-        node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY,
+      node =>
+        node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY
     )
-    .map((node) => String(node.id));
+    .map(node => String(node.id));
 };
 
 export { EPSILON };

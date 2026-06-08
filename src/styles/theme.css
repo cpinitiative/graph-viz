@@ -46,7 +46,7 @@ body {
   background-color: var(--surface);
   color: var(--on-surface);
   font-family:
-    "Inter",
+    'Inter',
     -apple-system,
     sans-serif;
   margin: 0;

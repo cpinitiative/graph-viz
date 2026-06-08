@@ -4,5 +4,4 @@
 User-agent: *
 Allow: /
 
-# Sitemap location (to be created when deployed)
-# Sitemap: https://graph-viz.usaco.guide/
+Sitemap: https://graph-viz.usaco.guide/sitemap.xml

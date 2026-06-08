@@ -1,17 +1,17 @@
-import { getSelectionBounds } from "../graphStudioUtils";
-import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "../constants";
+import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants';
+import { getSelectionBounds } from '../graphStudioUtils';
 
 export const computeMinGridZoomForViewport = (viewportWidth, viewportHeight) =>
   Math.max(
     0.1,
-    Math.min(viewportWidth / VIEWBOX_WIDTH, viewportHeight / VIEWBOX_HEIGHT),
+    Math.min(viewportWidth / VIEWBOX_WIDTH, viewportHeight / VIEWBOX_HEIGHT)
   );
 
 export const createCenteredViewState = (
   nodes = [],
   zoom = 1,
   viewportWidth = 1280,
-  viewportHeight = 760,
+  viewportHeight = 760
 ) => {
   const bounds = getSelectionBounds(nodes);
   if (!bounds) {
@@ -33,19 +33,19 @@ export const createCenteredViewState = (
 export const createInitialViewState = (
   nodes = [],
   viewportWidth = 1280,
-  viewportHeight = 760,
+  viewportHeight = 760
 ) => {
   const bounds = getSelectionBounds(nodes);
   if (!bounds) {
     const minGridZoom = computeMinGridZoomForViewport(
       viewportWidth,
-      viewportHeight,
+      viewportHeight
     );
     return createCenteredViewState(
       [],
       minGridZoom,
       viewportWidth,
-      viewportHeight,
+      viewportHeight
     );
   }
   const padding = 42;
@@ -56,7 +56,7 @@ export const createInitialViewState = (
   const fitZoom = Math.min(fitZoomX, fitZoomY, 1);
   const minGridZoom = computeMinGridZoomForViewport(
     viewportWidth,
-    viewportHeight,
+    viewportHeight
   );
   const zoom = Math.max(minGridZoom, fitZoom);
   return createCenteredViewState(nodes, zoom, viewportWidth, viewportHeight);

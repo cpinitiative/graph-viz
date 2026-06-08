@@ -1,6 +1,4 @@
-/* eslint-disable react/prop-types */
-import React from "react";
-import { motion } from "framer-motion";
+import { motion } from 'framer-motion';
 
 const GraphEdge = ({
   edge,
@@ -18,13 +16,13 @@ const GraphEdge = ({
   // Uses transparent fallback or edge color if not selected.
   const getLineStroke = () => {
     if (selected || multiSelected) {
-      return "currentColor"; // Defers to the text- color classes set below
+      return 'currentColor'; // Defers to the text- color classes set below
     }
-    return edge.color ?? "#77777766";
+    return edge.color ?? '#77777766';
   };
 
   return (
-    <g style={{ cursor: "pointer" }}>
+    <g style={{ cursor: 'pointer' }}>
       <path
         d={pathD}
         fill="none"
@@ -54,7 +52,7 @@ const GraphEdge = ({
           shouldAnimate
             ? {
                 duration: Math.max((edge.duration ?? 450) / 1000, 0.1),
-                ease: "easeInOut",
+                ease: 'easeInOut',
               }
             : { duration: 0 }
         }
@@ -62,14 +60,14 @@ const GraphEdge = ({
         // Uses Tailwind classes to handle line color transitions for selected states
         className={`transition-colors duration-200 ${
           selected || multiSelected
-            ? "text-neutral-900 dark:text-neutral-100"
-            : ""
+            ? 'text-neutral-900 dark:text-neutral-100'
+            : ''
         }`}
         style={{
           filter:
             selected || multiSelected
-              ? "drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))"
-              : "none",
+              ? 'drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))'
+              : 'none',
         }}
       />
       {edge.label && labelPosition && (
@@ -79,11 +77,11 @@ const GraphEdge = ({
             y={labelPosition.y + 4}
             textAnchor="middle"
             // Handles light mode (neutral-800) and dark mode (neutral-200)
-            className="fill-neutral-800 dark:fill-neutral-200 transition-colors duration-200 font-bold"
+            className="fill-neutral-800 font-bold transition-colors duration-200 dark:fill-neutral-200"
             style={{
-              fontSize: "10px",
+              fontSize: '10px',
               fontWeight: 700,
-              fontFamily: "sans-serif",
+              fontFamily: 'sans-serif',
             }}
           >
             {edge.label}

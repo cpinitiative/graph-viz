@@ -1,29 +1,29 @@
-import { useCallback, useEffect, useRef } from "react";
-import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from "../constants";
+import { useCallback, useEffect, useRef } from 'react';
+import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants';
 import {
   circularLayout,
   clampNodePosition,
   forceDirectedLayout,
   snapToGrid,
   treeLayout,
-} from "../graphStudioUtils";
+} from '../graphStudioUtils';
 
 const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
   nextNodeIdRef.current =
     Math.max(
       -1,
-      ...(graph?.nodes ?? []).map((node) =>
-        Number.isFinite(Number(node.id)) ? Number(node.id) : -1,
-      ),
+      ...(graph?.nodes ?? []).map(node =>
+        Number.isFinite(Number(node.id)) ? Number(node.id) : -1
+      )
     ) + 1;
 
   nextEdgeIdRef.current =
     Math.max(
       -1,
-      ...(graph?.edges ?? []).map((edge) => {
+      ...(graph?.edges ?? []).map(edge => {
         const match = String(edge.id).match(/^e(\d+)$/);
         return match ? Number(match[1]) : -1;
-      }),
+      })
     ) + 1;
 };
 
@@ -51,57 +51,57 @@ export const useGraphStudioGraphModel = ({
 
   const updateBaseNode = useCallback(
     (nodeId, patch) => {
-      setBaseGraph((prev) => ({
+      setBaseGraph(prev => ({
         ...prev,
-        nodes: prev.nodes.map((node) =>
-          String(node.id) === String(nodeId) ? { ...node, ...patch } : node,
+        nodes: prev.nodes.map(node =>
+          String(node.id) === String(nodeId) ? { ...node, ...patch } : node
         ),
       }));
     },
-    [setBaseGraph],
+    [setBaseGraph]
   );
 
   const updateBaseNodesBulk = useCallback(
-    (patchById) => {
-      setBaseGraph((prev) => ({
+    patchById => {
+      setBaseGraph(prev => ({
         ...prev,
-        nodes: prev.nodes.map((node) => {
+        nodes: prev.nodes.map(node => {
           const patch = patchById[String(node.id)];
           return patch ? { ...node, ...patch } : node;
         }),
       }));
     },
-    [setBaseGraph],
+    [setBaseGraph]
   );
 
   const updateBaseEdge = useCallback(
     (edgeId, patch) => {
-      setBaseGraph((prev) => ({
+      setBaseGraph(prev => ({
         ...prev,
-        edges: prev.edges.map((edge) =>
-          String(edge.id) === String(edgeId) ? { ...edge, ...patch } : edge,
+        edges: prev.edges.map(edge =>
+          String(edge.id) === String(edgeId) ? { ...edge, ...patch } : edge
         ),
       }));
     },
-    [setBaseGraph],
+    [setBaseGraph]
   );
 
   const setStepProperty = useCallback(
     (path, value) => {
       updateStep(currentFrame, path, value);
     },
-    [currentFrame, updateStep],
+    [currentFrame, updateStep]
   );
 
   const addNodeAt = useCallback(
-    (point) => {
+    point => {
       const id = nextNodeIdRef.current;
       nextNodeIdRef.current += 1;
       const position = clampNodePosition({
         x: snapEnabled ? snapToGrid(point.x) : point.x,
         y: snapEnabled ? snapToGrid(point.y) : point.y,
       });
-      setBaseGraph((prev) => ({
+      setBaseGraph(prev => ({
         ...prev,
         nodes: [
           ...prev.nodes,
@@ -114,11 +114,17 @@ export const useGraphStudioGraphModel = ({
           },
         ],
       }));
-      setSelectedObject({ type: "node", id });
+      setSelectedObject({ type: 'node', id });
       setSelectedNodeIds([String(id)]);
       setStatus(`Node ${id} added`);
     },
-    [setBaseGraph, setSelectedNodeIds, setSelectedObject, setStatus, snapEnabled],
+    [
+      setBaseGraph,
+      setSelectedNodeIds,
+      setSelectedObject,
+      setStatus,
+      snapEnabled,
+    ]
   );
 
   const addNode = useCallback(() => {
@@ -129,7 +135,7 @@ export const useGraphStudioGraphModel = ({
     (from, to) => {
       const id = `e${nextEdgeIdRef.current}`;
       nextEdgeIdRef.current += 1;
-      setBaseGraph((prev) => ({
+      setBaseGraph(prev => ({
         ...prev,
         edges: [
           ...prev.edges,
@@ -138,17 +144,17 @@ export const useGraphStudioGraphModel = ({
             from,
             to,
             directed: false,
-            label: "",
-            color: "#64748b",
+            label: '',
+            color: '#64748b',
             duration: 450,
             visible: true,
           },
         ],
       }));
-      setSelectedObject({ type: "edge", id });
+      setSelectedObject({ type: 'edge', id });
       setStatus(`Edge ${from} → ${to} added`);
     },
-    [setBaseGraph, setSelectedObject, setStatus],
+    [setBaseGraph, setSelectedObject, setStatus]
   );
 
   const deleteSelection = useCallback(() => {
@@ -156,23 +162,23 @@ export const useGraphStudioGraphModel = ({
       const selectedSet = new Set(selectedNodeIds.map(String));
       const nextBaseGraph = {
         nodes: baseGraph.nodes.filter(
-          (node) => !selectedSet.has(String(node.id)),
+          node => !selectedSet.has(String(node.id))
         ),
         edges: baseGraph.edges.filter(
-          (edge) =>
+          edge =>
             !selectedSet.has(String(edge.from)) &&
-            !selectedSet.has(String(edge.to)),
+            !selectedSet.has(String(edge.to))
         ),
       };
-      const nextSteps = steps.map((step) => {
+      const nextSteps = steps.map(step => {
         const nodeOverrides = { ...(step.nodeOverrides ?? {}) };
         const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
-        selectedSet.forEach((nodeId) => {
+        selectedSet.forEach(nodeId => {
           delete nodeOverrides[nodeId];
         });
-        Object.keys(edgeOverrides).forEach((edgeId) => {
+        Object.keys(edgeOverrides).forEach(edgeId => {
           const stillExists = nextBaseGraph.edges.some(
-            (edge) => String(edge.id) === String(edgeId),
+            edge => String(edge.id) === String(edgeId)
           );
           if (!stillExists) delete edgeOverrides[edgeId];
         });
@@ -181,17 +187,17 @@ export const useGraphStudioGraphModel = ({
       replaceTimeline(nextBaseGraph, nextSteps);
       setSelectedNodeIds([]);
       setSelectedObject(null);
-      setStatus("Selection deleted");
+      setStatus('Selection deleted');
       return;
     }
     if (selectedEdge) {
       const nextBaseGraph = {
         ...baseGraph,
         edges: baseGraph.edges.filter(
-          (edge) => String(edge.id) !== String(selectedEdge.id),
+          edge => String(edge.id) !== String(selectedEdge.id)
         ),
       };
-      const nextSteps = steps.map((step) => {
+      const nextSteps = steps.map(step => {
         const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
         delete edgeOverrides[String(selectedEdge.id)];
         return { ...step, edgeOverrides };
@@ -212,19 +218,19 @@ export const useGraphStudioGraphModel = ({
   ]);
 
   const applyLayout = useCallback(
-    (type) => {
+    type => {
       let nextGraph = baseGraph;
-      if (type === "circle") nextGraph = circularLayout(baseGraph);
-      if (type === "tree")
+      if (type === 'circle') nextGraph = circularLayout(baseGraph);
+      if (type === 'tree')
         nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
-      if (type === "force") {
+      if (type === 'force') {
         const iterations = Math.round(100 * forceStrength);
         nextGraph = forceDirectedLayout(baseGraph, iterations);
       }
       setBaseGraph(nextGraph);
       setStatus(`Applied ${type} layout`);
     },
-    [baseGraph, forceStrength, setBaseGraph, setStatus],
+    [baseGraph, forceStrength, setBaseGraph, setStatus]
   );
 
   return {
