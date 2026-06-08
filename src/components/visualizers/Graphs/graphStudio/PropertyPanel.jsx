@@ -32,7 +32,9 @@ const checkboxClass =
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
 const PanelShell = ({ children }) => (
-  <div className={panelClass}>{children}</div>
+  <div className={panelClass} data-testid="property-panel">
+    {children}
+  </div>
 );
 
 const Section = ({ title, children }) => (

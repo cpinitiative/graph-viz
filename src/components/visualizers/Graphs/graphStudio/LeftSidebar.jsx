@@ -179,7 +179,10 @@ const LeftSidebar = ({
       : 'Click the source node, then the target node. Select two nodes first to connect them instantly.';
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto bg-surface-container-low p-4 text-sm dark:bg-dark-surface md:gap-6 md:p-6">
+    <div
+      className="flex h-full flex-col gap-4 overflow-auto bg-surface-container-low p-4 text-sm dark:bg-dark-surface md:gap-6 md:p-6"
+      data-testid="left-sidebar"
+    >
       <div className="space-y-3">
         <SectionTitle>Tools</SectionTitle>
         <div className="flex rounded-md bg-surface-container p-1 dark:bg-dark-surface-container">
@@ -297,6 +300,7 @@ const LeftSidebar = ({
             </div>
             <select
               value={routing}
+              aria-label="Edge routing"
               onChange={event => setRouting(event.target.value)}
               className="w-full rounded-md border border-outline-variant/30 bg-white px-2 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
             >
@@ -344,6 +348,7 @@ const LeftSidebar = ({
       <div className="space-y-3">
         <SectionTitle>Presets</SectionTitle>
         <select
+          aria-label="Load graph preset"
           onChange={event => {
             if (event.target.value) onApplyPreset(event.target.value);
             event.target.value = '';
