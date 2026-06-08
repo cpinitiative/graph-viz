@@ -1,11 +1,11 @@
-import { useCallback, useState } from "react";
-import { DEFAULT_SCRIPT } from "../data/defaultScript";
-import { exportTimelineVideo } from "../lib/exportTimelineVideo";
+import { useCallback, useState } from 'react';
+import { DEFAULT_SCRIPT } from '../data/defaultScript';
 import {
   exportEdgeListText,
   parseEdgeListText,
   runScriptTrace,
-} from "../graphStudioUtils";
+} from '../graphStudioUtils';
+import { exportTimelineVideo } from '../lib/exportTimelineVideo';
 
 export const useGraphStudioImportExport = ({
   baseGraph,
@@ -15,20 +15,20 @@ export const useGraphStudioImportExport = ({
   setStatus,
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
-  const [parserText, setParserText] = useState("");
+  const [parserText, setParserText] = useState('');
   const [isScriptOpen, setIsScriptOpen] = useState(false);
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
-    useState("bottom-center");
+    useState('bottom-center');
 
   const applyParserText = useCallback(() => {
     try {
       const { graph, meta } = parseEdgeListText(parserText);
       replaceTimeline(graph, [
         {
-          id: "step-0",
-          description: "Parsed input",
+          id: 'step-0',
+          description: 'Parsed input',
           durationMs: 600,
           nodeOverrides: {},
           edgeOverrides: {},
@@ -45,26 +45,26 @@ export const useGraphStudioImportExport = ({
     const output = exportEdgeListText(baseGraph);
     try {
       await navigator.clipboard.writeText(output);
-      setStatus("Edge list copied to clipboard");
+      setStatus('Edge list copied to clipboard');
     } catch {
-      setStatus("Clipboard unavailable; open parser and paste manually");
+      setStatus('Clipboard unavailable; open parser and paste manually');
       setIsParserOpen(true);
       setParserText(output);
     }
   }, [baseGraph, setStatus]);
 
   const exportVideo = useCallback(
-    async (labelPos) => {
-      setStatus("Exporting video...");
+    async labelPos => {
+      setStatus('Exporting video...');
       try {
         await exportTimelineVideo({ steps, setCurrentFrame, labelPos });
-        setStatus("Video exported successfully");
+        setStatus('Video exported successfully');
       } catch (error) {
         console.error(error);
         setStatus(`Export failed: ${error.message}`);
       }
     },
-    [setCurrentFrame, setStatus, steps],
+    [setCurrentFrame, setStatus, steps]
   );
 
   const runScript = useCallback(() => {

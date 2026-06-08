@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { clamp } from "../graphStudioUtils";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { clamp } from '../graphStudioUtils';
 
 export const useGraphStudioPlayback = ({
   steps,
@@ -22,7 +22,7 @@ export const useGraphStudioPlayback = ({
   const playTimeline = useCallback(() => {
     stopTimeline();
     if (frameCount <= 1) {
-      setStatus("Add more keyframes to play timeline");
+      setStatus('Add more keyframes to play timeline');
       return;
     }
     setIsPlaying(true);
@@ -30,14 +30,14 @@ export const useGraphStudioPlayback = ({
     const tick = () => {
       if (cursor >= frameCount) {
         setIsPlaying(false);
-        setStatus("Playback complete");
+        setStatus('Playback complete');
         return;
       }
       setCurrentFrame(cursor);
       const stepDuration = clamp(
         Number(steps[cursor]?.durationMs ?? 600),
         80,
-        8000,
+        8000
       );
       cursor += 1;
       timelineRef.current = window.setTimeout(tick, stepDuration);

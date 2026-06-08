@@ -1,4 +1,39 @@
-/* eslint-disable react/prop-types */
+const toolbarButtonClass =
+  'min-h-[32px] rounded-md bg-surface-container px-2.5 py-1.5 text-xs text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0';
+const deleteButtonClass =
+  'min-h-[32px] rounded-md bg-surface-container-high px-2.5 py-1.5 text-xs text-primary transition-colors hover:bg-surface-container-highest dark:bg-dark-surface-container-high dark:text-dark-primary dark:hover:bg-dark-surface-container-highest md:min-h-0';
+const moveButtonClass =
+  'min-w-[32px] rounded-md bg-surface-container p-1.5 text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-w-0';
+
+const ChevronLeftIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+);
+
+const ChevronRightIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 18l6-6-6-6" />
+  </svg>
+);
 
 const TimelinePanel = ({
   steps,
@@ -12,154 +47,126 @@ const TimelinePanel = ({
   onMoveStep,
 }) => {
   return (
-    <div className="h-full flex flex-col bg-surface-container-low text-sm dark:bg-dark-surface-container-low">
-      {" "}
-      <div className="px-3 py-2 flex items-center justify-between bg-surface-container-low dark:bg-dark-surface-container-low flex-wrap gap-2">
-        {" "}
-        <div className="text-xs text-on-surface uppercase tracking-wider font-manrope font-semibold dark:text-dark-on-surface">
+    <div className="flex h-full flex-col bg-surface-container-low text-sm dark:bg-dark-surface-container-low">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-container-low px-3 py-2 dark:bg-dark-surface-container-low">
+        <div className="font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
           Timeline
-        </div>{" "}
-        <div className="flex items-center gap-2 flex-wrap">
-          {" "}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            className="py-1.5 px-2.5 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[32px] md:min-h-0"
+            type="button"
+            className={toolbarButtonClass}
             onClick={onAddStep}
           >
             + Keyframe
-          </button>{" "}
+          </button>
           <button
-            className="py-1.5 px-2.5 bg-surface-container hover:bg-surface-container-high rounded-md text-xs text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-h-[32px] md:min-h-0"
+            type="button"
+            className={toolbarButtonClass}
             onClick={onDuplicateStep}
           >
             Duplicate
-          </button>{" "}
+          </button>
           <button
-            className="py-1.5 px-2.5 bg-surface-container-high hover:bg-surface-container-highest text-primary rounded-md text-xs transition-colors dark:bg-dark-surface-container-high dark:hover:bg-dark-surface-container-highest dark:text-dark-primary min-h-[32px] md:min-h-0"
+            type="button"
+            className={deleteButtonClass}
             onClick={onDeleteStep}
           >
             Delete
-          </button>{" "}
-          <div className="w-px h-4 bg-surface-container-high mx-1 dark:bg-dark-surface-container-high"></div>{" "}
+          </button>
+          <div className="mx-1 h-4 w-px bg-surface-container-high dark:bg-dark-surface-container-high" />
           <button
-            className="p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[32px] md:min-w-0"
+            type="button"
+            className={moveButtonClass}
             onClick={() =>
               onMoveStep(currentFrame, Math.max(0, currentFrame - 1))
             }
             title="Move Left"
           >
-            {" "}
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>{" "}
-          </button>{" "}
+            <ChevronLeftIcon />
+          </button>
           <button
-            className="p-1.5 bg-surface-container hover:bg-surface-container-high rounded-md text-on-surface transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high dark:text-dark-on-surface min-w-[32px] md:min-w-0"
+            type="button"
+            className={moveButtonClass}
             onClick={() =>
               onMoveStep(
                 currentFrame,
-                Math.min(steps.length - 1, currentFrame + 1),
+                Math.min(steps.length - 1, currentFrame + 1)
               )
             }
             title="Move Right"
           >
-            {" "}
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>{" "}
-          </button>{" "}
-        </div>{" "}
-      </div>{" "}
-      <div className="flex-1 min-h-[112px] overflow-x-auto overflow-y-hidden p-2 bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
-        {" "}
-        <div className="min-w-max flex items-center gap-2 h-full">
-          {" "}
+            <ChevronRightIcon />
+          </button>
+        </div>
+      </div>
+
+      <div className="min-h-[112px] flex-1 overflow-x-auto overflow-y-hidden bg-surface p-2 font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+        <div className="flex h-full min-w-max items-center gap-2">
           {steps.map((step, index) => (
             <div
-              key={`${step.id ?? "step"}-${index}`}
-              className={`flex flex-col rounded-md transition-all min-w-[112px] md:min-w-[128px] cursor-pointer ${index === currentFrame ? "bg-surface-container dark:bg-dark-surface-container shadow-ambient border-2 border-blue-500" : "bg-surface-container-low dark:bg-dark-surface-container-low hover:bg-surface-container-high dark:hover:bg-dark-surface-container-high"}`}
+              key={`${step.id ?? 'step'}-${index}`}
+              className={`flex min-w-[112px] cursor-pointer flex-col rounded-md transition-all md:min-w-[128px] ${index === currentFrame ? 'border-2 border-blue-500 bg-surface-container shadow-ambient dark:bg-dark-surface-container' : 'bg-surface-container-low hover:bg-surface-container-high dark:bg-dark-surface-container-low dark:hover:bg-dark-surface-container-high'}`}
               onClick={() => onFrameChange(index)}
             >
-              {" "}
               <div className="p-2">
-                {" "}
-                <div className="flex items-center justify-between mb-1">
-                  {" "}
+                <div className="mb-1 flex items-center justify-between">
                   <div
-                    className={`text-xs font-bold ${index === currentFrame ? "text-blue-400" : "text-on-surface dark:text-dark-on-surface"}`}
+                    className={`text-xs font-bold ${index === currentFrame ? 'text-blue-400' : 'text-on-surface dark:text-dark-on-surface'}`}
                   >
                     Frame {index + 1}
-                  </div>{" "}
-                  <div className="text-[10px] text-outline font-mono dark:text-dark-outline">
+                  </div>
+                  <div className="font-mono text-[10px] text-outline dark:text-dark-outline">
                     {step.durationMs ?? 600}ms
-                  </div>{" "}
-                </div>{" "}
+                  </div>
+                </div>
                 <div
-                  className="text-[10px] text-on-surface truncate max-w-[92px] md:max-w-[108px] dark:text-dark-on-surface"
-                  title={step.description || "No description"}
+                  className="max-w-[92px] truncate text-[10px] text-on-surface dark:text-dark-on-surface md:max-w-[108px]"
+                  title={step.description || 'No description'}
                 >
-                  {" "}
                   {step.description || (
                     <span className="italic opacity-50">No description</span>
-                  )}{" "}
-                </div>{" "}
-              </div>{" "}
+                  )}
+                </div>
+              </div>
               <div
-                className="px-2 py-1.5 bg-black/20 rounded-b-lg dark:bg-white/10"
-                onClick={(e) => e.stopPropagation()}
+                className="rounded-b-lg bg-black/20 px-2 py-1.5 dark:bg-white/10"
+                onClick={event => event.stopPropagation()}
               >
-                {" "}
                 <input
-                  className="w-full accent-blue-500 h-1.5 bg-surface-container-high appearance-none cursor-pointer border-b border-outline-variant/20 dark:border-dark-outline-variant/20 focus:outline-none focus:border-b-primary focus:ring-0 py-1 px-0 transition-colors"
+                  className="h-1.5 w-full cursor-pointer appearance-none border-b border-outline-variant/20 bg-surface-container-high px-0 py-1 accent-blue-500 transition-colors focus:border-b-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/20"
                   type="range"
                   min="80"
                   max="2400"
                   step="20"
                   value={step.durationMs ?? 600}
-                  onChange={(event) =>
+                  onChange={event =>
                     onStepDurationChange(index, Number(event.target.value))
                   }
-                />{" "}
-              </div>{" "}
+                />
+              </div>
             </div>
-          ))}{" "}
-        </div>{" "}
-      </div>{" "}
-      <div className="p-3 bg-surface-container-low dark:bg-dark-surface-container-low">
-        {" "}
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-surface-container-low p-3 dark:bg-dark-surface-container-low">
         <div className="flex items-center gap-3">
-          {" "}
-          <div className="text-xs font-semibold text-on-surface whitespace-nowrap dark:text-dark-on-surface">
+          <div className="whitespace-nowrap text-xs font-semibold text-on-surface dark:text-dark-on-surface">
             Frame Description:
-          </div>{" "}
+          </div>
           <input
-            value={steps[currentFrame]?.description ?? ""}
-            onChange={(event) =>
+            value={steps[currentFrame]?.description ?? ''}
+            onChange={event =>
               onDescriptionChange(currentFrame, event.target.value)
             }
-            className="flex-1 bg-white rounded-md text-xs text-on-surface py-1.5 px-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
+            className="flex-1 rounded-md bg-white px-2.5 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
             placeholder="Enter a description for this frame..."
-          />{" "}
-        </div>{" "}
-      </div>{" "}
+          />
+        </div>
+      </div>
     </div>
   );
 };
+
 export default TimelinePanel;

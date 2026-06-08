@@ -1,16 +1,15 @@
-/* eslint-disable react/prop-types */
-import React from "react";
-import { motion } from "framer-motion";
-import { NODE_RADIUS, NODE_STATUS_COLORS } from "./constants";
-const getNodePalette = (node) => {
+import { motion } from 'framer-motion';
+import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
+const getNodePalette = node => {
   if (node?.color) {
-    return { fill: node.color, stroke: "#1b1b1b", text: "#1b1b1b" };
+    return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
   }
   return (
-    NODE_STATUS_COLORS[String(node?.status ?? "default").toLowerCase()] ??
+    NODE_STATUS_COLORS[String(node?.status ?? 'default').toLowerCase()] ??
     NODE_STATUS_COLORS.default
   );
 };
+
 const GraphNode = ({
   node,
   selected,
@@ -25,11 +24,10 @@ const GraphNode = ({
   const palette = getNodePalette(node);
   return (
     <g
-      style={{ cursor: mode === "draw" ? "crosshair" : "grab" }}
+      style={{ cursor: mode === 'draw' ? 'crosshair' : 'grab' }}
       onClick={onClick}
       onPointerDown={onPointerDown}
     >
-      {" "}
       <motion.circle
         cx={node.x}
         cy={node.y}
@@ -37,9 +35,9 @@ const GraphNode = ({
         fill={palette.fill}
         stroke={
           drawAnchor
-            ? "#000000"
+            ? '#000000'
             : selected || multiSelected
-              ? "#000000"
+              ? '#000000'
               : palette.stroke
         }
         strokeWidth={selected ? 4 : multiSelected ? 3 : 2}
@@ -47,33 +45,33 @@ const GraphNode = ({
         animate={{ cx: node.x, cy: node.y }}
         transition={
           shouldAnimate
-            ? { duration: 0.32, ease: "easeInOut" }
+            ? { duration: 0.32, ease: 'easeInOut' }
             : { duration: 0 }
         }
         style={{
           filter:
             selected || multiSelected
-              ? "drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))"
-              : "none",
+              ? 'drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))'
+              : 'none',
         }}
-      />{" "}
+      />
       <text
         x={node.x}
         y={node.y + 4}
         textAnchor="middle"
         fill={palette.text}
         style={{
-          fontSize: "12px",
+          fontSize: '12px',
           fontWeight: 600,
-          userSelect: "none",
-          pointerEvents: "none",
-          fontFamily: 'sans-serif'
+          userSelect: 'none',
+          pointerEvents: 'none',
+          fontFamily: 'sans-serif',
         }}
       >
-        {" "}
-        {node.label}{" "}
-      </text>{" "}
+        {node.label}
+      </text>
     </g>
   );
 };
+
 export default GraphNode;

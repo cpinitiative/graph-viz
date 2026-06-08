@@ -1,5 +1,5 @@
-import { useTheme } from "../context/ThemeContext";
-import logoSquare from "../assets/logo-square.png";
+import logoSquare from '../assets/logo-square.png';
+import { useTheme } from '../context/useTheme';
 
 const LogoSquare = () => (
   <img src={logoSquare} alt="USACO Guide Logo" className="h-8 w-8" />
@@ -7,12 +7,12 @@ const LogoSquare = () => (
 
 const NavBar = () => {
   const { theme, toggleTheme } = useTheme();
-  const isDarkMode = theme === "dark";
+  const isDarkMode = theme === 'dark';
 
   return (
     <div className="flex items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800 dark:bg-gray-900">
       <div className="flex items-center space-x-4">
-        <div className="mr-8 flex flex-nowrap items-center space-x-2 py-2 whitespace-nowrap">
+        <div className="mr-8 flex flex-nowrap items-center space-x-2 whitespace-nowrap py-2">
           <div className="h-8 w-8 shrink-0">
             <LogoSquare />
           </div>
@@ -30,7 +30,7 @@ const NavBar = () => {
 
       <button
         onClick={toggleTheme}
-        className="dark:hover:text-dark-high-emphasis -mx-1 rounded-full border-2 border-transparent p-1 text-gray-400 transition hover:text-gray-300 focus:bg-gray-100 focus:text-gray-500 focus:outline-hidden dark:text-gray-400 dark:focus:bg-gray-700"
+        className="dark:hover:text-dark-high-emphasis focus:outline-hidden -mx-1 rounded-full border-2 border-transparent p-1 text-gray-400 transition hover:text-gray-300 focus:bg-gray-100 focus:text-gray-500 dark:text-gray-400 dark:focus:bg-gray-700"
         aria-label="Toggle theme"
       >
         {isDarkMode ? (

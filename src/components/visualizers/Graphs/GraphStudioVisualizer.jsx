@@ -1,33 +1,32 @@
-"use client";
+'use client';
 
-/* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from "react";
-import { useGraphAnimation } from "./useGraphAnimation";
+import { useEffect, useMemo, useState } from 'react';
+import { EDGE_ROUTING } from './graphStudio/constants';
+import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
+import GraphStudioLayout from './graphStudio/GraphStudioLayout';
 import {
   computeStepDiff,
   normalizeTimelinePayload,
-} from "./graphStudio/graphStudioUtils";
-import { EDGE_ROUTING } from "./graphStudio/constants";
-import { GRAPH_PRESETS } from "./graphStudio/data/graphPresets";
-import { cloneJson } from "./graphStudio/lib/undoUtils";
-import { useGraphStudioCanvasHandlers } from "./graphStudio/hooks/useGraphStudioCanvasHandlers";
-import { useGraphStudioImportExport } from "./graphStudio/hooks/useGraphStudioImportExport";
-import { useGraphStudioGraphModel } from "./graphStudio/hooks/useGraphStudioGraphModel";
-import { useGraphStudioPlayback } from "./graphStudio/hooks/useGraphStudioPlayback";
+} from './graphStudio/graphStudioUtils';
+import { useGraphStudioCanvasHandlers } from './graphStudio/hooks/useGraphStudioCanvasHandlers';
+import { useGraphStudioGraphModel } from './graphStudio/hooks/useGraphStudioGraphModel';
+import { useGraphStudioImportExport } from './graphStudio/hooks/useGraphStudioImportExport';
+import { useGraphStudioPlayback } from './graphStudio/hooks/useGraphStudioPlayback';
 import {
   useGraphStudioSelection,
   useGraphStudioSelectionPatchers,
-} from "./graphStudio/hooks/useGraphStudioSelection";
-import { useGraphStudioUndo } from "./graphStudio/hooks/useGraphStudioUndo";
-import { useGraphStudioView } from "./graphStudio/hooks/useGraphStudioView";
-import GraphStudioLayout from "./graphStudio/GraphStudioLayout";
+} from './graphStudio/hooks/useGraphStudioSelection';
+import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
+import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
+import { cloneJson } from './graphStudio/lib/undoUtils';
+import { useGraphAnimation } from './useGraphAnimation';
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
     () =>
       normalizeTimelinePayload(
-        snapshot?.initialAnimation ?? snapshot?.initialGraph,
+        snapshot?.initialAnimation ?? snapshot?.initialGraph
       ),
-    [snapshot],
+    [snapshot]
   );
   const {
     baseGraph,
@@ -45,7 +44,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     moveStep,
     replaceTimeline,
   } = useGraphAnimation(seedTimeline.baseGraph, seedTimeline.steps);
-  const [mode, setMode] = useState("select");
+  const [mode, setMode] = useState('select');
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
@@ -64,7 +63,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   } = useGraphStudioView({
     initialNodes: seedTimeline.baseGraph.nodes,
   });
-  const [status, setStatus] = useState("Ready");
+  const [status, setStatus] = useState('Ready');
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
     edgeCurvature: 46,
@@ -204,9 +203,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   }, [currentFrame, getFrameGraph, computedGraph]);
   const diff = useMemo(
     () => computeStepDiff(previousGraph, computedGraph),
-    [previousGraph, computedGraph],
+    [previousGraph, computedGraph]
   );
-  const applyPreset = (presetName) => {
+  const applyPreset = presetName => {
     const preset = GRAPH_PRESETS[presetName];
     if (!preset) return;
     const nextGraph = cloneJson(preset.graph);
@@ -249,7 +248,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     },
     canvas: {
       graph: computedGraph,
-      previousGraph,
       diff,
       selectedObject,
       selectedNodeIds: selectedNodeIdSet,
@@ -284,21 +282,21 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       globalSettings,
       onUpdateNode: updateSelectedNode,
       onUpdateEdge: updateSelectedEdge,
-      onSelectEdge: (edgeId) => onSelectEdge(edgeId),
-      onSelectNode: (nodeId) => onSelectNode(nodeId, false),
+      onSelectEdge: edgeId => onSelectEdge(edgeId),
+      onSelectNode: nodeId => onSelectNode(nodeId, false),
       onApplyToSelection: applyPatchToSelectedNodes,
       onDeleteSelection: deleteSelection,
-      onUpdateGlobal: (patch) =>
-        setGlobalSettings((prev) => ({ ...prev, ...patch })),
+      onUpdateGlobal: patch =>
+        setGlobalSettings(prev => ({ ...prev, ...patch })),
     },
     timeline: {
       steps,
       currentFrame,
       onFrameChange: setCurrentFrame,
       onStepDurationChange: (index, value) =>
-        updateStep(index, "durationMs", value),
+        updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
-        updateStep(index, "description", value),
+        updateStep(index, 'description', value),
       onAddStep: () => {
         addStep(currentFrame);
         setCurrentFrame(currentFrame + 1);

@@ -1,20 +1,116 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import {
   Panel,
   Group as PanelGroup,
   Separator as PanelResizeHandle,
-} from "react-resizable-panels";
-import LeftSidebar from "./LeftSidebar";
-import GraphCanvas from "./GraphCanvas";
-import TimelinePanel from "./TimelinePanel";
-import PropertyPanel from "./PropertyPanel";
-import ParserModal from "./modals/ParserModal";
-import ScriptModal from "./modals/ScriptModal";
-import ExportVideoModal from "./modals/ExportVideoModal";
-import { DEFAULT_SCRIPT } from "./data/defaultScript";
+} from 'react-resizable-panels';
+import GraphCanvas from './GraphCanvas';
+import LeftSidebar from './LeftSidebar';
+import PropertyPanel from './PropertyPanel';
+import TimelinePanel from './TimelinePanel';
+import { DEFAULT_SCRIPT } from './data/defaultScript';
+import ExportVideoModal from './modals/ExportVideoModal';
+import ParserModal from './modals/ParserModal';
+import ScriptModal from './modals/ScriptModal';
+
+const PANEL_TOGGLE_CLASS =
+  'rounded-md bg-surface-container p-2 transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high';
+const RESIZE_HANDLE_CLASS =
+  'graphstudio-resize w-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50';
+
+const MenuIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const MobileHeaderButton = ({ label, onClick, children }) => (
+  <button
+    type="button"
+    aria-label={label}
+    onClick={onClick}
+    className={PANEL_TOGGLE_CLASS}
+  >
+    {children}
+  </button>
+);
+
+const MobileOverlay = ({ side, onClose, children }) => {
+  const sideClass = side === 'left' ? 'left-0' : 'right-0';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}>
+      <div
+        className={`absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-surface-container-low ${sideClass}`}
+        onClick={event => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const CanvasStage = ({ canvas, status }) => (
+  <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
+    <GraphCanvas {...canvas} />
+    <div className="absolute bottom-3 left-3 z-20 rounded bg-surface-container-low/90 px-2 py-1 text-[11px] text-on-surface">
+      {status}
+    </div>
+  </motion.div>
+);
+
+const ModalStack = ({ modals }) => (
+  <>
+    <ParserModal
+      open={modals.parser.open}
+      text={modals.parser.text}
+      onTextChange={modals.parser.onTextChange}
+      onClose={modals.parser.onClose}
+      onSubmit={modals.parser.onSubmit}
+    />
+    <ScriptModal
+      open={modals.script.open}
+      text={modals.script.text}
+      onTextChange={modals.script.onTextChange}
+      onClose={modals.script.onClose}
+      onSubmit={modals.script.onSubmit}
+      defaultScript={DEFAULT_SCRIPT}
+    />
+    <ExportVideoModal
+      open={modals.exportVideo.open}
+      labelPos={modals.exportVideo.labelPos}
+      onLabelPosChange={modals.exportVideo.onLabelPosChange}
+      onClose={modals.exportVideo.onClose}
+      onExport={modals.exportVideo.onExport}
+    />
+  </>
+);
 
 const GraphStudioLayout = ({
   sidebar,
@@ -34,130 +130,60 @@ const GraphStudioLayout = ({
     };
 
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   if (isMobile) {
     return (
-      <div className="h-full min-h-0 bg-surface font-inter text-on-surface flex flex-col">
+      <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface">
         {/* Mobile Header with Toggle Buttons */}
-        <div className="flex items-center justify-between p-3 bg-surface-container-low border-b border-outline-variant/20 dark:bg-dark-surface-container-low dark:border-dark-outline-variant/20">
-          <button
-            type="button"
-            aria-label={showSidebar ? "Close tools panel" : "Open tools panel"}
+        <div className="flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-low p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface-container-low">
+          <MobileHeaderButton
+            label={showSidebar ? 'Close tools panel' : 'Open tools panel'}
             onClick={() => setShowSidebar(!showSidebar)}
-            className="p-2 rounded-md bg-surface-container hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
+            <MenuIcon />
+          </MobileHeaderButton>
           <span className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
             Graph Studio
           </span>
-          <button
-            type="button"
-            aria-label={
-              showPropertyPanel ? "Close properties panel" : "Open properties panel"
+          <MobileHeaderButton
+            label={
+              showPropertyPanel
+                ? 'Close properties panel'
+                : 'Open properties panel'
             }
             onClick={() => setShowPropertyPanel(!showPropertyPanel)}
-            className="p-2 rounded-md bg-surface-container hover:bg-surface-container-high transition-colors dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high"
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
+            <SettingsIcon />
+          </MobileHeaderButton>
         </div>
 
-        {/* Mobile Sidebar Overlay */}
         {showSidebar && (
-          <div
-            className="fixed inset-0 z-50 bg-black/50"
-            onClick={() => setShowSidebar(false)}
-          >
-            <div
-              className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-surface-container-low overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LeftSidebar {...sidebar} />
-            </div>
-          </div>
+          <MobileOverlay side="left" onClose={() => setShowSidebar(false)}>
+            <LeftSidebar {...sidebar} />
+          </MobileOverlay>
         )}
 
-        {/* Mobile Property Panel Overlay */}
         {showPropertyPanel && (
-          <div
-            className="fixed inset-0 z-50 bg-black/50"
-            onClick={() => setShowPropertyPanel(false)}
+          <MobileOverlay
+            side="right"
+            onClose={() => setShowPropertyPanel(false)}
           >
-            <div
-              className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-surface-container-low overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <PropertyPanel {...property} />
-            </div>
-          </div>
+            <PropertyPanel {...property} />
+          </MobileOverlay>
         )}
 
-        {/* Main Canvas Area */}
-        <div className="flex-1 min-h-0 relative">
-          <motion.div
-            className="relative h-full"
-            layoutId="graphstudio-main-canvas"
-          >
-            <GraphCanvas {...canvas} />
-            <div className="absolute left-3 bottom-3 z-20 px-2 py-1 rounded bg-surface-container-low/90 text-[11px] text-on-surface">
-              {status}
-            </div>
-          </motion.div>
+        <div className="relative min-h-0 flex-1">
+          <CanvasStage canvas={canvas} status={status} />
         </div>
 
-        {/* Mobile Timeline */}
         <div className="h-60 min-h-[240px] border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
           <TimelinePanel {...timeline} />
         </div>
 
-        {/* Modals */}
-        <ParserModal
-          open={modals.parser.open}
-          text={modals.parser.text}
-          onTextChange={modals.parser.onTextChange}
-          onClose={modals.parser.onClose}
-          onSubmit={modals.parser.onSubmit}
-        />
-        <ScriptModal
-          open={modals.script.open}
-          text={modals.script.text}
-          onTextChange={modals.script.onTextChange}
-          onClose={modals.script.onClose}
-          onSubmit={modals.script.onSubmit}
-          defaultScript={DEFAULT_SCRIPT}
-        />
-        <ExportVideoModal
-          open={modals.exportVideo.open}
-          labelPos={modals.exportVideo.labelPos}
-          onLabelPosChange={modals.exportVideo.onLabelPosChange}
-          onClose={modals.exportVideo.onClose}
-          onExport={modals.exportVideo.onExport}
-        />
+        <ModalStack modals={modals} />
       </div>
     );
   }
@@ -170,51 +196,22 @@ const GraphStudioLayout = ({
             <Panel defaultSize="18%" minSize="14%">
               <LeftSidebar {...sidebar} />
             </Panel>
-            <PanelResizeHandle className="w-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors graphstudio-resize" />
+            <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel minSize="40%" defaultSize="60%">
-              <motion.div
-                className="relative h-full"
-                layoutId="graphstudio-main-canvas"
-              >
-                <GraphCanvas {...canvas} />
-                <div className="absolute left-3 bottom-3 z-20 px-2 py-1 rounded bg-surface-container-low/90 text-[11px] text-on-surface">
-                  {status}
-                </div>
-              </motion.div>
+              <CanvasStage canvas={canvas} status={status} />
             </Panel>
-            <PanelResizeHandle className="w-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors graphstudio-resize" />
+            <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel defaultSize="22%" minSize="16%">
               <PropertyPanel {...property} />
             </Panel>
           </PanelGroup>
         </Panel>
-        <PanelResizeHandle className="h-1 bg-outline-variant/30 hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50 transition-colors graphstudio-resize-horizontal" />
+        <PanelResizeHandle className="graphstudio-resize-horizontal h-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50" />
         <Panel defaultSize="30%" minSize="22%">
           <TimelinePanel {...timeline} />
         </Panel>
       </PanelGroup>
-      <ParserModal
-        open={modals.parser.open}
-        text={modals.parser.text}
-        onTextChange={modals.parser.onTextChange}
-        onClose={modals.parser.onClose}
-        onSubmit={modals.parser.onSubmit}
-      />
-      <ScriptModal
-        open={modals.script.open}
-        text={modals.script.text}
-        onTextChange={modals.script.onTextChange}
-        onClose={modals.script.onClose}
-        onSubmit={modals.script.onSubmit}
-        defaultScript={DEFAULT_SCRIPT}
-      />
-      <ExportVideoModal
-        open={modals.exportVideo.open}
-        labelPos={modals.exportVideo.labelPos}
-        onLabelPosChange={modals.exportVideo.onLabelPosChange}
-        onClose={modals.exportVideo.onClose}
-        onExport={modals.exportVideo.onExport}
-      />
+      <ModalStack modals={modals} />
     </div>
   );
 };

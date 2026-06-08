@@ -1,6 +1,6 @@
-import GraphStudioVisualizer from "./components/visualizers/Graphs/GraphStudioVisualizer";
-import { ThemeProvider } from "./context/ThemeContext";
-import NavBar from "./components/NavBar";
+import NavBar from './components/NavBar';
+import GraphStudioVisualizer from './components/visualizers/Graphs/GraphStudioVisualizer';
+import { ThemeProvider } from './context/ThemeProvider';
 
 function App() {
   return (

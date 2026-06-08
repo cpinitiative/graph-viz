@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import {
-  HISTORY_LIMIT,
-  snapshotTimelineState,
-} from "../lib/undoUtils";
+import { useCallback, useEffect, useRef } from 'react';
+import { HISTORY_LIMIT, snapshotTimelineState } from '../lib/undoUtils';
 
 export const useGraphStudioUndo = ({
   baseGraph,
@@ -51,28 +48,28 @@ export const useGraphStudioUndo = ({
   const undoLastAction = useCallback(() => {
     const previousSnapshot = undoHistoryRef.current.pop();
     if (!previousSnapshot) {
-      setStatus("Nothing to undo");
+      setStatus('Nothing to undo');
       return;
     }
     applyingUndoRef.current = true;
     replaceTimeline(previousSnapshot.baseGraph, previousSnapshot.steps);
     setCurrentFrame(previousSnapshot.currentFrame);
-    setStatus("Undid last action");
+    setStatus('Undid last action');
   }, [replaceTimeline, setCurrentFrame, setStatus]);
 
   useEffect(() => {
-    const onKeyDown = (event) => {
+    const onKeyDown = event => {
       const isUndo =
         (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
-        String(event.key).toLowerCase() === "z";
+        String(event.key).toLowerCase() === 'z';
       if (!isUndo) return;
       const target = event.target;
-      const tagName = String(target?.tagName ?? "").toLowerCase();
+      const tagName = String(target?.tagName ?? '').toLowerCase();
       if (
-        tagName === "input" ||
-        tagName === "textarea" ||
-        tagName === "select" ||
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
         target?.isContentEditable
       ) {
         return;
@@ -80,8 +77,8 @@ export const useGraphStudioUndo = ({
       event.preventDefault();
       undoLastAction();
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [undoLastAction]);
 
   return { undoLastAction, resetUndoHistory };

@@ -1,3 +1,83 @@
+
+
+--- FILE: ./replace_theme.py ---
+import os
+import re
+
+def replace_in_file(filepath):
+    with open(filepath, 'r') as f:
+        content = f.read()
+
+    # App.jsx wrapper bg
+    content = content.replace("bg-[#0b1220]", "bg-surface font-inter text-on-surface")
+    
+    # Outer level backgrounds: bg-[#0f172a] -> bg-surface-container-low
+    content = content.replace('bg-[#0f172a]', 'bg-surface-container-low')
+    
+    # Inner level backgrounds: bg-[#1e293b] -> bg-surface-container
+    content = content.replace('bg-[#1e293b]', 'bg-surface-container')
+    
+    # Hover states
+    content = content.replace('hover:bg-slate-800', 'hover:bg-surface-container-high')
+    content = content.replace('hover:bg-slate-700', 'hover:bg-surface-container-high')
+    content = content.replace('hover:bg-slate-600', 'hover:bg-surface-container-high')
+
+    # Deepest hover / active
+    content = content.replace('bg-blue-600', 'bg-primary text-on-primary')
+    
+    # Text colors
+    content = content.replace('text-slate-100', 'text-on-surface')
+    content = content.replace('text-slate-200', 'text-on-surface')
+    content = content.replace('text-slate-300', 'text-on-surface')
+    content = content.replace('text-slate-400', 'text-on-surface')
+    
+    # Remove text-white if we also replaced bg-blue-600, or let text-on-primary take over
+    content = content.replace('text-white', '')
+
+    # Specific borders for floating / inputs: focus:border-blue-500 -> focus:border-primary
+    content = content.replace('focus:border-blue-500', 'focus:border-primary')
+
+    # Borders: "No Line Rule"
+    content = re.sub(r'\s*border-[t|b|l|r]\s+border-\[#[a-fA-F0-9]+\]', '', content)
+    content = re.sub(r'\s*border\s+border-\[#[a-fA-F0-9]+\]', '', content)
+    content = re.sub(r'\s*border-\[#[a-fA-F0-9]+\]', '', content)
+    content = re.sub(r'\s*border\s+border-slate-[0-9]+(/[0-9]+)?', '', content)
+    content = re.sub(r'\s*border-[t|b|l|r]\s+border-slate-[0-9]+(/[0-9]+)?', '', content)
+    content = re.sub(r'\s*border-slate-[0-9]+', '', content)
+    content = re.sub(r'\s*border\s+', ' ', content)
+    
+    # Clean up multiple spaces
+    content = re.sub(r'\s{2,}', ' ', content).replace('className=" ', 'className="')
+    
+    # Remove floating shadows and replace with ambient
+    content = content.replace('shadow-2xl', 'shadow-ambient-lg')
+    content = content.replace('shadow-[0_0_0_1px_rgba(59,130,246,0.5)]', 'shadow-ambient border-primary border')
+    content = content.replace('shadow-sm', '')
+    
+    # Buttons corner radius: md (0.375rem)
+    content = content.replace('rounded-lg', 'rounded-md')
+    content = content.replace('rounded-xl', 'rounded-md')
+    
+    # Text sizes -> Headings should use manrope
+    # Right now they use text-xs font-semibold uppercase... we will keep text sizing but add manrope where there's headers
+    content = content.replace('uppercase tracking-wider', 'uppercase tracking-wider font-manrope font-semibold')
+    
+    # Red buttons or standard buttons
+    content = content.replace('bg-red-500/10', 'bg-surface-container-high')
+    content = content.replace('hover:bg-red-500/20', 'hover:bg-surface-container-highest text-primary')
+    content = content.replace('text-red-400', 'text-primary')
+
+    with open(filepath, 'w') as f:
+        f.write(content)
+
+for root, _, files in os.walk('/Users/davidzhou/graph/export/graph-editor-animator/src'):
+    for file in files:
+        if file.endswith('.jsx') or file.endswith('.js'):
+            replace_in_file(os.path.join(root, file))
+
+
+
+--- FILE: ./package-lock.json ---
 {
   "name": "graph-editor-studio",
   "version": "0.0.0",
@@ -25,9 +105,6 @@
         "eslint-plugin-react-refresh": "^0.5.0",
         "globals": "^17.3.0",
         "postcss": "^8.4.31",
-        "prettier": "^3.8.3",
-        "prettier-plugin-organize-imports": "^4.3.0",
-        "prettier-plugin-tailwindcss": "^0.6.14",
         "tailwindcss": "^3.3.5",
         "vite": "^5.4.21"
       }
@@ -4559,126 +4636,6 @@
         "node": ">= 0.8.0"
       }
     },
-    "node_modules/prettier": {
-      "version": "3.8.3",
-      "resolved": "https://registry.npmjs.org/prettier/-/prettier-3.8.3.tgz",
-      "integrity": "sha512-7igPTM53cGHMW8xWuVTydi2KO233VFiTNyF5hLJqpilHfmn8C8gPf+PS7dUT64YcXFbiMGZxS9pCSxL/Dxm/Jw==",
-      "dev": true,
-      "license": "MIT",
-      "bin": {
-        "prettier": "bin/prettier.cjs"
-      },
-      "engines": {
-        "node": ">=14"
-      },
-      "funding": {
-        "url": "https://github.com/prettier/prettier?sponsor=1"
-      }
-    },
-    "node_modules/prettier-plugin-organize-imports": {
-      "version": "4.3.0",
-      "resolved": "https://registry.npmjs.org/prettier-plugin-organize-imports/-/prettier-plugin-organize-imports-4.3.0.tgz",
-      "integrity": "sha512-FxFz0qFhyBsGdIsb697f/EkvHzi5SZOhWAjxcx2dLt+Q532bAlhswcXGYB1yzjZ69kW8UoadFBw7TyNwlq96Iw==",
-      "dev": true,
-      "license": "MIT",
-      "peerDependencies": {
-        "prettier": ">=2.0",
-        "typescript": ">=2.9",
-        "vue-tsc": "^2.1.0 || 3"
-      },
-      "peerDependenciesMeta": {
-        "vue-tsc": {
-          "optional": true
-        }
-      }
-    },
-    "node_modules/prettier-plugin-tailwindcss": {
-      "version": "0.6.14",
-      "resolved": "https://registry.npmjs.org/prettier-plugin-tailwindcss/-/prettier-plugin-tailwindcss-0.6.14.tgz",
-      "integrity": "sha512-pi2e/+ZygeIqntN+vC573BcW5Cve8zUB0SSAGxqpB4f96boZF4M3phPVoOFCeypwkpRYdi7+jQ5YJJUwrkGUAg==",
-      "dev": true,
-      "license": "MIT",
-      "engines": {
-        "node": ">=14.21.3"
-      },
-      "peerDependencies": {
-        "@ianvs/prettier-plugin-sort-imports": "*",
-        "@prettier/plugin-hermes": "*",
-        "@prettier/plugin-oxc": "*",
-        "@prettier/plugin-pug": "*",
-        "@shopify/prettier-plugin-liquid": "*",
-        "@trivago/prettier-plugin-sort-imports": "*",
-        "@zackad/prettier-plugin-twig": "*",
-        "prettier": "^3.0",
-        "prettier-plugin-astro": "*",
-        "prettier-plugin-css-order": "*",
-        "prettier-plugin-import-sort": "*",
-        "prettier-plugin-jsdoc": "*",
-        "prettier-plugin-marko": "*",
-        "prettier-plugin-multiline-arrays": "*",
-        "prettier-plugin-organize-attributes": "*",
-        "prettier-plugin-organize-imports": "*",
-        "prettier-plugin-sort-imports": "*",
-        "prettier-plugin-style-order": "*",
-        "prettier-plugin-svelte": "*"
-      },
-      "peerDependenciesMeta": {
-        "@ianvs/prettier-plugin-sort-imports": {
-          "optional": true
-        },
-        "@prettier/plugin-hermes": {
-          "optional": true
-        },
-        "@prettier/plugin-oxc": {
-          "optional": true
-        },
-        "@prettier/plugin-pug": {
-          "optional": true
-        },
-        "@shopify/prettier-plugin-liquid": {
-          "optional": true
-        },
-        "@trivago/prettier-plugin-sort-imports": {
-          "optional": true
-        },
-        "@zackad/prettier-plugin-twig": {
-          "optional": true
-        },
-        "prettier-plugin-astro": {
-          "optional": true
-        },
-        "prettier-plugin-css-order": {
-          "optional": true
-        },
-        "prettier-plugin-import-sort": {
-          "optional": true
-        },
-        "prettier-plugin-jsdoc": {
-          "optional": true
-        },
-        "prettier-plugin-marko": {
-          "optional": true
-        },
-        "prettier-plugin-multiline-arrays": {
-          "optional": true
-        },
-        "prettier-plugin-organize-attributes": {
-          "optional": true
-        },
-        "prettier-plugin-organize-imports": {
-          "optional": true
-        },
-        "prettier-plugin-sort-imports": {
-          "optional": true
-        },
-        "prettier-plugin-style-order": {
-          "optional": true
-        },
-        "prettier-plugin-svelte": {
-          "optional": true
-        }
-      }
-    },
     "node_modules/prop-types": {
       "version": "15.8.1",
       "resolved": "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz",
@@ -5591,21 +5548,6 @@
         "url": "https://github.com/sponsors/ljharb"
       }
     },
-    "node_modules/typescript": {
-      "version": "6.0.3",
-      "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
-      "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
-      "dev": true,
-      "license": "Apache-2.0",
-      "peer": true,
-      "bin": {
-        "tsc": "bin/tsc",
-        "tsserver": "bin/tsserver"
-      },
-      "engines": {
-        "node": ">=14.17"
-      }
-    },
     "node_modules/unbox-primitive": {
       "version": "1.1.0",
       "resolved": "https://registry.npmjs.org/unbox-primitive/-/unbox-primitive-1.1.0.tgz",
@@ -5896,4 +5838,127 @@
       }
     }
   }
+}
+
+
+--- FILE: ./package.json ---
+{
+  "name": "graph-editor-studio",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "framer-motion": "^10.16.4",
+    "mp4-muxer": "^5.2.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-resizable-panels": "^4.6.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^17.3.0",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "vite": "^5.4.21"
+  }
+}
+
+
+--- FILE: ./src/index.css ---
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* JetBrains Mono for code */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@import './styles/theme.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+--- FILE: ./src/styles/theme.css ---
+:root {
+  --surface: #f9f9f9;
+  --surface-container-low: #f3f3f3;
+  --surface-container: #eeeeee;
+  --surface-container-high: #e8e8e8;
+  --surface-container-highest: #e2e2e2;
+  --surface-container-lowest: #ffffff;
+  --on-surface: #1b1b1b;
+  --primary: #000000;
+  --on-primary: #e2e2e2;
+  --outline-variant: #c6c6c6;
+  --outline: #777777;
+}
+
+body {
+  background-color: var(--surface);
+  color: var(--on-surface);
+  font-family: 'Inter', -apple-system, sans-serif;
+  margin: 0;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-container-low);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+  border-radius: 0.125rem;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-variant);
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+
+--- FILE: ./src/components/visualizers/Graphs/graphStudio/graphStudio.css ---
+.graphstudio-resize {
+    width: 4px;
+    background: #0f172a;
+    border-left: 1px solid #1e293b;
+    border-right: 1px solid #1e293b;
+    transition: background-color 0.2s;
+}
+
+.graphstudio-resize:hover, .graphstudio-resize:active {
+    background: #3b82f6;
+}
+
+.graphstudio-resize-horizontal {
+    height: 4px;
+    background: #0f172a;
+    border-top: 1px solid #1e293b;
+    border-bottom: 1px solid #1e293b;
+    transition: background-color 0.2s;
+}
+
+.graphstudio-resize-horizontal:hover, .graphstudio-resize-horizontal:active {
+    background: #3b82f6;
 }

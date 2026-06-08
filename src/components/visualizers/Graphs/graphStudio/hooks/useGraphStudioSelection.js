@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { splitEdgePatch, splitNodePatch } from "../lib/graphPropertyRouting";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { splitEdgePatch, splitNodePatch } from '../lib/graphPropertyRouting';
 
 export const useGraphStudioSelection = ({ computedGraph }) => {
   const [selectedObject, setSelectedObject] = useState(null);
@@ -7,56 +7,63 @@ export const useGraphStudioSelection = ({ computedGraph }) => {
 
   const selectedNodeIdSet = useMemo(
     () => new Set(selectedNodeIds.map(String)),
-    [selectedNodeIds],
+    [selectedNodeIds]
   );
 
   const selectedNode = useMemo(() => {
-    if (!selectedObject || selectedObject.type !== "node") return null;
+    if (!selectedObject || selectedObject.type !== 'node') return null;
     return (
       computedGraph.nodes.find(
-        (node) => String(node.id) === String(selectedObject.id),
+        node => String(node.id) === String(selectedObject.id)
       ) ?? null
     );
   }, [selectedObject, computedGraph.nodes]);
 
   const selectedEdge = useMemo(() => {
-    if (!selectedObject || selectedObject.type !== "edge") return null;
+    if (!selectedObject || selectedObject.type !== 'edge') return null;
     return (
       computedGraph.edges.find(
-        (edge) => String(edge.id) === String(selectedObject.id),
+        edge => String(edge.id) === String(selectedObject.id)
       ) ?? null
     );
   }, [selectedObject, computedGraph.edges]);
 
   useEffect(() => {
     if (!selectedObject) return;
-    if (selectedObject.type === "node") {
+    if (selectedObject.type === 'node') {
       const exists = computedGraph.nodes.some(
-        (node) => String(node.id) === String(selectedObject.id),
+        node => String(node.id) === String(selectedObject.id)
       );
-      if (!exists) setSelectedObject(null);
+      if (!exists) {
+        const timeout = setTimeout(() => setSelectedObject(null), 0);
+        return () => clearTimeout(timeout);
+      }
       return;
     }
-    if (selectedObject.type === "edge") {
+    if (selectedObject.type === 'edge') {
       const exists = computedGraph.edges.some(
-        (edge) => String(edge.id) === String(selectedObject.id),
+        edge => String(edge.id) === String(selectedObject.id)
       );
-      if (!exists) setSelectedObject(null);
+      if (!exists) {
+        const timeout = setTimeout(() => setSelectedObject(null), 0);
+        return () => clearTimeout(timeout);
+      }
     }
+    return;
   }, [selectedObject, computedGraph]);
 
   const nodeConnectedEdges = useMemo(() => {
     if (!selectedNode) return [];
     const nodeId = String(selectedNode.id);
     return computedGraph.edges.filter(
-      (edge) => String(edge.from) === nodeId || String(edge.to) === nodeId,
+      edge => String(edge.from) === nodeId || String(edge.to) === nodeId
     );
   }, [selectedNode, computedGraph.edges]);
 
   const edgeConnectedNodes = useMemo(() => {
     if (!selectedEdge) return [];
     const nodeMap = new Map(
-      computedGraph.nodes.map((node) => [String(node.id), node]),
+      computedGraph.nodes.map(node => [String(node.id), node])
     );
     const fromNode = nodeMap.get(String(selectedEdge.from));
     const toNode = nodeMap.get(String(selectedEdge.to));
@@ -91,7 +98,7 @@ export const useGraphStudioSelectionPatchers = ({
   setStepProperty,
 }) => {
   const updateSelectedNode = useCallback(
-    (patch) => {
+    patch => {
       if (!selectedNode) return;
       const { basePatch, stepUpdates } = splitNodePatch(patch);
       stepUpdates.forEach(({ key, value }) => {
@@ -101,11 +108,11 @@ export const useGraphStudioSelectionPatchers = ({
         updateBaseNode(selectedNode.id, basePatch);
       }
     },
-    [selectedNode, setStepProperty, updateBaseNode],
+    [selectedNode, setStepProperty, updateBaseNode]
   );
 
   const updateSelectedEdge = useCallback(
-    (patch) => {
+    patch => {
       if (!selectedEdge) return;
       const { basePatch, stepUpdates } = splitEdgePatch(patch);
       stepUpdates.forEach(({ key, value }) => {
@@ -115,19 +122,19 @@ export const useGraphStudioSelectionPatchers = ({
         updateBaseEdge(selectedEdge.id, basePatch);
       }
     },
-    [selectedEdge, setStepProperty, updateBaseEdge],
+    [selectedEdge, setStepProperty, updateBaseEdge]
   );
 
   const applyPatchToSelectedNodes = useCallback(
-    (patch) => {
+    patch => {
       if (!selectedNodeIds.length) return;
-      selectedNodeIds.forEach((id) => {
+      selectedNodeIds.forEach(id => {
         Object.entries(patch).forEach(([key, value]) => {
           setStepProperty(`nodeOverrides.${id}.${key}`, value);
         });
       });
     },
-    [selectedNodeIds, setStepProperty],
+    [selectedNodeIds, setStepProperty]
   );
 
   return {
