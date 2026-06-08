@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { DEFAULT_SCRIPT } from '../data/defaultScript';
 import {
   exportEdgeListText,
@@ -18,6 +18,7 @@ export const useGraphStudioImportExport = ({
   const [parserText, setParserText] = useState('');
   const [isScriptOpen, setIsScriptOpen] = useState(false);
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
+  const isScriptRunningRef = useRef(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
     useState('bottom-center');
@@ -67,14 +68,22 @@ export const useGraphStudioImportExport = ({
     [setCurrentFrame, setStatus, steps]
   );
 
-  const runScript = useCallback(() => {
+  const runScript = useCallback(async () => {
+    if (isScriptRunningRef.current) return;
+    isScriptRunningRef.current = true;
+    setStatus('Running script...');
     try {
-      const traceSteps = runScriptTrace({ code: scriptText, graph: baseGraph });
+      const traceSteps = await runScriptTrace({
+        code: scriptText,
+        graph: baseGraph,
+      });
       replaceTimeline(baseGraph, traceSteps);
       setIsScriptOpen(false);
       setStatus(`Script generated ${traceSteps.length} frames`);
     } catch (error) {
       setStatus(`Script error: ${error.message}`);
+    } finally {
+      isScriptRunningRef.current = false;
     }
   }, [baseGraph, replaceTimeline, scriptText, setStatus]);
 

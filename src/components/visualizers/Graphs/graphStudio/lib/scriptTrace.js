@@ -1,5 +1,8 @@
 const SCRIPT_MAX_LENGTH = 20000;
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
+export const DEFAULT_SCRIPT_TIMEOUT_MS = 2000;
+const SCRIPT_TIMEOUT_ERROR =
+  'Script timed out. Check for infinite loops or expensive work.';
 const SCRIPT_NODE_STATUSES = new Set([
   'default',
   'active',
@@ -38,6 +41,15 @@ const validateScriptSource = code => {
     );
   }
   return source;
+};
+
+const normalizeScriptTimeout = timeoutMs => {
+  if (timeoutMs === undefined) return DEFAULT_SCRIPT_TIMEOUT_MS;
+  const value = Number(timeoutMs);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('timeoutMs must be a positive finite number');
+  }
+  return value;
 };
 
 const normalizeScriptDuration = durationMs => {
@@ -135,32 +147,71 @@ const validateScriptTraceEntry = (entry, context) => {
   throw new Error(`Unsupported trace entry type "${type || 'missing'}"`);
 };
 
-export const runScriptTrace = ({ code, graph }) => {
-  const source = validateScriptSource(code);
-  const safeGraph = deepFreeze(cloneSerializable(graph, 'api.graph'));
-  const context = {
-    nodeIds: new Set((safeGraph.nodes ?? []).map(node => String(node.id))),
-    edgeIds: new Set((safeGraph.edges ?? []).map(edge => String(edge.id))),
-  };
-  const trace = [];
-  const pushTrace = entry => {
-    if (trace.length >= SCRIPT_MAX_TRACE_ENTRIES) {
-      throw new Error(
-        `Script generated too many events; limit is ${SCRIPT_MAX_TRACE_ENTRIES}`
-      );
-    }
-    trace.push(validateScriptTraceEntry(entry, context));
-  };
-  const api = {
-    graph: safeGraph,
-    push: pushTrace,
-    active: id => pushTrace({ type: 'node', id, status: 'active' }),
-    visited: id => pushTrace({ type: 'node', id, status: 'visited' }),
-    queued: id => pushTrace({ type: 'node', id, status: 'queued' }),
-    edge: (id, color = '#f59e0b') => pushTrace({ type: 'edge', id, color }),
-  };
-  const fn = new Function('api', `'use strict';\n${source}\n`);
-  fn(api);
+const createScriptContext = graph => ({
+  nodeIds: new Set((graph.nodes ?? []).map(node => String(node.id))),
+  edgeIds: new Set((graph.edges ?? []).map(edge => String(edge.id))),
+});
+
+const validateWorkerTrace = ({ trace, context }) => {
+  if (!Array.isArray(trace)) {
+    throw new Error('Script worker returned an invalid trace');
+  }
+  if (trace.length > SCRIPT_MAX_TRACE_ENTRIES) {
+    throw new Error(
+      `Script generated too many events; limit is ${SCRIPT_MAX_TRACE_ENTRIES}`
+    );
+  }
+
+  return trace.map(entry => validateScriptTraceEntry(entry, context));
+};
+
+const runScriptTraceWorker = ({ source, graph, timeoutMs }) =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL('./scriptTraceWorker.js', import.meta.url),
+      {
+        type: 'module',
+      }
+    );
+    let settled = false;
+
+    const finish = callback => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      worker.terminate();
+      callback();
+    };
+
+    const timeoutId = setTimeout(() => {
+      finish(() => reject(new Error(SCRIPT_TIMEOUT_ERROR)));
+    }, timeoutMs);
+
+    worker.onmessage = event => {
+      finish(() => {
+        const payload = event.data;
+        if (!payload || typeof payload !== 'object') {
+          reject(new Error('Script worker returned an invalid response'));
+          return;
+        }
+        if (payload.ok) {
+          resolve(payload.trace);
+          return;
+        }
+        reject(new Error(String(payload.error || 'Script execution failed')));
+      });
+    };
+
+    worker.onerror = event => {
+      finish(() => {
+        reject(new Error(event.message || 'Script worker failed'));
+      });
+    };
+
+    worker.postMessage({ code: source, graph });
+  });
+
+const buildTimelineSteps = trace => {
   const steps = [
     {
       id: 'step-0',
@@ -205,4 +256,18 @@ export const runScriptTrace = ({ code, graph }) => {
     steps.push(next);
   });
   return steps;
+};
+
+export const runScriptTrace = async ({ code, graph, timeoutMs }) => {
+  const source = validateScriptSource(code);
+  const normalizedTimeoutMs = normalizeScriptTimeout(timeoutMs);
+  const safeGraph = deepFreeze(cloneSerializable(graph, 'api.graph'));
+  const context = createScriptContext(safeGraph);
+  const rawTrace = await runScriptTraceWorker({
+    source,
+    graph: safeGraph,
+    timeoutMs: normalizedTimeoutMs,
+  });
+  const trace = validateWorkerTrace({ trace: rawTrace, context });
+  return buildTimelineSteps(trace);
 };
