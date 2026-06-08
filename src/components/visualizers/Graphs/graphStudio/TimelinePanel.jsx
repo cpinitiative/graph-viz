@@ -47,7 +47,10 @@ const TimelinePanel = ({
   onMoveStep,
 }) => {
   return (
-    <div className="flex h-full flex-col bg-surface-container-low text-sm dark:bg-dark-surface-container-low">
+    <div
+      className="flex h-full flex-col bg-surface-container-low text-sm dark:bg-dark-surface-container-low"
+      data-testid="timeline-panel"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-container-low px-3 py-2 dark:bg-dark-surface-container-low">
         <div className="font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
           Timeline

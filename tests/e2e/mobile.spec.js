@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test';
+
+const graphCanvas = page =>
+  page
+    .getByTestId('graph-canvas-svg')
+    .or(page.locator('svg#graph-studio-canvas-svg'));
+
+test.describe('Graph Viz mobile smoke', () => {
+  test('keeps the canvas and timeline usable around mobile overlays', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    await expect(page.getByText('Graph Studio')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText('Timeline')).toBeVisible();
+
+    await page
+      .getByTestId('mobile-tools-toggle')
+      .or(page.getByRole('button', { name: 'Open tools panel' }))
+      .click();
+    await expect(page.getByText('Tools')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Node' })).toBeVisible();
+    await page.mouse.click(390, 80);
+    await expect(page.getByRole('button', { name: 'Add Node' })).toBeHidden();
+
+    await page
+      .getByTestId('mobile-properties-toggle')
+      .or(page.getByRole('button', { name: 'Open properties panel' }))
+      .click();
+    await expect(page.getByText('Global Settings')).toBeVisible();
+    await expect(page.getByText('Gravity (force)')).toBeVisible();
+    await page.mouse.click(10, 80);
+    await expect(page.getByText('Global Settings')).toBeHidden();
+
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText('Timeline')).toBeVisible();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(page.getByText('Frame 2')).toBeVisible();
+  });
+});

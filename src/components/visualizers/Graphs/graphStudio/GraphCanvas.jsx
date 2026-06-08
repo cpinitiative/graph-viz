@@ -336,6 +336,7 @@ const GraphCanvas = ({
     <div className="relative h-full bg-white font-inter text-on-surface dark:bg-gray-900 dark:text-dark-on-surface">
       <svg
         id="graph-studio-canvas-svg"
+        data-testid="graph-canvas-svg"
         xmlns="http://www.w3.org/2000/svg"
         ref={svgRef}
         className="h-full w-full"

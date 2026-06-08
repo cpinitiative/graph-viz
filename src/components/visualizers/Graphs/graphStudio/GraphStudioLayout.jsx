@@ -50,10 +50,11 @@ const SettingsIcon = () => (
   </svg>
 );
 
-const MobileHeaderButton = ({ label, onClick, children }) => (
+const MobileHeaderButton = ({ label, onClick, testId, children }) => (
   <button
     type="button"
     aria-label={label}
+    data-testid={testId}
     onClick={onClick}
     className={PANEL_TOGGLE_CLASS}
   >
@@ -141,6 +142,7 @@ const GraphStudioLayout = ({
         <div className="flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-low p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface-container-low">
           <MobileHeaderButton
             label={showSidebar ? 'Close tools panel' : 'Open tools panel'}
+            testId="mobile-tools-toggle"
             onClick={() => setShowSidebar(!showSidebar)}
           >
             <MenuIcon />
@@ -154,6 +156,7 @@ const GraphStudioLayout = ({
                 ? 'Close properties panel'
                 : 'Open properties panel'
             }
+            testId="mobile-properties-toggle"
             onClick={() => setShowPropertyPanel(!showPropertyPanel)}
           >
             <SettingsIcon />
