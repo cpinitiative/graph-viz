@@ -123,6 +123,23 @@ test.describe('Graph Viz desktop smoke', () => {
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
+    await page.locator('[data-testid="script-modal"] textarea').fill(`
+while (true) {}
+`);
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(
+      page.getByText(
+        'Script error: Script timed out. Check for infinite loops or expensive work.'
+      )
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+    await expect(graphCanvas(page)).toBeVisible();
 
     expect(errors).toEqual([]);
   });
