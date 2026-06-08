@@ -20,8 +20,25 @@ npm install
 npm run dev
 ```
 
+## Commands
+
+```bash
+npm run dev
+npm run check
+npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:ui
+npm run check:e2e
+PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e
+```
+
 ## Build
 
 ```bash
 npm run build
 ```
+
+## CI
+
+GitHub Actions runs CI checks and E2E tests on pull requests and pushes to
+`main`.
