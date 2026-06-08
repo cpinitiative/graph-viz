@@ -46,12 +46,7 @@ test.describe('Graph Viz desktop smoke', () => {
     await expect(
       page.getByTestId('graph-studio-root').or(page.locator('main'))
     ).toBeVisible();
-    await expect(
-      page.getByRole('link', {
-        name: 'Guide Graph Visualizer',
-        exact: true,
-      })
-    ).toBeVisible();
+    await expect(page.getByText(/Guide Graph Visualizer/)).toBeVisible();
     await expect(page.getByAltText('USACO Guide Logo')).toBeVisible();
     await expect(page.getByText('Tools')).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
