@@ -62,7 +62,22 @@ const MobileHeaderButton = ({ label, onClick, testId, children }) => (
   </button>
 );
 
-const MobileOverlay = ({ side, onClose, children }) => {
+const CloseIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   const sideClass = side === 'left' ? 'left-0' : 'right-0';
 
   return (
@@ -71,6 +86,14 @@ const MobileOverlay = ({ side, onClose, children }) => {
         className={`absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-surface-container-low ${sideClass}`}
         onClick={event => event.stopPropagation()}
       >
+        <button
+          type="button"
+          aria-label={closeLabel}
+          onClick={onClose}
+          className={`${PANEL_TOGGLE_CLASS} absolute right-3 top-3 z-10`}
+        >
+          <CloseIcon />
+        </button>
         {children}
       </div>
     </div>
@@ -164,7 +187,11 @@ const GraphStudioLayout = ({
         </div>
 
         {showSidebar && (
-          <MobileOverlay side="left" onClose={() => setShowSidebar(false)}>
+          <MobileOverlay
+            side="left"
+            closeLabel="Dismiss tools overlay"
+            onClose={() => setShowSidebar(false)}
+          >
             <LeftSidebar {...sidebar} />
           </MobileOverlay>
         )}
@@ -172,6 +199,7 @@ const GraphStudioLayout = ({
         {showPropertyPanel && (
           <MobileOverlay
             side="right"
+            closeLabel="Dismiss properties overlay"
             onClose={() => setShowPropertyPanel(false)}
           >
             <PropertyPanel {...property} />

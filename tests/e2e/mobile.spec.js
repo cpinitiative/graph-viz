@@ -21,7 +21,7 @@ test.describe('Graph Viz mobile smoke', () => {
       .click();
     await expect(page.getByText('Tools')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Node' })).toBeVisible();
-    await page.mouse.click(390, 80);
+    await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
     await expect(page.getByRole('button', { name: 'Add Node' })).toBeHidden();
 
     await page
@@ -30,7 +30,9 @@ test.describe('Graph Viz mobile smoke', () => {
       .click();
     await expect(page.getByText('Global Settings')).toBeVisible();
     await expect(page.getByText('Gravity (force)')).toBeVisible();
-    await page.mouse.click(10, 80);
+    await page
+      .getByRole('button', { name: 'Dismiss properties overlay' })
+      .click();
     await expect(page.getByText('Global Settings')).toBeHidden();
 
     await expect(graphCanvas(page)).toBeVisible();
