@@ -6,13 +6,35 @@ import {
   runScriptTrace,
 } from '../graphStudioUtils';
 import { exportTimelineVideo } from '../lib/exportTimelineVideo';
+import {
+  downloadProjectJson,
+  exportProjectJson,
+  parseProjectJson,
+} from '../lib/projectJson';
 
 export const useGraphStudioImportExport = ({
   baseGraph,
   steps,
+  currentFrame,
   setCurrentFrame,
   replaceTimeline,
   setStatus,
+  edgeRouting,
+  setEdgeRouting,
+  snapEnabled,
+  setSnapEnabled,
+  showGrid,
+  setShowGrid,
+  lockCanvas,
+  setLockCanvas,
+  viewState,
+  setViewState,
+  globalSettings,
+  setGlobalSettings,
+  setMode,
+  clearSelection,
+  clearDrawState,
+  resetUndoHistory,
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
@@ -53,6 +75,81 @@ export const useGraphStudioImportExport = ({
       setParserText(output);
     }
   }, [baseGraph, setStatus]);
+
+  const exportProject = useCallback(() => {
+    const payload = exportProjectJson({
+      baseGraph,
+      steps,
+      currentFrame,
+      settings: {
+        edgeRouting,
+        snapEnabled,
+        showGrid,
+        lockCanvas,
+        viewState,
+        globalSettings,
+      },
+    });
+    downloadProjectJson(payload);
+    setStatus('Project exported');
+  }, [
+    baseGraph,
+    currentFrame,
+    edgeRouting,
+    globalSettings,
+    lockCanvas,
+    setStatus,
+    showGrid,
+    snapEnabled,
+    steps,
+    viewState,
+  ]);
+
+  const importProjectFile = useCallback(
+    async file => {
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const project = parseProjectJson(text);
+        replaceTimeline(
+          project.graph,
+          project.timeline.steps,
+          project.timeline.currentFrame
+        );
+        setEdgeRouting(project.settings.edgeRouting);
+        setSnapEnabled(project.settings.snapEnabled);
+        setShowGrid(project.settings.showGrid);
+        setLockCanvas(project.settings.lockCanvas);
+        setGlobalSettings(project.settings.globalSettings);
+        if (project.settings.viewState) {
+          setViewState(project.settings.viewState);
+          // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
+          window.setTimeout(() => setViewState(project.settings.viewState), 0);
+        }
+        setMode('select');
+        clearSelection?.();
+        clearDrawState?.();
+        resetUndoHistory?.();
+        setStatus('Project imported');
+      } catch (error) {
+        setStatus(`Project import error: ${error.message}`);
+      }
+    },
+    [
+      clearDrawState,
+      clearSelection,
+      replaceTimeline,
+      resetUndoHistory,
+      setEdgeRouting,
+      setGlobalSettings,
+      setLockCanvas,
+      setMode,
+      setShowGrid,
+      setSnapEnabled,
+      setStatus,
+      setViewState,
+    ]
+  );
 
   const exportVideo = useCallback(
     async labelPos => {
@@ -116,6 +213,8 @@ export const useGraphStudioImportExport = ({
     setExportVideoLabelPos,
     exportVideo,
     exportText,
+    exportProject,
+    importProjectFile,
     openExportVideoModal,
     closeExportVideoModal,
     confirmExportVideo,

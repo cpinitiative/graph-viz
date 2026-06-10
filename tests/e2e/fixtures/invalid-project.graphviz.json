@@ -1,0 +1,13 @@
+{
+  "format": "graph-viz-project",
+  "version": 99,
+  "graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "timeline": {
+    "steps": [],
+    "currentFrame": 0
+  },
+  "settings": {}
+}

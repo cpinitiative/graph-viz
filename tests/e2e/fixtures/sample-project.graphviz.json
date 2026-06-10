@@ -1,0 +1,62 @@
+{
+  "format": "graph-viz-project",
+  "version": 1,
+  "exportedAt": "2026-06-09T00:00:00.000Z",
+  "graph": {
+    "nodes": [
+      { "id": 10, "label": "Source", "x": 420, "y": 420, "visible": true },
+      { "id": 11, "label": "Target", "x": 760, "y": 420, "visible": true }
+    ],
+    "edges": [
+      {
+        "id": "e10",
+        "from": 10,
+        "to": 11,
+        "directed": true,
+        "label": "5",
+        "color": "#64748b",
+        "duration": 450,
+        "visible": true
+      }
+    ]
+  },
+  "timeline": {
+    "steps": [
+      {
+        "id": "step-0",
+        "description": "Imported fixture frame one",
+        "durationMs": 600,
+        "nodeOverrides": {
+          "10": { "status": "active", "color": "#3b82f6" }
+        },
+        "edgeOverrides": {}
+      },
+      {
+        "id": "step-1",
+        "description": "Imported fixture frame two",
+        "durationMs": 800,
+        "nodeOverrides": {
+          "10": { "status": "visited", "color": "#22c55e" },
+          "11": { "status": "active", "color": "#3b82f6" }
+        },
+        "edgeOverrides": {
+          "e10": { "color": "#eab308" }
+        }
+      }
+    ],
+    "currentFrame": 1
+  },
+  "settings": {
+    "edgeRouting": "bezier",
+    "snapEnabled": false,
+    "showGrid": true,
+    "lockCanvas": true,
+    "viewState": { "zoom": 0.9, "x": 120, "y": 80 },
+    "globalSettings": {
+      "forceStrength": 1.2,
+      "edgeCurvature": 60,
+      "nodeSize": 24,
+      "edgeWidth": 3
+    }
+  }
+}

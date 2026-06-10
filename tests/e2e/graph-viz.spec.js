@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { fileURLToPath } from 'url';
 
 const unexpectedConsoleTypes = new Set(['error']);
 
@@ -31,6 +32,9 @@ const choosePreset = async (page, value) => {
   await presetSelect.selectOption(value);
   await expect(graphCanvas(page)).toBeVisible();
 };
+
+const fixturePath = name =>
+  fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
 test.describe('Graph Viz desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
@@ -107,7 +111,7 @@ test.describe('Graph Viz desktop smoke', () => {
     await frameDescription.fill('Smoke test frame');
     await expect(frameDescription).toHaveValue('Smoke test frame');
 
-    await page.getByRole('button', { name: 'Import' }).click();
+    await page.getByRole('button', { name: 'Import Edge List' }).click();
     await expect(page.getByText('Text-to-Graph Parser')).toBeVisible();
     await page.locator('textarea').last().fill('0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
@@ -140,6 +144,45 @@ while (true) {}
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('supports full project JSON export and import', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await expect(page.getByTestId('project-export-button')).toBeVisible();
+    await expect(page.getByTestId('project-import-button')).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('project-export-button').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.graphviz\.json$/);
+
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('sample-project.graphviz.json'));
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText(/^Frame \d+$/)).toHaveCount(2);
+    await expect(
+      page.getByPlaceholder('Enter a description for this frame...')
+    ).toHaveValue('Imported fixture frame two');
+    await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
+    await expect(page.getByLabel('Dot Grid')).toBeChecked();
+    await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
+
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('invalid-project.graphviz.json'));
+    await expect(page.getByText(/Project import error:/)).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Enter a description for this frame...')
+    ).toHaveValue('Imported fixture frame two');
 
     expect(errors).toEqual([]);
   });

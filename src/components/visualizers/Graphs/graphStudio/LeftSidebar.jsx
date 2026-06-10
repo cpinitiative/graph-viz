@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 const MODE_OPTIONS = ['select', 'pan', 'draw'];
 const LAYOUT_OPTIONS = [
   ['circle', 'Circle'],
@@ -160,6 +162,8 @@ const LeftSidebar = ({
   onAutoLayout,
   onOpenParser,
   onExportText,
+  onExportProject,
+  onImportProjectFile,
   onExportVideo,
   onOpenScript,
   selectedCount,
@@ -173,6 +177,7 @@ const LeftSidebar = ({
   onZoomIn,
   onZoomOut,
 }) => {
+  const projectImportInputRef = useRef(null);
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
       ? `Source: node ${drawFrom}. Click the target node.`
@@ -314,20 +319,54 @@ const LeftSidebar = ({
       <div className="space-y-3">
         <SectionTitle>Data</SectionTitle>
         <div className="grid grid-cols-2 gap-1 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container md:p-2">
+          <div className="col-span-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-outline dark:text-dark-outline">
+            Edge List
+          </div>
           <button
             type="button"
             className={dataButtonClass}
             onClick={onOpenParser}
           >
-            Import
+            Import Edge List
           </button>
           <button
             type="button"
             className={dataButtonClass}
             onClick={onExportText}
           >
-            Export
+            Export Edge List
           </button>
+          <div className="col-span-2 mt-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-outline dark:text-dark-outline">
+            Project
+          </div>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="project-import-button"
+            onClick={() => projectImportInputRef.current?.click()}
+          >
+            Import Project
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="project-export-button"
+            onClick={onExportProject}
+          >
+            Export Project
+          </button>
+          <input
+            ref={projectImportInputRef}
+            type="file"
+            accept=".json,.graphviz.json,application/json"
+            aria-label="Import Project JSON"
+            data-testid="project-import-input"
+            className="sr-only"
+            onChange={event => {
+              onImportProjectFile?.(event.target.files?.[0]);
+              event.target.value = '';
+            }}
+          />
           <button
             type="button"
             className={joinClasses(dataButtonClass, 'col-span-2')}
