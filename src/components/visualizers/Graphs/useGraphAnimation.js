@@ -200,12 +200,18 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
       return next;
     });
   }, []);
-  const replaceTimeline = useCallback((nextBaseGraph, nextSteps = [{}]) => {
-    setBaseGraph(nextBaseGraph);
-    const normalized = normalizeAnimationSteps(nextSteps);
-    setSteps(normalized.length ? normalized : [normalizeAnimationStep({}, 0)]);
-    setCurrentFrame(0);
-  }, []);
+  const replaceTimeline = useCallback(
+    (nextBaseGraph, nextSteps = [{}], nextFrame = 0) => {
+      setBaseGraph(nextBaseGraph);
+      const normalized = normalizeAnimationSteps(nextSteps);
+      const safeSteps = normalized.length
+        ? normalized
+        : [normalizeAnimationStep({}, 0)];
+      setSteps(safeSteps);
+      setCurrentFrame(clampFrame(Number(nextFrame), safeSteps.length));
+    },
+    []
+  );
   const setFrame = useCallback(
     nextFrame => {
       setCurrentFrame(clampFrame(nextFrame, frameCount));
