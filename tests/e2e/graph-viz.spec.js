@@ -187,6 +187,60 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('imports and renders a directed self-loop edge', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('self-loop-project.graphviz.json'));
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const selfLoopEdge = graphCanvas(page).locator(
+      'path[marker-end="url(#graphstudio-arrow)"]'
+    );
+    await expect(selfLoopEdge).toHaveCount(1);
+    await expect(selfLoopEdge.first()).toBeVisible();
+    await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#64748b');
+    await expect(selfLoopEdge.first()).toHaveAttribute(
+      'marker-end',
+      'url(#graphstudio-arrow)'
+    );
+    await expect(
+      graphCanvas(page)
+        .locator('text')
+        .filter({ hasText: /^loop$/ })
+    ).toBeVisible();
+
+    await page.getByText('Frame 2').click();
+    await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await page.locator('[data-testid="script-modal"] textarea').fill(`
+api.edge('loop', '#3b82f6');
+`);
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+    await page.getByText('Frame 2').click();
+    await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#3b82f6');
+
+    const edgeHitTarget = graphCanvas(page)
+      .locator('path[stroke="rgba(0,0,0,0)"]')
+      .first();
+    await edgeHitTarget.dispatchEvent('click');
+    await expect(page.getByText('Edge Inspector')).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('project-export-button').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.graphviz\.json$/);
+
+    expect(errors).toEqual([]);
+  });
+
   test('keeps directed arrowheads bound to effective edge stroke colors', async ({
     page,
   }) => {

@@ -1,0 +1,56 @@
+{
+  "format": "graph-viz-project",
+  "version": 1,
+  "exportedAt": "2026-06-10T00:00:00.000Z",
+  "graph": {
+    "nodes": [
+      { "id": "n0", "label": "Loop Node", "x": 650, "y": 520, "visible": true }
+    ],
+    "edges": [
+      {
+        "id": "loop",
+        "from": "n0",
+        "to": "n0",
+        "directed": true,
+        "label": "loop",
+        "color": "#64748b",
+        "duration": 450,
+        "visible": true
+      }
+    ]
+  },
+  "timeline": {
+    "steps": [
+      {
+        "id": "step-0",
+        "description": "Self-loop base",
+        "durationMs": 600,
+        "nodeOverrides": {},
+        "edgeOverrides": {}
+      },
+      {
+        "id": "step-1",
+        "description": "Self-loop highlighted",
+        "durationMs": 600,
+        "nodeOverrides": {},
+        "edgeOverrides": {
+          "loop": { "color": "#f59e0b" }
+        }
+      }
+    ],
+    "currentFrame": 0
+  },
+  "settings": {
+    "edgeRouting": "bezier",
+    "snapEnabled": true,
+    "showGrid": false,
+    "lockCanvas": true,
+    "viewState": null,
+    "globalSettings": {
+      "forceStrength": 1,
+      "edgeCurvature": 46,
+      "nodeSize": 22,
+      "edgeWidth": 2.2
+    }
+  }
+}
