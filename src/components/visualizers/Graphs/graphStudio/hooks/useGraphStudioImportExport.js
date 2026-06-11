@@ -26,6 +26,8 @@ export const useGraphStudioImportExport = ({
   setSnapEnabled,
   showGrid,
   setShowGrid,
+  showLegend,
+  setShowLegend,
   lockCanvas,
   setLockCanvas,
   viewState,
@@ -93,6 +95,7 @@ export const useGraphStudioImportExport = ({
         edgeRouting,
         snapEnabled,
         showGrid,
+        showLegend,
         lockCanvas,
         viewState,
         globalSettings,
@@ -108,6 +111,7 @@ export const useGraphStudioImportExport = ({
     lockCanvas,
     setStatus,
     showGrid,
+    showLegend,
     snapEnabled,
     steps,
     viewState,
@@ -127,6 +131,7 @@ export const useGraphStudioImportExport = ({
         setEdgeRouting(project.settings.edgeRouting);
         setSnapEnabled(project.settings.snapEnabled);
         setShowGrid(project.settings.showGrid);
+        setShowLegend(project.settings.showLegend);
         setLockCanvas(project.settings.lockCanvas);
         setGlobalSettings(project.settings.globalSettings);
         if (project.settings.viewState) {
@@ -153,6 +158,7 @@ export const useGraphStudioImportExport = ({
       setLockCanvas,
       setMode,
       setShowGrid,
+      setShowLegend,
       setSnapEnabled,
       setStatus,
       setViewState,

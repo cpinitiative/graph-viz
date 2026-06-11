@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
-import { NODE_RADIUS, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './constants';
+import {
+  NODE_RADIUS,
+  NODE_STATUS_COLORS,
+  VIEWBOX_HEIGHT,
+  VIEWBOX_WIDTH,
+} from './constants';
 import {
   clampViewStateToPlayspace,
   clampZoom,
@@ -14,6 +19,58 @@ import { edgeBetweenSelected } from './graphStudioUtils';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
+const STATE_LEGEND_ITEMS = [
+  { type: 'node', label: 'Default node', palette: NODE_STATUS_COLORS.default },
+  { type: 'node', label: 'Active node', palette: NODE_STATUS_COLORS.active },
+  { type: 'node', label: 'Visited node', palette: NODE_STATUS_COLORS.visited },
+  { type: 'node', label: 'Queued node', palette: NODE_STATUS_COLORS.queued },
+  { type: 'edge', label: 'Highlighted edge', color: '#f59e0b' },
+  { type: 'edge', label: 'Selected edge' },
+];
+
+const StateLegendSwatch = ({ item }) => {
+  if (item.type === 'edge') {
+    return (
+      <span className="flex h-4 w-5 items-center" aria-hidden="true">
+        <span
+          className="block h-0 w-full border-t-2 border-neutral-900 dark:border-neutral-100"
+          style={item.color ? { borderColor: item.color } : undefined}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="h-3.5 w-3.5 rounded-full border"
+      aria-hidden="true"
+      style={{
+        backgroundColor: item.palette.fill,
+        borderColor: item.palette.stroke,
+      }}
+    />
+  );
+};
+
+const StateLegend = () => (
+  <div
+    className="pointer-events-none absolute right-4 top-4 z-10 w-44 border border-outline-variant bg-white px-3 py-2 text-xs text-on-surface shadow-sm dark:border-dark-outline-variant dark:bg-gray-900 dark:text-dark-on-surface"
+    data-testid="graph-state-legend"
+    aria-label="State legend"
+  >
+    <div className="mb-1.5 font-semibold uppercase tracking-wide">
+      State Legend
+    </div>
+    <div className="space-y-1">
+      {STATE_LEGEND_ITEMS.map(item => (
+        <div key={item.label} className="flex items-center gap-2">
+          <StateLegendSwatch item={item} />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 const GraphCanvas = ({
   graph,
@@ -25,6 +82,7 @@ const GraphCanvas = ({
   viewState,
   setViewState,
   showGrid,
+  showLegend,
   snapEnabled,
   lockCanvas,
   edgeRouting,
@@ -466,6 +524,7 @@ const GraphCanvas = ({
           )}
         </g>
       </svg>
+      {showLegend && <StateLegend />}
     </div>
   );
 };

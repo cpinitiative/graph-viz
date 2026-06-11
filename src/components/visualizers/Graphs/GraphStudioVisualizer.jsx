@@ -48,6 +48,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
   const {
     viewState,
     setViewState,
@@ -191,6 +192,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSnapEnabled,
     showGrid,
     setShowGrid,
+    showLegend,
+    setShowLegend,
     lockCanvas,
     setLockCanvas,
     viewState,
@@ -255,6 +258,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setSnapEnabled,
       showGrid,
       setShowGrid,
+      showLegend,
+      setShowLegend,
       lockCanvas,
       setLockCanvas,
       onAddNode: addNode,
@@ -287,6 +292,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       viewState,
       setViewState,
       showGrid,
+      showLegend,
       snapEnabled,
       lockCanvas,
       edgeRouting,

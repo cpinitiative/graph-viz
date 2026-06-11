@@ -148,6 +148,37 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('toggles the built-in state legend without affecting the canvas', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const stateLegendToggle = page.getByLabel('Show State Legend');
+    const stateLegend = page.getByTestId('graph-state-legend');
+
+    await expect(stateLegendToggle).toBeVisible();
+    await expect(stateLegend).toBeHidden();
+
+    await stateLegendToggle.check();
+    await expect(stateLegend).toBeVisible();
+    await expect(stateLegend.getByText('Default node')).toBeVisible();
+    await expect(stateLegend.getByText('Active node')).toBeVisible();
+    await expect(stateLegend.getByText('Visited node')).toBeVisible();
+    await expect(stateLegend.getByText('Queued node')).toBeVisible();
+    await expect(stateLegend.getByText('Highlighted edge')).toBeVisible();
+    await expect(stateLegend.getByText('Selected edge')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await stateLegendToggle.uncheck();
+    await expect(stateLegend).toBeHidden();
+    await expect(graphCanvas(page)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
   test('supports full project JSON export and import', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
@@ -174,6 +205,8 @@ while (true) {}
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
+    await expect(page.getByLabel('Show State Legend')).toBeChecked();
+    await expect(page.getByTestId('graph-state-legend')).toBeVisible();
 
     await page
       .getByTestId('project-import-input')
@@ -198,6 +231,7 @@ while (true) {}
       .setInputFiles(fixturePath('self-loop-project.graphviz.json'));
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByLabel('Show State Legend')).not.toBeChecked();
 
     const selfLoopEdge = graphCanvas(page).locator(
       'path[marker-end="url(#graphstudio-arrow)"]'

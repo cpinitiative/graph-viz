@@ -154,6 +154,8 @@ const LeftSidebar = ({
   setSnapEnabled,
   showGrid,
   setShowGrid,
+  showLegend,
+  setShowLegend,
   lockCanvas,
   setLockCanvas,
   onAddNode,
@@ -217,6 +219,15 @@ const LeftSidebar = ({
             Draw Edge
           </ActionButton>
         </div>
+        {mode === 'draw' && (
+          <p className="text-[10px] leading-snug text-outline dark:text-dark-outline">
+            {drawHelpText}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle>Layout</SectionTitle>
         <div className="grid grid-cols-3 gap-1">
           {LAYOUT_OPTIONS.map(([type, label]) => (
             <ActionButton
@@ -228,15 +239,10 @@ const LeftSidebar = ({
             </ActionButton>
           ))}
         </div>
-        {mode === 'draw' && (
-          <p className="text-[10px] leading-snug text-outline dark:text-dark-outline">
-            {drawHelpText}
-          </p>
-        )}
       </div>
 
       <div className="space-y-3">
-        <SectionTitle>View</SectionTitle>
+        <SectionTitle>View / Canvas</SectionTitle>
         <div className="flex items-center justify-between rounded-md bg-surface-container p-2 dark:bg-dark-surface-container">
           <IconButton title="Center View" onClick={onCenterView}>
             <CenterViewIcon />
@@ -280,11 +286,21 @@ const LeftSidebar = ({
             {currentFrame + 1} / {Math.max(1, totalFrames)}
           </div>
         </div>
-      </div>
-
-      <div className="space-y-3">
-        <SectionTitle>Canvas</SectionTitle>
         <div className="space-y-2">
+          <div className="rounded-md bg-surface-container p-3 dark:bg-dark-surface-container md:p-2">
+            <div className="mb-1.5 text-xs text-on-surface dark:text-dark-on-surface">
+              Edge Routing
+            </div>
+            <select
+              value={routing}
+              aria-label="Edge routing"
+              onChange={event => setRouting(event.target.value)}
+              className="w-full rounded-md border border-outline-variant/30 bg-white px-2 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
+            >
+              <option value="straight">Straight</option>
+              <option value="bezier">Bezier Avoid</option>
+            </select>
+          </div>
           <ToggleRow
             label="Dot Grid"
             checked={showGrid}
@@ -300,97 +316,11 @@ const LeftSidebar = ({
             checked={lockCanvas}
             onChange={setLockCanvas}
           />
-          <div className="rounded-md bg-surface-container p-3 dark:bg-dark-surface-container md:p-2">
-            <div className="mb-1.5 text-xs text-on-surface dark:text-dark-on-surface">
-              Edge Routing
-            </div>
-            <select
-              value={routing}
-              aria-label="Edge routing"
-              onChange={event => setRouting(event.target.value)}
-              className="w-full rounded-md border border-outline-variant/30 bg-white px-2 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
-            >
-              <option value="straight">Straight</option>
-              <option value="bezier">Bezier Avoid</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <SectionTitle>Data</SectionTitle>
-        <div className="grid grid-cols-2 gap-1 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container md:p-2">
-          <div className="col-span-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-outline dark:text-dark-outline">
-            Edge List
-          </div>
-          <button
-            type="button"
-            className={dataButtonClass}
-            onClick={onOpenParser}
-          >
-            Import Edge List
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            onClick={onExportText}
-          >
-            Export Edge List
-          </button>
-          <div className="col-span-2 mt-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-outline dark:text-dark-outline">
-            Project
-          </div>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="project-import-button"
-            onClick={() => projectImportInputRef.current?.click()}
-          >
-            Import Project
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="project-export-button"
-            onClick={onExportProject}
-          >
-            Export Project
-          </button>
-          <input
-            ref={projectImportInputRef}
-            type="file"
-            accept=".json,.graphviz.json,application/json"
-            aria-label="Import Project JSON"
-            data-testid="project-import-input"
-            className="sr-only"
-            onChange={event => {
-              onImportProjectFile?.(event.target.files?.[0]);
-              event.target.value = '';
-            }}
+          <ToggleRow
+            label="Show State Legend"
+            checked={showLegend}
+            onChange={setShowLegend}
           />
-          <button
-            type="button"
-            className={joinClasses(dataButtonClass, 'col-span-2')}
-            onClick={onExportVideo}
-          >
-            Export MP4
-          </button>
-          <button
-            type="button"
-            className={joinClasses(dataButtonClass, 'col-span-2')}
-            data-testid="slideshow-export-button"
-            disabled={!totalFrames}
-            onClick={onExportSlideshow}
-          >
-            Export Slideshow
-          </button>
-          <button
-            type="button"
-            className={joinClasses(dataButtonClass, 'col-span-2')}
-            onClick={onOpenScript}
-          >
-            Script Mode
-          </button>
         </div>
       </div>
 
@@ -411,6 +341,83 @@ const LeftSidebar = ({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle>Import</SectionTitle>
+        <div className="grid grid-cols-1 gap-1">
+          <button
+            type="button"
+            className={dataButtonClass}
+            onClick={onOpenParser}
+          >
+            Import Edge List
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="project-import-button"
+            onClick={() => projectImportInputRef.current?.click()}
+          >
+            Import Project
+          </button>
+          <input
+            ref={projectImportInputRef}
+            type="file"
+            accept=".json,.graphviz.json,application/json"
+            aria-label="Import Project JSON"
+            data-testid="project-import-input"
+            className="sr-only"
+            onChange={event => {
+              onImportProjectFile?.(event.target.files?.[0]);
+              event.target.value = '';
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle>Export</SectionTitle>
+        <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            className={dataButtonClass}
+            onClick={onExportText}
+          >
+            Export Edge List
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="project-export-button"
+            onClick={onExportProject}
+          >
+            Export Project
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            onClick={onExportVideo}
+          >
+            Export MP4
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="slideshow-export-button"
+            disabled={!totalFrames}
+            onClick={onExportSlideshow}
+          >
+            Export Slideshow
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle>Advanced</SectionTitle>
+        <ActionButton className="w-full" onClick={onOpenScript}>
+          Script Mode
+        </ActionButton>
       </div>
 
       <div className="mt-auto pt-4">

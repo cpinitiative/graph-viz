@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   edgeRouting: EDGE_ROUTING.straight,
   snapEnabled: true,
   showGrid: false,
+  showLegend: false,
   lockCanvas: true,
   viewState: null,
   globalSettings: {
@@ -147,6 +148,7 @@ const sanitizeSettings = settings => {
       DEFAULT_SETTINGS.snapEnabled
     ),
     showGrid: booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid),
+    showLegend: booleanOrDefault(input.showLegend, DEFAULT_SETTINGS.showLegend),
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
     globalSettings: {
