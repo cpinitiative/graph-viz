@@ -187,6 +187,46 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('keeps directed arrowheads bound to effective edge stroke colors', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await choosePreset(page, 'dfs');
+
+    const markerTriangle = graphCanvas(page).locator(
+      'marker#graphstudio-arrow path'
+    );
+    await expect(markerTriangle).toHaveAttribute('fill', 'context-stroke');
+
+    const directedEdges = graphCanvas(page).locator(
+      'path[marker-end="url(#graphstudio-arrow)"]'
+    );
+    await expect(directedEdges.first()).toBeVisible();
+
+    await page.getByText('Frame 2').click();
+    await expect(directedEdges.first()).toHaveAttribute('stroke', '#3b82f6');
+    await expect(directedEdges.first()).toHaveAttribute(
+      'marker-end',
+      'url(#graphstudio-arrow)'
+    );
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await page.locator('[data-testid="script-modal"] textarea').fill(`
+api.edge('e0', '#f59e0b');
+`);
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+    await page.getByText('Frame 2').click();
+    await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
+    await expect(markerTriangle).toHaveAttribute('fill', 'context-stroke');
+
+    expect(errors).toEqual([]);
+  });
+
   test('exports the default timeline as a PPTX slideshow', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
