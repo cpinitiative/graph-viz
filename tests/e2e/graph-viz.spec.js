@@ -54,6 +54,24 @@ const educationalPresets = [
     secondDescription:
       'Traverse from 0: queue neighbors 1 and 2 in component 1',
   },
+  {
+    value: 'kruskal-mst',
+    firstDescription:
+      'Kruskal MST: sort weighted edges ascending; each node starts in its own DSU component',
+    secondDescription:
+      'Consider edge A-B (1): find(A) and find(B) differ, so union accepts it',
+    thirdDescription:
+      'Consider edge D-E (5): find(D) equals find(E), so this cycle edge is rejected',
+  },
+  {
+    value: 'dijkstra-shortest-paths',
+    firstDescription:
+      'Dijkstra starts at source S: distance[S]=0 and all other distances are infinity',
+    secondDescription:
+      'Relax edges from S: A gets distance 2 and B gets distance 5 as queued candidates',
+    thirdDescription:
+      'Final shortest-path tree from S: S-A, A-B, A-C, B-D, and D-T are highlighted',
+  },
 ];
 
 test.describe('Graph Viz desktop smoke', () => {
@@ -189,6 +207,13 @@ while (true) {}
       await frameLabels.nth(1).click();
       await expect(frameDescription).toHaveValue(preset.secondDescription);
       await expect(graphCanvas(page)).toBeVisible();
+
+      if (preset.thirdDescription) {
+        const targetFrameIndex = preset.value === 'kruskal-mst' ? 5 : 7;
+        await frameLabels.nth(targetFrameIndex).click();
+        await expect(frameDescription).toHaveValue(preset.thirdDescription);
+        await expect(graphCanvas(page)).toBeVisible();
+      }
     }
 
     expect(errors).toEqual([]);

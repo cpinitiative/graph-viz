@@ -10,6 +10,8 @@ const PRESET_OPTIONS = [
   ['bfs', 'BFS Preset'],
   ['dfs', 'DFS Preset'],
   ['dijkstra', 'Dijkstra Preset'],
+  ['kruskal-mst', 'Kruskal MST'],
+  ['dijkstra-shortest-paths', 'Dijkstra Shortest Paths'],
   ['topological-sort', 'Topological Sort'],
   ['disjoint-set-union', 'Disjoint Set Union'],
   ['connected-components', 'Connected Components'],
