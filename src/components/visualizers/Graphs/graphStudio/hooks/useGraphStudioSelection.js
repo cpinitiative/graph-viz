@@ -67,7 +67,11 @@ export const useGraphStudioSelection = ({ computedGraph }) => {
     );
     const fromNode = nodeMap.get(String(selectedEdge.from));
     const toNode = nodeMap.get(String(selectedEdge.to));
-    return [fromNode, toNode].filter(Boolean);
+    return [fromNode, toNode].filter(
+      (node, index, nodes) =>
+        node &&
+        nodes.findIndex(item => String(item?.id) === String(node.id)) === index
+    );
   }, [selectedEdge, computedGraph.nodes]);
 
   const clearSelection = useCallback(() => {

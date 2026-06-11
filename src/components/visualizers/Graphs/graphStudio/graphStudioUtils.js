@@ -46,12 +46,7 @@ export const normalizeBaseGraph = (payload = DEFAULT_GRAPH) => {
     .map((edge, index) => {
       const from = normalizeNodeId(edge.from ?? edge.u ?? edge.source, index);
       const to = normalizeNodeId(edge.to ?? edge.v ?? edge.target, index + 1);
-      if (
-        !nodeIds.has(String(from)) ||
-        !nodeIds.has(String(to)) ||
-        String(from) === String(to)
-      )
-        return null;
+      if (!nodeIds.has(String(from)) || !nodeIds.has(String(to))) return null;
       return {
         id: String(edge.id ?? `e${index}`),
         from,
