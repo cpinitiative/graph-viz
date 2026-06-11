@@ -28,7 +28,7 @@ const toggleRowClass =
 const checkboxClass =
   'h-5 w-5 rounded bg-surface-container-high text-blue-800 focus:ring-blue-800 focus:ring-offset-slate-800';
 const dataButtonClass =
-  'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
+  'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -165,6 +165,7 @@ const LeftSidebar = ({
   onExportProject,
   onImportProjectFile,
   onExportVideo,
+  onExportSlideshow,
   onOpenScript,
   selectedCount,
   onApplyPreset,
@@ -373,6 +374,15 @@ const LeftSidebar = ({
             onClick={onExportVideo}
           >
             Export MP4
+          </button>
+          <button
+            type="button"
+            className={joinClasses(dataButtonClass, 'col-span-2')}
+            data-testid="slideshow-export-button"
+            disabled={!totalFrames}
+            onClick={onExportSlideshow}
+          >
+            Export Slideshow
           </button>
           <button
             type="button"

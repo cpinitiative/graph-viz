@@ -20,6 +20,10 @@ export const useGraphStudioCanvasHandlers = ({
     setDrawFrom(null);
   }, []);
 
+  const restoreDrawState = useCallback(nextDrawFrom => {
+    setDrawFrom(nextDrawFrom ?? null);
+  }, []);
+
   const onSelectNode = useCallback(
     (nodeId, additive = false) => {
       const idText = String(nodeId);
@@ -167,6 +171,7 @@ export const useGraphStudioCanvasHandlers = ({
   return {
     drawFrom,
     clearDrawState,
+    restoreDrawState,
     handleSetMode,
     startDrawEdge,
     onSelectNode,

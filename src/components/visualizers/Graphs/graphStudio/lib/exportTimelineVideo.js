@@ -1,6 +1,12 @@
 import * as Mp4Muxer from 'mp4-muxer';
+import {
+  DEFAULT_SVG_ELEMENT_ID,
+  createCaptureCanvas,
+  getGraphSvgElement,
+  loadSvgImageFromElement,
+  waitForFrameRender,
+} from './timelineFrameCapture';
 
-const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
 const AVC_CODEC = 'avc1.42E01F';
 
 const withDefaultColorSpace = meta => {
@@ -33,16 +39,8 @@ export async function exportTimelineVideo({
     throw new Error('VideoEncoder API is not supported in this browser.');
   }
 
-  const canvas = document.createElement('canvas');
-  const svgEl =
-    document.getElementById(svgElementId) || document.querySelector('svg');
-  if (!svgEl) throw new Error('SVG not found');
-
-  const rect = svgEl.getBoundingClientRect();
-  canvas.width = Math.floor(rect.width / 2) * 2;
-  canvas.height = Math.floor(rect.height / 2) * 2;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas rendering context unavailable');
+  const svgEl = getGraphSvgElement(svgElementId);
+  const { canvas, ctx } = createCaptureCanvas(svgEl);
 
   const muxer = new Mp4Muxer.Muxer({
     target: new Mp4Muxer.ArrayBufferTarget(),
@@ -72,41 +70,12 @@ export async function exportTimelineVideo({
 
   for (let i = 0; i < steps.length; i++) {
     setCurrentFrame(i);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForFrameRender();
 
-    const origWidth = svgEl.getAttribute('width');
-    const origHeight = svgEl.getAttribute('height');
-
-    svgEl.setAttribute('width', canvas.width);
-    svgEl.setAttribute('height', canvas.height);
-
-    let svgData = new XMLSerializer().serializeToString(svgEl);
-
-    if (origWidth === null) svgEl.removeAttribute('width');
-    else svgEl.setAttribute('width', origWidth);
-
-    if (origHeight === null) svgEl.removeAttribute('height');
-    else svgEl.setAttribute('height', origHeight);
-
-    if (!svgData.includes('xmlns=')) {
-      svgData = svgData.replace(
-        '<svg',
-        '<svg xmlns="http://www.w3.org/2000/svg"'
-      );
-    }
-
-    const img = new Image();
-    const svgBlob = new Blob([svgData], {
-      type: 'image/svg+xml;charset=utf-8',
-    });
-    const url = URL.createObjectURL(svgBlob);
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = () =>
-        reject(
-          new Error('Failed to load SVG image. Check console for details.')
-        );
-      img.src = url;
+    const img = await loadSvgImageFromElement({
+      svgEl,
+      width: canvas.width,
+      height: canvas.height,
     });
 
     const stepDurationMs = steps[i].durationMs || 600;
@@ -144,7 +113,6 @@ export async function exportTimelineVideo({
       frame.close();
       frameIndex++;
     }
-    URL.revokeObjectURL(url);
   }
 
   await videoEncoder.flush();
