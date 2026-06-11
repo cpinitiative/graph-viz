@@ -186,4 +186,33 @@ while (true) {}
 
     expect(errors).toEqual([]);
   });
+
+  test('exports the default timeline as a PPTX slideshow', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const frameCounter = page.getByText(/^\d+ \/ \d+$/).first();
+    const initialFrameCounter = await frameCounter.textContent();
+
+    await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
+    await expect(page.getByTestId('slideshow-export-button')).toBeEnabled();
+
+    await page.getByRole('button', { name: 'Export MP4' }).click();
+    await expect(page.getByText('Export MP4 Video')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Export MP4 Video')).toBeHidden();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('slideshow-export-button').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/\.pptx$/);
+
+    await expect(page.getByText('Slideshow exported')).toBeVisible();
+    await expect(frameCounter).toHaveText(initialFrameCounter);
+    await expect(graphCanvas(page)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
 });

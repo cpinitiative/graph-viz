@@ -5,6 +5,7 @@ import {
   parseEdgeListText,
   runScriptTrace,
 } from '../graphStudioUtils';
+import { exportTimelineSlideshow } from '../lib/exportTimelineSlideshow';
 import { exportTimelineVideo } from '../lib/exportTimelineVideo';
 import {
   downloadProjectJson,
@@ -31,7 +32,14 @@ export const useGraphStudioImportExport = ({
   setViewState,
   globalSettings,
   setGlobalSettings,
+  mode,
   setMode,
+  selectedObject,
+  setSelectedObject,
+  selectedNodeIds,
+  setSelectedNodeIds,
+  drawFrom,
+  restoreDrawState,
   clearSelection,
   clearDrawState,
   resetUndoHistory,
@@ -165,6 +173,64 @@ export const useGraphStudioImportExport = ({
     [setCurrentFrame, setStatus, steps]
   );
 
+  const exportSlideshow = useCallback(async () => {
+    if (!steps.length) {
+      setStatus('Slideshow export error: no timeline frames to export');
+      return;
+    }
+
+    const originalFrame = currentFrame;
+    const originalViewState = viewState ? { ...viewState } : null;
+    const originalMode = mode;
+    const originalSelectedObject = selectedObject
+      ? { ...selectedObject }
+      : null;
+    const originalSelectedNodeIds = [...selectedNodeIds];
+    const originalDrawFrom = drawFrom;
+
+    const restoreViewState = () => {
+      if (!originalViewState) return;
+      setViewState(originalViewState);
+      window.setTimeout(() => setViewState(originalViewState), 0);
+      window.requestAnimationFrame?.(() => setViewState(originalViewState));
+    };
+
+    setStatus('Exporting slideshow...');
+    try {
+      await exportTimelineSlideshow({
+        steps,
+        currentFrame,
+        setCurrentFrame,
+      });
+      setStatus('Slideshow exported');
+    } catch (error) {
+      console.error(error);
+      setStatus(`Slideshow export error: ${error.message}`);
+    } finally {
+      setCurrentFrame(originalFrame);
+      restoreViewState();
+      setMode(originalMode);
+      setSelectedObject(originalSelectedObject);
+      setSelectedNodeIds(originalSelectedNodeIds);
+      restoreDrawState?.(originalDrawFrom);
+    }
+  }, [
+    currentFrame,
+    drawFrom,
+    mode,
+    restoreDrawState,
+    selectedNodeIds,
+    selectedObject,
+    setCurrentFrame,
+    setMode,
+    setSelectedNodeIds,
+    setSelectedObject,
+    setStatus,
+    setViewState,
+    steps,
+    viewState,
+  ]);
+
   const runScript = useCallback(async () => {
     if (isScriptRunningRef.current) return;
     isScriptRunningRef.current = true;
@@ -212,6 +278,7 @@ export const useGraphStudioImportExport = ({
     exportVideoLabelPos,
     setExportVideoLabelPos,
     exportVideo,
+    exportSlideshow,
     exportText,
     exportProject,
     importProjectFile,
