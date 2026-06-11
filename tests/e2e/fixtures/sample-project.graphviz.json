@@ -50,6 +50,7 @@
     "edgeRouting": "bezier",
     "snapEnabled": false,
     "showGrid": true,
+    "showLegend": true,
     "lockCanvas": true,
     "viewState": { "zoom": 0.9, "x": 120, "y": 80 },
     "globalSettings": {
