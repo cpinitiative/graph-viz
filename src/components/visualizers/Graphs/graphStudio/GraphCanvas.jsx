@@ -374,7 +374,7 @@ const GraphCanvas = ({
             orient="auto"
             markerUnits="userSpaceOnUse"
           >
-            <path d="M0,0 L0,12 L10,6 z" fill="#777777" />
+            <path d="M0,0 L0,12 L10,6 z" fill="context-stroke" />
           </marker>
         </defs>
         <rect
