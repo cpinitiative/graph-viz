@@ -36,6 +36,26 @@ const choosePreset = async (page, value) => {
 const fixturePath = name =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
+const educationalPresets = [
+  {
+    value: 'topological-sort',
+    firstDescription: 'Zero indegree nodes A and B enter the queue',
+    secondDescription:
+      'Process A: remove outgoing edge A->C; C still waits on B',
+  },
+  {
+    value: 'disjoint-set-union',
+    firstDescription: 'Initialize DSU: each node is its own component',
+    secondDescription: 'find(0) and find(1) differ, so union accepts edge 0-1',
+  },
+  {
+    value: 'connected-components',
+    firstDescription: 'Start component 1 at node 0 and mark it active',
+    secondDescription:
+      'Traverse from 0: queue neighbors 1 and 2 in component 1',
+  },
+];
+
 test.describe('Graph Viz desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -144,6 +164,32 @@ while (true) {}
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('loads USACO Guide educational graph presets with timeline descriptions', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const frameDescription = page.getByPlaceholder(
+      'Enter a description for this frame...'
+    );
+    const frameLabels = page.getByText(/^Frame \d+$/);
+
+    for (const preset of educationalPresets) {
+      await choosePreset(page, preset.value);
+      await expect(frameDescription).toHaveValue(preset.firstDescription);
+      expect(await frameLabels.count()).toBeGreaterThan(1);
+
+      await frameLabels.nth(1).click();
+      await expect(frameDescription).toHaveValue(preset.secondDescription);
+      await expect(graphCanvas(page)).toBeVisible();
+    }
 
     expect(errors).toEqual([]);
   });

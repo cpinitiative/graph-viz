@@ -10,6 +10,9 @@ const PRESET_OPTIONS = [
   ['bfs', 'BFS Preset'],
   ['dfs', 'DFS Preset'],
   ['dijkstra', 'Dijkstra Preset'],
+  ['topological-sort', 'Topological Sort'],
+  ['disjoint-set-union', 'Disjoint Set Union'],
+  ['connected-components', 'Connected Components'],
   ['multigraph', 'Multi-Edge / Loop'],
 ];
 
