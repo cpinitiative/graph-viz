@@ -33,10 +33,22 @@ export async function exportTimelineVideo({
   steps,
   setCurrentFrame,
   labelPos,
+  frameIndexes,
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
 }) {
   if (typeof VideoEncoder === 'undefined') {
     throw new Error('VideoEncoder API is not supported in this browser.');
+  }
+  if (!steps?.length) {
+    throw new Error('No timeline frames to export');
+  }
+  const selectedFrameIndexes = Array.isArray(frameIndexes)
+    ? frameIndexes.filter(
+        index => Number.isInteger(index) && index >= 0 && index < steps.length
+      )
+    : steps.map((_, index) => index);
+  if (!selectedFrameIndexes.length) {
+    throw new Error('No timeline frames selected for export');
   }
 
   const svgEl = getGraphSvgElement(svgElementId);
@@ -68,7 +80,7 @@ export async function exportTimelineVideo({
   const fps = 30;
   let frameIndex = 0;
 
-  for (let i = 0; i < steps.length; i++) {
+  for (const i of selectedFrameIndexes) {
     setCurrentFrame(i);
     await waitForFrameRender();
 

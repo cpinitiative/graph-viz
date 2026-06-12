@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SCRIPT } from '../data/defaultScript';
 import {
   exportEdgeListText,
@@ -6,6 +6,11 @@ import {
   runScriptTrace,
 } from '../graphStudioUtils';
 import { normalizeCustomLegend } from '../lib/customLegend';
+import {
+  DEFAULT_EXPORT_FRAME_RANGE,
+  clampExportFrameRange,
+  resolveExportFrameIndexes,
+} from '../lib/exportFrameRange';
 import { exportTimelineSlideshow } from '../lib/exportTimelineSlideshow';
 import { exportTimelineVideo } from '../lib/exportTimelineVideo';
 import {
@@ -13,6 +18,11 @@ import {
   exportProjectJson,
   parseProjectJson,
 } from '../lib/projectJson';
+import {
+  exportCurrentFramePng,
+  exportCurrentFrameSvg,
+  waitForFrameRender,
+} from '../lib/timelineFrameCapture';
 
 export const useGraphStudioImportExport = ({
   baseGraph,
@@ -56,6 +66,38 @@ export const useGraphStudioImportExport = ({
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
     useState('bottom-center');
+  const [exportFrameRangeState, setExportFrameRangeState] = useState(() => ({
+    ...DEFAULT_EXPORT_FRAME_RANGE,
+    endFrame: Math.max(1, steps.length),
+  }));
+  const exportFrameRange = useMemo(() => {
+    const clamped = clampExportFrameRange(exportFrameRangeState, steps.length);
+    if (clamped.mode === 'range') return clamped;
+    return {
+      ...clamped,
+      startFrame: 1,
+      endFrame: Math.max(1, steps.length),
+    };
+  }, [exportFrameRangeState, steps.length]);
+
+  const updateExportFrameRange = useCallback(
+    patch => {
+      setExportFrameRangeState(prev =>
+        clampExportFrameRange({ ...prev, ...patch }, steps.length)
+      );
+    },
+    [steps.length]
+  );
+
+  const getExportFrameIndexes = useCallback(
+    () =>
+      resolveExportFrameIndexes({
+        frameCount: steps.length,
+        currentFrame,
+        range: exportFrameRange,
+      }),
+    [currentFrame, exportFrameRange, steps.length]
+  );
 
   const applyParserText = useCallback(() => {
     try {
@@ -119,6 +161,28 @@ export const useGraphStudioImportExport = ({
     viewState,
   ]);
 
+  const exportSvg = useCallback(async () => {
+    setStatus('Exporting SVG...');
+    try {
+      await exportCurrentFrameSvg();
+      setStatus('SVG exported');
+    } catch (error) {
+      console.error(error);
+      setStatus(`SVG export error: ${error.message}`);
+    }
+  }, [setStatus]);
+
+  const exportPng = useCallback(async () => {
+    setStatus('Exporting PNG...');
+    try {
+      await exportCurrentFramePng();
+      setStatus('PNG exported');
+    } catch (error) {
+      console.error(error);
+      setStatus(`PNG export error: ${error.message}`);
+    }
+  }, [setStatus]);
+
   const importProjectFile = useCallback(
     async file => {
       if (!file) return;
@@ -169,16 +233,31 @@ export const useGraphStudioImportExport = ({
 
   const exportVideo = useCallback(
     async labelPos => {
+      const frameIndexes = getExportFrameIndexes();
+      if (!frameIndexes.length) {
+        setStatus('Export failed: no timeline frames to export');
+        return;
+      }
+
+      const originalFrame = currentFrame;
       setStatus('Exporting video...');
       try {
-        await exportTimelineVideo({ steps, setCurrentFrame, labelPos });
+        await exportTimelineVideo({
+          steps,
+          setCurrentFrame,
+          labelPos,
+          frameIndexes,
+        });
         setStatus('Video exported successfully');
       } catch (error) {
         console.error(error);
         setStatus(`Export failed: ${error.message}`);
+      } finally {
+        setCurrentFrame(originalFrame);
+        await waitForFrameRender();
       }
     },
-    [setCurrentFrame, setStatus, steps]
+    [currentFrame, getExportFrameIndexes, setCurrentFrame, setStatus, steps]
   );
 
   const exportSlideshow = useCallback(async () => {
@@ -195,6 +274,11 @@ export const useGraphStudioImportExport = ({
       : null;
     const originalSelectedNodeIds = [...selectedNodeIds];
     const originalDrawFrom = drawFrom;
+    const frameIndexes = getExportFrameIndexes();
+    if (!frameIndexes.length) {
+      setStatus('Slideshow export error: no timeline frames to export');
+      return;
+    }
 
     const restoreViewState = () => {
       if (!originalViewState) return;
@@ -209,6 +293,7 @@ export const useGraphStudioImportExport = ({
         steps,
         currentFrame,
         setCurrentFrame,
+        frameIndexes,
       });
       setStatus('Slideshow exported');
     } catch (error) {
@@ -225,6 +310,7 @@ export const useGraphStudioImportExport = ({
   }, [
     currentFrame,
     drawFrom,
+    getExportFrameIndexes,
     mode,
     restoreDrawState,
     selectedNodeIds,
@@ -302,8 +388,12 @@ export const useGraphStudioImportExport = ({
     setExportVideoLabelPos,
     exportVideo,
     exportSlideshow,
+    exportSvg,
+    exportPng,
     exportText,
     exportProject,
+    exportFrameRange,
+    updateExportFrameRange,
     importProjectFile,
     openExportVideoModal,
     closeExportVideoModal,

@@ -41,6 +41,10 @@ const dataButtonClass =
   'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
 const compactSelectClass =
   'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+const compactNumberInputClass =
+  'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+const rangeRadioClass =
+  'h-3.5 w-3.5 border-outline-variant text-blue-800 focus:ring-blue-800';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -177,9 +181,13 @@ const LeftSidebar = ({
   onOpenParser,
   onExportText,
   onExportProject,
+  onExportSvg,
+  onExportPng,
   onImportProjectFile,
   onExportVideo,
   onExportSlideshow,
+  exportFrameRange,
+  onExportFrameRangeChange,
   onOpenLegendEditor,
   isLegendEditorOpen = false,
   onOpenScript,
@@ -208,6 +216,13 @@ const LeftSidebar = ({
   const legendSummary = `${legendEntries.length} ${
     legendEntries.length === 1 ? 'entry' : 'entries'
   } - ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
+  const maxFrame = Math.max(1, totalFrames);
+  const frameRange = {
+    mode: exportFrameRange?.mode ?? 'all',
+    startFrame: exportFrameRange?.startFrame ?? 1,
+    endFrame: exportFrameRange?.endFrame ?? maxFrame,
+  };
+  const isCustomFrameRange = frameRange.mode === 'range';
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -464,6 +479,82 @@ const LeftSidebar = ({
             </select>
           </label>
         </div>
+        <div
+          className="space-y-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
+          data-testid="export-frame-range-controls"
+        >
+          <div className="text-[10px] font-semibold uppercase text-outline dark:text-dark-outline">
+            Export Frames
+          </div>
+          <div className="space-y-1">
+            {[
+              ['all', 'All frames'],
+              ['current', 'Current frame'],
+              ['range', 'Custom range'],
+            ].map(([value, label]) => (
+              <label
+                key={value}
+                className="flex cursor-pointer items-center gap-2 text-[11px] font-medium text-on-surface dark:text-dark-on-surface"
+              >
+                <input
+                  type="radio"
+                  name="export-frame-range-mode"
+                  value={value}
+                  checked={frameRange.mode === value}
+                  onChange={() => onExportFrameRangeChange?.({ mode: value })}
+                  className={rangeRadioClass}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label
+              className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
+              htmlFor="export-frame-range-start"
+            >
+              <span>Start</span>
+              <input
+                id="export-frame-range-start"
+                type="number"
+                min="1"
+                max={maxFrame}
+                value={frameRange.startFrame}
+                aria-label="Export start frame"
+                data-testid="export-frame-start-input"
+                disabled={!isCustomFrameRange}
+                onChange={event =>
+                  onExportFrameRangeChange?.({
+                    startFrame: event.target.value,
+                  })
+                }
+                className={compactNumberInputClass}
+              />
+            </label>
+            <label
+              className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
+              htmlFor="export-frame-range-end"
+            >
+              <span>End</span>
+              <input
+                id="export-frame-range-end"
+                type="number"
+                min="1"
+                max={maxFrame}
+                value={frameRange.endFrame}
+                aria-label="Export end frame"
+                data-testid="export-frame-end-input"
+                disabled={!isCustomFrameRange}
+                onChange={event =>
+                  onExportFrameRangeChange?.({
+                    endFrame: event.target.value,
+                  })
+                }
+                className={compactNumberInputClass}
+              />
+            </label>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-1">
           <button
             type="button"
@@ -479,6 +570,22 @@ const LeftSidebar = ({
             onClick={onExportProject}
           >
             Export Project
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="svg-export-button"
+            onClick={onExportSvg}
+          >
+            Export SVG
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="png-export-button"
+            onClick={onExportPng}
+          >
+            Export PNG
           </button>
           <button
             type="button"

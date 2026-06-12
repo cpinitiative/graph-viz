@@ -111,6 +111,14 @@ const setRangeValue = async (page, label, value) => {
   }, value);
 };
 
+const expectDownloadFrom = async ({ page, locator, filenamePattern }) => {
+  const downloadPromise = page.waitForEvent('download');
+  await locator.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(filenamePattern);
+  return download;
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   const modal = page.getByTestId('custom-legend-modal');
@@ -856,6 +864,32 @@ api.edge('e0', '#f59e0b');
 
     await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
     await expect(page.getByTestId('slideshow-export-button')).toBeEnabled();
+    await expect(page.getByTestId('svg-export-button')).toBeVisible();
+    await expect(page.getByTestId('svg-export-button')).toBeEnabled();
+    await expect(page.getByTestId('png-export-button')).toBeVisible();
+    await expect(page.getByTestId('png-export-button')).toBeEnabled();
+    await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'All frames' })).toBeChecked();
+    await expect(
+      page.getByRole('radio', { name: 'Current frame' })
+    ).not.toBeChecked();
+    await expect(
+      page.getByRole('radio', { name: 'Custom range' })
+    ).not.toBeChecked();
+
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    await expect(page.getByText('SVG exported')).toBeVisible();
+
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+    await expect(page.getByText('PNG exported')).toBeVisible();
 
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await expandLegendEditor(page);
@@ -868,18 +902,56 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
     await closeLegendEditor(page);
 
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
+    await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeHidden();
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByTestId('slideshow-export-button').click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/\.pptx$/);
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('slideshow-export-button'),
+      filenamePattern: /\.pptx$/,
+    });
 
     await expect(page.getByText('Slideshow exported')).toBeVisible();
     await expect(frameCounter).toHaveText(initialFrameCounter);
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page.getByRole('radio', { name: 'Current frame' }).check();
+    await expect(
+      page.getByRole('radio', { name: 'Current frame' })
+    ).toBeChecked();
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('slideshow-export-button'),
+      filenamePattern: /\.pptx$/,
+    });
+    await expect(frameCounter).toHaveText(initialFrameCounter);
+
+    await choosePreset(page, 'bfs');
+    await page.getByRole('radio', { name: 'Custom range' }).check();
+    await expect(
+      page.getByRole('radio', { name: 'Custom range' })
+    ).toBeChecked();
+    await page.getByLabel('Export start frame').fill('1');
+    await page.getByLabel('Export end frame').fill('2');
+    await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('slideshow-export-button'),
+      filenamePattern: /\.pptx$/,
+    });
     await expect(graphCanvas(page)).toBeVisible();
 
     expect(errors).toEqual([]);
