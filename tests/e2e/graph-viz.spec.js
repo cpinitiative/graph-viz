@@ -113,11 +113,18 @@ const setRangeValue = async (page, label, value) => {
 
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
+  const modal = page.getByTestId('custom-legend-modal');
   await expect(editToggle).toBeVisible();
-  if ((await editToggle.getAttribute('aria-expanded')) !== 'true') {
+  if (!(await modal.isVisible())) {
     await editToggle.click();
   }
+  await expect(modal).toBeVisible();
   await expect(page.getByTestId('custom-legend-editor')).toBeVisible();
+};
+
+const closeLegendEditor = async page => {
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('custom-legend-modal')).toBeHidden();
 };
 
 const fixturePath = name =>
@@ -405,7 +412,6 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
-    await expandLegendEditor(page);
 
     const legendTitle = page.getByTestId('custom-legend-title-input');
     const legendPreview = page.getByTestId('custom-export-legend');
@@ -415,6 +421,7 @@ while (true) {}
       await expect(
         page.getByRole('checkbox', { name: /^Legend$/ })
       ).toBeChecked();
+      await expandLegendEditor(page);
       await expect(legendTitle).toHaveValue(preset.title);
       await expect(legendPreview).toBeVisible();
       await expect(
@@ -429,6 +436,7 @@ while (true) {}
           legendPreview.getByText(entry, { exact: true })
         ).toBeVisible();
       }
+      await closeLegendEditor(page);
     }
 
     expect(errors).toEqual([]);
@@ -444,6 +452,7 @@ while (true) {}
 
     const legendToggle = page.getByRole('checkbox', { name: /^Legend$/ });
     const legendEditToggle = page.getByTestId('custom-legend-edit-toggle');
+    const legendModal = page.getByTestId('custom-legend-modal');
     const legendEditor = page.getByTestId('custom-legend-editor');
     const legendTitle = page.getByTestId('custom-legend-title-input');
     const legendPosition = page.getByTestId('custom-legend-position-select');
@@ -452,20 +461,32 @@ while (true) {}
     await expect(page.getByLabel('Show State Legend')).toBeHidden();
     await expect(legendToggle).toBeVisible();
     await expect(legendEditToggle).toBeVisible();
+    await expect(page.getByTestId('custom-legend-summary')).toContainText(
+      '6 entries'
+    );
+    await expect(page.getByTestId('custom-legend-summary')).toContainText(
+      'Bottom right'
+    );
     await expect(legendEditor).toBeHidden();
     await expect(legendToggle).not.toBeChecked();
     await expect(legendPreview).toBeHidden();
 
     await legendEditToggle.click();
     await expect(legendEditToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(legendModal).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Edit Legend' })
+    ).toBeVisible();
     await expect(legendEditor).toBeVisible();
-    await legendEditToggle.click();
+    await page.keyboard.press('Escape');
     await expect(legendEditToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(legendModal).toBeHidden();
     await expect(legendEditor).toBeHidden();
     await legendEditToggle.click();
+    await expect(legendModal).toBeVisible();
     await expect(legendEditor).toBeVisible();
 
-    await legendToggle.check();
+    await page.getByLabel('Enable Legend').check();
     await expect(legendPreview).toBeVisible();
     for (const text of [
       'Nodes',
@@ -524,6 +545,7 @@ while (true) {}
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Edges' })
     ).toBeVisible();
+    await closeLegendEditor(page);
 
     expect(errors).toEqual([]);
   });
@@ -597,7 +619,7 @@ while (true) {}
     await expect(legendPreview).toBeHidden();
 
     await expandLegendEditor(page);
-    await legendToggle.check();
+    await page.getByLabel('Enable Legend').check();
     await expect(legendPreview).toBeVisible();
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Legend' })
@@ -621,6 +643,7 @@ while (true) {}
       legendPreview.locator('line[stroke="#f59e0b"]')
     ).toHaveAttribute('stroke', '#f59e0b');
 
+    await closeLegendEditor(page);
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
@@ -644,6 +667,7 @@ while (true) {}
     );
 
     await legendToggle.uncheck();
+    await expandLegendEditor(page);
     await legendTitle.fill('Temporary');
     await legendPosition.selectOption('bottom-right');
     await expect(legendPreview).toBeHidden();
@@ -838,6 +862,7 @@ api.edge('e0', '#f59e0b');
     await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
     await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
+    await closeLegendEditor(page);
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();

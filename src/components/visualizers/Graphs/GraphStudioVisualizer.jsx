@@ -66,6 +66,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
+  const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const {
     viewState,
     setViewState,
@@ -295,6 +296,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onImportProjectFile: importProjectFile,
       onExportVideo: openExportVideoModal,
       onExportSlideshow: exportSlideshow,
+      onOpenLegendEditor: () => setIsLegendEditorOpen(true),
+      isLegendEditorOpen,
       onOpenScript: () => setIsScriptOpen(true),
       selectedCount: selectedNodeIds.length,
       onApplyPreset: applyPreset,
@@ -398,6 +401,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         onLabelPosChange: setExportVideoLabelPos,
         onClose: closeExportVideoModal,
         onExport: confirmExportVideo,
+      },
+      legend: {
+        open: isLegendEditorOpen,
+        customLegend,
+        setCustomLegend,
+        onClose: () => setIsLegendEditorOpen(false),
       },
     },
     status,
