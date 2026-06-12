@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
-import {
-  NODE_RADIUS,
-  NODE_STATUS_COLORS,
-  VIEWBOX_HEIGHT,
-  VIEWBOX_WIDTH,
-} from './constants';
+import { NODE_RADIUS, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './constants';
 import {
   clampViewStateToPlayspace,
   clampZoom,
@@ -20,14 +15,6 @@ import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
-const STATE_LEGEND_ITEMS = [
-  { type: 'node', label: 'Default node', palette: NODE_STATUS_COLORS.default },
-  { type: 'node', label: 'Active node', palette: NODE_STATUS_COLORS.active },
-  { type: 'node', label: 'Visited node', palette: NODE_STATUS_COLORS.visited },
-  { type: 'node', label: 'Queued node', palette: NODE_STATUS_COLORS.queued },
-  { type: 'edge', label: 'Highlighted edge', color: '#f59e0b' },
-  { type: 'edge', label: 'Selected edge' },
-];
 
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
@@ -35,51 +22,57 @@ const truncateLegendText = (value, maxLength = 34) => {
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
-const StateLegendSwatch = ({ item }) => {
-  if (item.type === 'edge') {
+const buildLegendRows = entries => {
+  const rows = [];
+  let activeGroup = null;
+  entries.forEach((entry, index) => {
+    const group = entry.group || '';
+    if (group && group !== activeGroup) {
+      rows.push({
+        type: 'group',
+        key: `group-${index}-${group}`,
+        label: truncateLegendText(group, 28),
+      });
+      activeGroup = group;
+    }
+    rows.push({
+      type: 'entry',
+      key: `entry-${index}-${entry.label}`,
+      entry,
+      label: truncateLegendText(entry.label, 34),
+    });
+  });
+  return rows;
+};
+
+const LegendSwatch = ({ entry }) => {
+  if (entry.kind === 'edge') {
     return (
-      <span className="flex h-4 w-5 items-center" aria-hidden="true">
-        <span
-          className="block h-0 w-full border-t-2 border-neutral-900 dark:border-neutral-100"
-          style={item.color ? { borderColor: item.color } : undefined}
-        />
-      </span>
+      <line
+        x1="0"
+        y1="-3"
+        x2="18"
+        y2="-3"
+        stroke={entry.color}
+        strokeWidth="3"
+        strokeLinecap="square"
+      />
     );
   }
 
   return (
-    <span
-      className="h-3.5 w-3.5 rounded-full border"
-      aria-hidden="true"
-      style={{
-        backgroundColor: item.palette.fill,
-        borderColor: item.palette.stroke,
-      }}
+    <circle
+      cx="7"
+      cy="-4"
+      r="6"
+      fill={entry.color}
+      stroke="#334155"
+      strokeWidth="1"
     />
   );
 };
 
-const StateLegend = () => (
-  <div
-    className="pointer-events-none absolute right-4 top-4 z-10 w-44 border border-outline-variant bg-white px-3 py-2 text-xs text-on-surface shadow-sm dark:border-dark-outline-variant dark:bg-gray-900 dark:text-dark-on-surface"
-    data-testid="graph-state-legend"
-    aria-label="State legend"
-  >
-    <div className="mb-1.5 font-semibold uppercase tracking-wide">
-      State Legend
-    </div>
-    <div className="space-y-1">
-      {STATE_LEGEND_ITEMS.map(item => (
-        <div key={item.label} className="flex items-center gap-2">
-          <StateLegendSwatch item={item} />
-          <span>{item.label}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const CustomExportLegend = ({ customLegend, canvasSize }) => {
+const Legend = ({ customLegend, canvasSize }) => {
   const legend = normalizeCustomLegend(customLegend);
   if (!legend.enabled || canvasSize.width <= 0 || canvasSize.height <= 0) {
     return null;
@@ -90,13 +83,18 @@ const CustomExportLegend = ({ customLegend, canvasSize }) => {
     ...entry,
     label: truncateLegendText(entry.label, 34),
   }));
+  const rows = buildLegendRows(entries);
   const maxTextLength = Math.max(
     title.length,
-    ...entries.map(entry => entry.label.length),
+    ...rows.map(row => row.label.length),
     10
   );
-  const boxWidth = Math.min(280, Math.max(156, 42 + maxTextLength * 7));
-  const boxHeight = 34 + Math.max(0, entries.length) * 22;
+  const boxWidth = Math.min(300, Math.max(168, 48 + maxTextLength * 7));
+  const rowsHeight = rows.reduce(
+    (height, row) => height + (row.type === 'group' ? 18 : 22),
+    0
+  );
+  const boxHeight = 42 + rowsHeight;
   const margin = 16;
   const x = legend.position.includes('right')
     ? Math.max(margin, canvasSize.width - boxWidth - margin)
@@ -108,7 +106,7 @@ const CustomExportLegend = ({ customLegend, canvasSize }) => {
   return (
     <g
       data-testid="custom-export-legend"
-      aria-label="Export legend preview"
+      aria-label="Legend preview"
       pointerEvents="none"
       transform={`translate(${x} ${y})`}
     >
@@ -140,22 +138,36 @@ const CustomExportLegend = ({ customLegend, canvasSize }) => {
         stroke="#E2E8F0"
         strokeWidth="1"
       />
-      {entries.map((entry, index) => {
-        const rowY = 46 + index * 22;
+      {rows.map((row, index) => {
+        const rowY =
+          42 +
+          rows
+            .slice(0, index)
+            .reduce(
+              (height, previous) =>
+                height + (previous.type === 'group' ? 18 : 22),
+              0
+            );
+        if (row.type === 'group') {
+          return (
+            <text
+              key={row.key}
+              x="12"
+              y={rowY}
+              fill="#64748B"
+              fontFamily="Arial, sans-serif"
+              fontSize="10"
+              fontWeight="700"
+              letterSpacing="0"
+            >
+              {row.label}
+            </text>
+          );
+        }
+
         return (
-          <g
-            key={`${index}-${entry.label}`}
-            transform={`translate(12 ${rowY})`}
-          >
-            <rect
-              x="0"
-              y="-9"
-              width="14"
-              height="14"
-              fill={entry.color}
-              stroke="#334155"
-              strokeWidth="1"
-            />
+          <g key={row.key} transform={`translate(12 ${rowY + 5})`}>
+            <LegendSwatch entry={row.entry} />
             <text
               x="22"
               y="2"
@@ -165,7 +177,7 @@ const CustomExportLegend = ({ customLegend, canvasSize }) => {
               fontWeight="500"
               letterSpacing="0"
             >
-              {entry.label}
+              {row.label}
             </text>
           </g>
         );
@@ -184,7 +196,6 @@ const GraphCanvas = ({
   viewState,
   setViewState,
   showGrid,
-  showLegend,
   customLegend,
   snapEnabled,
   lockCanvas,
@@ -651,12 +662,8 @@ const GraphCanvas = ({
             />
           )}
         </g>
-        <CustomExportLegend
-          customLegend={customLegend}
-          canvasSize={canvasSize}
-        />
+        <Legend customLegend={customLegend} canvasSize={canvasSize} />
       </svg>
-      {showLegend && <StateLegend />}
     </div>
   );
 };

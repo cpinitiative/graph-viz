@@ -1,5 +1,142 @@
+const makePresetLegend = (title, entries) => ({
+  title,
+  position: 'bottom-right',
+  entries,
+});
+
+const traversalLegendEntries = [
+  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
+  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Current edge', color: '#3B82F6' },
+  { group: 'Edges', kind: 'edge', label: 'Completed edge', color: '#22C55E' },
+];
+
+const BFS_LEGEND = makePresetLegend('BFS Legend', traversalLegendEntries);
+const DFS_LEGEND = makePresetLegend('DFS Legend', traversalLegendEntries);
+
+const DIJKSTRA_LEGEND = makePresetLegend('Dijkstra Legend', [
+  { group: 'Nodes', kind: 'node', label: 'Current minimum', color: '#3B82F6' },
+  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Relaxing edge', color: '#3B82F6' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Final shortest-path edge',
+    color: '#22C55E',
+  },
+  { group: 'Edges', kind: 'edge', label: 'Superseded edge', color: '#64748B' },
+]);
+
+const DIJKSTRA_SHORTEST_PATHS_LEGEND = makePresetLegend('Dijkstra Legend', [
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Current minimum',
+    color: '#3B82F6',
+  },
+  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Relaxed candidate edge',
+    color: '#F59E0B',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Final shortest-path edge',
+    color: '#22C55E',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Superseded edge',
+    color: '#64748B',
+  },
+]);
+
+const KRUSKAL_LEGEND = makePresetLegend('Kruskal MST Legend', [
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Candidate endpoints',
+    color: '#3B82F6',
+  },
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Unprocessed nodes',
+    color: '#EAB308',
+  },
+  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Accepted MST edge',
+    color: '#22C55E',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Rejected cycle edge',
+    color: '#DC2626',
+  },
+  { group: 'Edges', kind: 'edge', label: 'Unprocessed edge', color: '#64748B' },
+]);
+
+const TOPOLOGICAL_SORT_LEGEND = makePresetLegend('Topological Sort Legend', [
+  { group: 'Nodes', kind: 'node', label: 'Ready node', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Processing node', color: '#3B82F6' },
+  { group: 'Nodes', kind: 'node', label: 'Output node', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Removing edge', color: '#3B82F6' },
+  { group: 'Edges', kind: 'edge', label: 'Processed edge', color: '#22C55E' },
+]);
+
+const DSU_LEGEND = makePresetLegend('DSU Legend', [
+  { group: 'Nodes', kind: 'node', label: 'Component A', color: '#BFDBFE' },
+  { group: 'Nodes', kind: 'node', label: 'Component B', color: '#FED7AA' },
+  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#BBF7D0' },
+  { group: 'Edges', kind: 'edge', label: 'Accepted union', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Rejected cycle', color: '#DC2626' },
+]);
+
+const CONNECTED_COMPONENTS_LEGEND = makePresetLegend(
+  'Connected Components Legend',
+  [
+    { group: 'Nodes', kind: 'node', label: 'Component 1', color: '#BFDBFE' },
+    { group: 'Nodes', kind: 'node', label: 'Component 2', color: '#FED7AA' },
+    { group: 'Nodes', kind: 'node', label: 'Component 3', color: '#DDD6FE' },
+    { group: 'Nodes', kind: 'node', label: 'Frontier node', color: '#EAB308' },
+    {
+      group: 'Edges',
+      kind: 'edge',
+      label: 'Traversing edge',
+      color: '#3B82F6',
+    },
+    { group: 'Edges', kind: 'edge', label: 'Component edge', color: '#22C55E' },
+  ]
+);
+
+const MULTIGRAPH_LEGEND = makePresetLegend('Multi-Edge / Loop Legend', [
+  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
+  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Candidate path', color: '#3B82F6' },
+  { group: 'Edges', kind: 'edge', label: 'Selected path', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Non-selected path',
+    color: '#64748B',
+  },
+]);
+
 export const GRAPH_PRESETS = {
   bfs: {
+    legend: BFS_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 400, y: 200, visible: true },
@@ -97,6 +234,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   dfs: {
+    legend: DFS_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 400, y: 200, visible: true },
@@ -247,6 +385,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   dijkstra: {
+    legend: DIJKSTRA_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 200, y: 300, visible: true },
@@ -383,6 +522,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   'kruskal-mst': {
+    legend: KRUSKAL_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 280, y: 420, visible: true },
@@ -622,6 +762,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   'dijkstra-shortest-paths': {
+    legend: DIJKSTRA_SHORTEST_PATHS_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'S', x: 260, y: 520, visible: true },
@@ -850,6 +991,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   'topological-sort': {
+    legend: TOPOLOGICAL_SORT_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 160, y: 260, visible: true },
@@ -966,6 +1108,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   'disjoint-set-union': {
+    legend: DSU_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: '0', x: 180, y: 260, visible: true },
@@ -1158,6 +1301,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   'connected-components': {
+    legend: CONNECTED_COMPONENTS_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: '0', x: 180, y: 240, visible: true },
@@ -1318,6 +1462,7 @@ export const GRAPH_PRESETS = {
     ],
   },
   multigraph: {
+    legend: MULTIGRAPH_LEGEND,
     graph: {
       nodes: [
         { id: 0, label: 'A', x: 200, y: 300, visible: true },
