@@ -245,6 +245,41 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('loads Script Mode examples without auto-running them', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
+
+    const exampleSelect = page.getByLabel('Load script example');
+    const editor = page.locator('[data-testid="script-modal"] textarea');
+
+    await expect(exampleSelect).toBeVisible();
+    await exampleSelect.selectOption('bfs');
+    await expect(editor).toHaveValue(/Breadth-first search/);
+    await expect(editor).toHaveValue(/Start BFS/);
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+    await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await exampleSelect.selectOption('dfs');
+    await expect(editor).toHaveValue(/Depth-first search/);
+    await expect(editor).not.toHaveValue(/Breadth-first search/);
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+
+    expect(errors).toEqual([]);
+  });
+
   test('loads USACO Guide educational graph presets with timeline descriptions', async ({
     page,
   }) => {

@@ -1,3 +1,4 @@
+import { SCRIPT_EXAMPLES } from '../data/scriptExamples';
 import ModalCloseButton from './ModalCloseButton';
 
 const ScriptModal = ({
@@ -10,6 +11,16 @@ const ScriptModal = ({
   error,
 }) => {
   if (!open) return null;
+
+  const selectedExample =
+    SCRIPT_EXAMPLES.find(example => example.code === text) ?? null;
+
+  const handleExampleChange = event => {
+    const example = SCRIPT_EXAMPLES.find(
+      item => item.id === event.target.value
+    );
+    if (example) onTextChange(example.code);
+  };
 
   return (
     <div
@@ -32,6 +43,33 @@ const ScriptModal = ({
             Write JS using `api.active(id)`, `api.visited(id)`, `api.edge(id,
             color)` or `api.push(patch)`.
           </p>
+          <div className="mb-3 grid gap-2 sm:grid-cols-[180px_1fr] sm:items-center">
+            <label
+              className="text-xs font-semibold text-on-surface dark:text-dark-on-surface"
+              htmlFor="script-example-select"
+            >
+              Load example
+            </label>
+            <select
+              id="script-example-select"
+              aria-label="Load script example"
+              value={selectedExample?.id ?? ''}
+              onChange={handleExampleChange}
+              className="w-full rounded-md border border-outline-variant bg-white px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-dark-on-surface"
+            >
+              <option value="">Choose an example...</option>
+              {SCRIPT_EXAMPLES.map(example => (
+                <option key={example.id} value={example.id}>
+                  {example.name}
+                </option>
+              ))}
+            </select>
+            {selectedExample && (
+              <p className="text-xs leading-relaxed text-on-surface dark:text-dark-on-surface sm:col-start-2">
+                {selectedExample.description}
+              </p>
+            )}
+          </div>
           {error && (
             <div
               className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-950 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
