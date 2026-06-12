@@ -1,3 +1,5 @@
+import { GRAPH_STATE_COLORS } from './stateColors';
+
 const SCRIPT_MAX_LENGTH = 20000;
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
 export const DEFAULT_SCRIPT_TIMEOUT_MS = 2000;
@@ -120,7 +122,10 @@ const validateScriptTraceEntry = (entry, context) => {
     return {
       type,
       id,
-      color: typeof entry.color === 'string' ? entry.color : '#f59e0b',
+      color:
+        typeof entry.color === 'string'
+          ? entry.color
+          : GRAPH_STATE_COLORS.edgeHighlighted,
       description,
       durationMs,
     };
@@ -240,7 +245,7 @@ const buildTimelineSteps = trace => {
     if (entry.type === 'edge') {
       next.edgeOverrides[String(entry.id)] = {
         ...(next.edgeOverrides[String(entry.id)] ?? {}),
-        color: entry.color ?? '#f59e0b',
+        color: entry.color ?? GRAPH_STATE_COLORS.edgeHighlighted,
       };
     }
     if (entry.type === 'patch') {
