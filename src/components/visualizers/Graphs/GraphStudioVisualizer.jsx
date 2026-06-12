@@ -18,6 +18,7 @@ import {
 } from './graphStudio/hooks/useGraphStudioSelection';
 import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
 import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
+import { DEFAULT_CUSTOM_LEGEND } from './graphStudio/lib/customLegend';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
 
@@ -62,6 +63,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [showLegend, setShowLegend] = useState(false);
+  const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const {
     viewState,
     setViewState,
@@ -208,6 +210,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setShowGrid,
     showLegend,
     setShowLegend,
+    customLegend,
+    setCustomLegend,
     lockCanvas,
     setLockCanvas,
     viewState,
@@ -274,6 +278,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setShowGrid,
       showLegend,
       setShowLegend,
+      customLegend,
+      setCustomLegend,
       lockCanvas,
       setLockCanvas,
       onAddNode: addNode,
@@ -307,6 +313,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setViewState,
       showGrid,
       showLegend,
+      customLegend,
       snapEnabled,
       lockCanvas,
       edgeRouting,

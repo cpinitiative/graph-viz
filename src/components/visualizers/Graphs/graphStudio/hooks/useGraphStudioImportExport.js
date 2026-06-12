@@ -5,6 +5,7 @@ import {
   parseEdgeListText,
   runScriptTrace,
 } from '../graphStudioUtils';
+import { normalizeCustomLegend } from '../lib/customLegend';
 import { exportTimelineSlideshow } from '../lib/exportTimelineSlideshow';
 import { exportTimelineVideo } from '../lib/exportTimelineVideo';
 import {
@@ -28,6 +29,8 @@ export const useGraphStudioImportExport = ({
   setShowGrid,
   showLegend,
   setShowLegend,
+  customLegend,
+  setCustomLegend,
   lockCanvas,
   setLockCanvas,
   viewState,
@@ -97,6 +100,7 @@ export const useGraphStudioImportExport = ({
         snapEnabled,
         showGrid,
         showLegend,
+        customLegend: normalizeCustomLegend(customLegend),
         lockCanvas,
         viewState,
         globalSettings,
@@ -107,6 +111,7 @@ export const useGraphStudioImportExport = ({
   }, [
     baseGraph,
     currentFrame,
+    customLegend,
     edgeRouting,
     globalSettings,
     lockCanvas,
@@ -133,6 +138,7 @@ export const useGraphStudioImportExport = ({
         setSnapEnabled(project.settings.snapEnabled);
         setShowGrid(project.settings.showGrid);
         setShowLegend(project.settings.showLegend);
+        setCustomLegend(project.settings.customLegend);
         setLockCanvas(project.settings.lockCanvas);
         setGlobalSettings(project.settings.globalSettings);
         if (project.settings.viewState) {
@@ -160,6 +166,7 @@ export const useGraphStudioImportExport = ({
       setMode,
       setShowGrid,
       setShowLegend,
+      setCustomLegend,
       setSnapEnabled,
       setStatus,
       setViewState,

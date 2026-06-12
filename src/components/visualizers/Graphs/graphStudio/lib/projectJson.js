@@ -1,4 +1,5 @@
 import { EDGE_ROUTING } from '../constants';
+import { DEFAULT_CUSTOM_LEGEND, normalizeCustomLegend } from './customLegend';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS = {
   snapEnabled: true,
   showGrid: false,
   showLegend: false,
+  customLegend: DEFAULT_CUSTOM_LEGEND,
   lockCanvas: true,
   viewState: null,
   globalSettings: {
@@ -149,6 +151,7 @@ const sanitizeSettings = settings => {
     ),
     showGrid: booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid),
     showLegend: booleanOrDefault(input.showLegend, DEFAULT_SETTINGS.showLegend),
+    customLegend: normalizeCustomLegend(input.customLegend),
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
     globalSettings: {

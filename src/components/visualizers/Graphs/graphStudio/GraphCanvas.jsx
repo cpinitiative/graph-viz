@@ -16,6 +16,7 @@ import {
   toWorld,
 } from './graphCanvasUtils';
 import { edgeBetweenSelected } from './graphStudioUtils';
+import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
@@ -27,6 +28,12 @@ const STATE_LEGEND_ITEMS = [
   { type: 'edge', label: 'Highlighted edge', color: '#f59e0b' },
   { type: 'edge', label: 'Selected edge' },
 ];
+
+const truncateLegendText = (value, maxLength = 34) => {
+  const text = String(value ?? '').trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+};
 
 const StateLegendSwatch = ({ item }) => {
   if (item.type === 'edge') {
@@ -72,6 +79,101 @@ const StateLegend = () => (
   </div>
 );
 
+const CustomExportLegend = ({ customLegend, canvasSize }) => {
+  const legend = normalizeCustomLegend(customLegend);
+  if (!legend.enabled || canvasSize.width <= 0 || canvasSize.height <= 0) {
+    return null;
+  }
+
+  const title = truncateLegendText(legend.title || 'Legend', 32);
+  const entries = legend.entries.map(entry => ({
+    ...entry,
+    label: truncateLegendText(entry.label, 34),
+  }));
+  const maxTextLength = Math.max(
+    title.length,
+    ...entries.map(entry => entry.label.length),
+    10
+  );
+  const boxWidth = Math.min(280, Math.max(156, 42 + maxTextLength * 7));
+  const boxHeight = 34 + Math.max(0, entries.length) * 22;
+  const margin = 16;
+  const x = legend.position.includes('right')
+    ? Math.max(margin, canvasSize.width - boxWidth - margin)
+    : margin;
+  const y = legend.position.includes('bottom')
+    ? Math.max(margin, canvasSize.height - boxHeight - margin)
+    : margin;
+
+  return (
+    <g
+      data-testid="custom-export-legend"
+      aria-label="Export legend preview"
+      pointerEvents="none"
+      transform={`translate(${x} ${y})`}
+    >
+      <rect
+        x="0"
+        y="0"
+        width={boxWidth}
+        height={boxHeight}
+        fill="#FFFFFF"
+        stroke="#CBD5E1"
+        strokeWidth="1"
+      />
+      <text
+        x="12"
+        y="20"
+        fill="#0F172A"
+        fontFamily="Arial, sans-serif"
+        fontSize="12"
+        fontWeight="700"
+        letterSpacing="0"
+      >
+        {title}
+      </text>
+      <line
+        x1="12"
+        y1="28"
+        x2={boxWidth - 12}
+        y2="28"
+        stroke="#E2E8F0"
+        strokeWidth="1"
+      />
+      {entries.map((entry, index) => {
+        const rowY = 46 + index * 22;
+        return (
+          <g
+            key={`${index}-${entry.label}`}
+            transform={`translate(12 ${rowY})`}
+          >
+            <rect
+              x="0"
+              y="-9"
+              width="14"
+              height="14"
+              fill={entry.color}
+              stroke="#334155"
+              strokeWidth="1"
+            />
+            <text
+              x="22"
+              y="2"
+              fill="#334155"
+              fontFamily="Arial, sans-serif"
+              fontSize="11"
+              fontWeight="500"
+              letterSpacing="0"
+            >
+              {entry.label}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+};
+
 const GraphCanvas = ({
   graph,
   diff,
@@ -83,6 +185,7 @@ const GraphCanvas = ({
   setViewState,
   showGrid,
   showLegend,
+  customLegend,
   snapEnabled,
   lockCanvas,
   edgeRouting,
@@ -101,6 +204,7 @@ const GraphCanvas = ({
   onCanvasDoubleClick,
 }) => {
   const svgRef = useRef(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
@@ -126,6 +230,30 @@ const GraphCanvas = ({
     edgeCurvature,
     nodeRadius,
   ]);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return undefined;
+    const updateCanvasSize = () => {
+      const bounds = el.getBoundingClientRect();
+      setCanvasSize(prev => {
+        const next = {
+          width: Math.max(0, Math.round(bounds.width)),
+          height: Math.max(0, Math.round(bounds.height)),
+        };
+        return prev.width === next.width && prev.height === next.height
+          ? prev
+          : next;
+      });
+    };
+    updateCanvasSize();
+    const ro = new ResizeObserver(updateCanvasSize);
+    ro.observe(el);
+    window.addEventListener('resize', updateCanvasSize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, []);
   useEffect(() => {
     hasInitializedViewRef.current = false;
     const el = svgRef.current;
@@ -523,6 +651,10 @@ const GraphCanvas = ({
             />
           )}
         </g>
+        <CustomExportLegend
+          customLegend={customLegend}
+          canvasSize={canvasSize}
+        />
       </svg>
       {showLegend && <StateLegend />}
     </div>
