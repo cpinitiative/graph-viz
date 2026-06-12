@@ -70,10 +70,19 @@ export async function exportTimelineSlideshow({
   steps,
   currentFrame,
   setCurrentFrame,
+  frameIndexes,
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
 }) {
   if (!steps?.length) {
     throw new Error('No timeline frames to export');
+  }
+  const selectedFrameIndexes = Array.isArray(frameIndexes)
+    ? frameIndexes.filter(
+        index => Number.isInteger(index) && index >= 0 && index < steps.length
+      )
+    : steps.map((_, index) => index);
+  if (!selectedFrameIndexes.length) {
+    throw new Error('No timeline frames selected for export');
   }
 
   const { default: PptxGenJS } = await import('pptxgenjs');
@@ -94,7 +103,7 @@ export async function exportTimelineSlideshow({
   const { canvas, ctx } = createCaptureCanvas(svgEl);
 
   try {
-    for (let i = 0; i < steps.length; i++) {
+    for (const i of selectedFrameIndexes) {
       setCurrentFrame(i);
       await waitForFrameRender();
 
