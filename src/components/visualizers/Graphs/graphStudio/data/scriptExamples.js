@@ -1,3 +1,11 @@
+import { GRAPH_STATE_COLORS } from '../lib/stateColors';
+
+const SCRIPT_EXAMPLE_COLORS = {
+  currentEdge: GRAPH_STATE_COLORS.edgeHighlighted,
+  completedEdge: GRAPH_STATE_COLORS.edgeCompleted,
+  rejectedEdge: GRAPH_STATE_COLORS.edgeRejected,
+};
+
 export const SCRIPT_EXAMPLES = [
   {
     id: 'bfs',
@@ -45,7 +53,7 @@ if (!nodes.length) {
     });
 
     for (const next of adjacency.get(current)) {
-      api.edge(next.edgeId, '#3B82F6');
+      api.edge(next.edgeId, '${SCRIPT_EXAMPLE_COLORS.currentEdge}');
       if (seen.has(next.to)) continue;
       seen.add(next.to);
       queue.push(next.to);
@@ -104,7 +112,7 @@ if (!nodes.length) {
     });
 
     for (const next of adjacency.get(id)) {
-      api.edge(next.edgeId, '#3B82F6');
+      api.edge(next.edgeId, '${SCRIPT_EXAMPLE_COLORS.currentEdge}');
       if (!seen.has(next.to)) visit(next.to);
     }
 
@@ -168,13 +176,13 @@ if (!nodes.length) {
     });
 
     for (const next of outgoing.get(current)) {
-      api.edge(next.edgeId, '#3B82F6');
+      api.edge(next.edgeId, '${SCRIPT_EXAMPLE_COLORS.currentEdge}');
       indegree.set(next.to, indegree.get(next.to) - 1);
       if (indegree.get(next.to) === 0) {
         queue.push(next.to);
         api.queued(next.to);
       }
-      api.edge(next.edgeId, '#22C55E');
+      api.edge(next.edgeId, '${SCRIPT_EXAMPLE_COLORS.completedEdge}');
     }
 
     api.visited(current);
@@ -249,7 +257,7 @@ if (!nodes.length) {
 
     for (const next of adjacency.get(current)) {
       if (done.has(next.to)) continue;
-      api.edge(next.edgeId, '#3B82F6');
+      api.edge(next.edgeId, '${SCRIPT_EXAMPLE_COLORS.currentEdge}');
       const candidate = dist.get(current) + next.weight;
       if (candidate < dist.get(next.to)) {
         dist.set(next.to, candidate);
@@ -268,7 +276,7 @@ if (!nodes.length) {
   }
 
   for (const edgeId of parentEdge.values()) {
-    api.edge(edgeId, '#22C55E');
+    api.edge(edgeId, '${SCRIPT_EXAMPLE_COLORS.completedEdge}');
   }
 }
 `,
@@ -322,10 +330,10 @@ if (!nodes.length || !edges.length) {
     const to = String(edge.to);
     api.active(from);
     api.active(to);
-    api.edge(edge.id, '#F59E0B');
+    api.edge(edge.id, '${SCRIPT_EXAMPLE_COLORS.currentEdge}');
 
     if (union(from, to)) {
-      api.edge(edge.id, '#22C55E');
+      api.edge(edge.id, '${SCRIPT_EXAMPLE_COLORS.completedEdge}');
       api.push({
         type: 'node',
         id: from,
@@ -337,7 +345,7 @@ if (!nodes.length || !edges.length) {
       api.push({
         type: 'edge',
         id: edge.id,
-        color: '#DC2626',
+        color: '${SCRIPT_EXAMPLE_COLORS.rejectedEdge}',
         description: \`Reject \${labels.get(from)}-\${labels.get(to)} as a cycle\`,
       });
     }
@@ -353,7 +361,7 @@ if (!nodes.length || !edges.length) {
 const nodes = api.graph.nodes || [];
 const edges = api.graph.edges || [];
 const labels = new Map(nodes.map(node => [String(node.id), node.label || String(node.id)]));
-const palette = ['#3B82F6', '#F59E0B', '#22C55E', '#DC2626'];
+const palette = ['${GRAPH_STATE_COLORS.nodeActive}', '${SCRIPT_EXAMPLE_COLORS.currentEdge}', '${SCRIPT_EXAMPLE_COLORS.completedEdge}', '${SCRIPT_EXAMPLE_COLORS.rejectedEdge}'];
 
 if (!edges.length) {
   api.push({ type: 'patch', description: 'Graph has no edges to color.' });

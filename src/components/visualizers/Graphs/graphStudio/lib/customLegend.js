@@ -1,3 +1,5 @@
+import { GRAPH_STATE_COLORS } from './stateColors';
+
 export const CUSTOM_LEGEND_POSITIONS = [
   'top-left',
   'top-right',
@@ -7,42 +9,44 @@ export const CUSTOM_LEGEND_POSITIONS = [
 
 export const CUSTOM_LEGEND_KINDS = ['node', 'edge'];
 
+export const CUSTOM_LEGEND_FALLBACK_COLOR = GRAPH_STATE_COLORS.edgeDefault;
+
 export const DEFAULT_CUSTOM_LEGEND_ENTRIES = [
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Default node',
-    color: '#E2E8F0',
+    color: GRAPH_STATE_COLORS.nodeDefault,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Active node',
-    color: '#3B82F6',
+    color: GRAPH_STATE_COLORS.nodeActive,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Queued node',
-    color: '#EAB308',
+    color: GRAPH_STATE_COLORS.nodeQueued,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Visited node',
-    color: '#22C55E',
+    color: GRAPH_STATE_COLORS.nodeVisited,
   },
   {
     group: 'Edges',
     kind: 'edge',
     label: 'Highlighted edge',
-    color: '#F59E0B',
+    color: GRAPH_STATE_COLORS.edgeHighlighted,
   },
   {
     group: 'Edges',
     kind: 'edge',
     label: 'Selected edge',
-    color: '#0F172A',
+    color: GRAPH_STATE_COLORS.edgeSelected,
   },
 ];
 
@@ -77,7 +81,9 @@ const normalizeLegendEntry = entry => {
     ...(group ? { group } : {}),
     kind,
     label,
-    color: isValidLegendColor(entry.color) ? entry.color : '#64748B',
+    color: isValidLegendColor(entry.color)
+      ? entry.color
+      : CUSTOM_LEGEND_FALLBACK_COLOR,
   };
 };
 

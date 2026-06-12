@@ -1,3 +1,5 @@
+import { GRAPH_STATE_COLORS } from './stateColors';
+
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
 
 const cloneSerializable = (value, label) => {
@@ -37,7 +39,8 @@ self.onmessage = event => {
       active: id => pushTrace({ type: 'node', id, status: 'active' }),
       visited: id => pushTrace({ type: 'node', id, status: 'visited' }),
       queued: id => pushTrace({ type: 'node', id, status: 'queued' }),
-      edge: (id, color = '#f59e0b') => pushTrace({ type: 'edge', id, color }),
+      edge: (id, color = GRAPH_STATE_COLORS.edgeHighlighted) =>
+        pushTrace({ type: 'edge', id, color }),
     };
     const fn = new Function('api', `'use strict';\n${source}\n`);
     fn(api);
