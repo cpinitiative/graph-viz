@@ -34,6 +34,83 @@ const choosePreset = async (page, value) => {
   await expect(graphCanvas(page)).toBeVisible();
 };
 
+const getDirectedEdgeEndpointOffsets = async page =>
+  graphCanvas(page).evaluate(svg => {
+    const edgePaths = Array.from(
+      svg.querySelectorAll('path[marker-end="url(#graphstudio-arrow)"]')
+    );
+    const nodeCircles = Array.from(svg.querySelectorAll(':scope > g circle'))
+      .map(circle => ({
+        x: Number(circle.getAttribute('cx')),
+        y: Number(circle.getAttribute('cy')),
+        r: Number(circle.getAttribute('r')),
+      }))
+      .filter(
+        circle =>
+          Number.isFinite(circle.x) &&
+          Number.isFinite(circle.y) &&
+          Number.isFinite(circle.r)
+      );
+
+    return edgePaths
+      .map(path => {
+        const values = (path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [])
+          .map(Number)
+          .filter(Number.isFinite);
+        if (values.length < 4 || !nodeCircles.length) return null;
+        const x = values[values.length - 2];
+        const y = values[values.length - 1];
+        const nearest = nodeCircles.reduce((best, circle) => {
+          const distance = Math.hypot(x - circle.x, y - circle.y);
+          const offset = Math.abs(distance - circle.r);
+          return !best || offset < best.offset
+            ? { distance, radius: circle.r, offset }
+            : best;
+        }, null);
+        return nearest;
+      })
+      .filter(Boolean);
+  });
+
+const expectDirectedEdgesAnchored = async page => {
+  await expect
+    .poll(async () => {
+      const offsets = await getDirectedEdgeEndpointOffsets(page);
+      if (!offsets.length) return Number.POSITIVE_INFINITY;
+      return Math.max(...offsets.map(offset => offset.offset));
+    })
+    .toBeLessThanOrEqual(1.25);
+
+  const offsets = await getDirectedEdgeEndpointOffsets(page);
+  expect(offsets.length).toBeGreaterThan(0);
+};
+
+const dragFirstGraphNode = async page => {
+  const node = page.locator('svg#graph-studio-canvas-svg > g circle').first();
+  await expect(node).toBeVisible();
+  const box = await node.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + 72,
+    box.y + box.height / 2 + 36,
+    {
+      steps: 8,
+    }
+  );
+  await page.mouse.up();
+};
+
+const setRangeValue = async (page, label, value) => {
+  await page.getByLabel(label).evaluate((input, nextValue) => {
+    input.value = String(nextValue);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   await expect(editToggle).toBeVisible();
@@ -661,6 +738,14 @@ api.edge('loop', '#3b82f6');
 
     await choosePreset(page, 'dfs');
 
+    const marker = graphCanvas(page).locator('marker#graphstudio-arrow');
+    await expect(marker).toHaveAttribute('markerWidth', '12');
+    await expect(marker).toHaveAttribute('markerHeight', '12');
+    await expect(marker).toHaveAttribute('refX', '10');
+    await expect(marker).toHaveAttribute('refY', '6');
+    await expect(marker).toHaveAttribute('orient', 'auto');
+    await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
+
     const markerTriangle = graphCanvas(page).locator(
       'marker#graphstudio-arrow path'
     );
@@ -687,6 +772,47 @@ api.edge('e0', '#f59e0b');
     await page.getByText('Frame 2').click();
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
     await expect(markerTriangle).toHaveAttribute('fill', 'context-stroke');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps directed edge endpoints anchored through graph interactions', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await choosePreset(page, 'dfs');
+    await expectDirectedEdgesAnchored(page);
+
+    await page.getByLabel('Edge routing').selectOption('bezier');
+    await expectDirectedEdgesAnchored(page);
+
+    await setRangeValue(page, 'Node size', 34);
+    await setRangeValue(page, 'Edge width', 5);
+    await expectDirectedEdgesAnchored(page);
+
+    await dragFirstGraphNode(page);
+    await expect(graphCanvas(page)).toBeVisible();
+    await expectDirectedEdgesAnchored(page);
+
+    for (const layout of ['Circle', 'Tree', 'Force']) {
+      await page.getByRole('button', { name: layout }).click();
+      await expect(graphCanvas(page)).toBeVisible();
+      await expectDirectedEdgesAnchored(page);
+    }
+
+    await choosePreset(page, 'kruskal-mst');
+    await page.getByText('Frame 6').click();
+    await expect(
+      graphCanvas(page).locator('path[stroke]').first()
+    ).toBeVisible();
+
+    await choosePreset(page, 'dijkstra-shortest-paths');
+    await page.getByText('Frame 2').click();
+    await expectDirectedEdgesAnchored(page);
 
     expect(errors).toEqual([]);
   });
