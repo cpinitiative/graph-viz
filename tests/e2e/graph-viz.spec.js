@@ -75,6 +75,62 @@ const educationalPresets = [
   },
 ];
 
+const presetLegends = [
+  {
+    value: 'bfs',
+    title: 'BFS Legend',
+    entries: ['Active node', 'Queued node', 'Visited node', 'Current edge'],
+  },
+  {
+    value: 'dfs',
+    title: 'DFS Legend',
+    entries: ['Active node', 'Visited node', 'Completed edge'],
+  },
+  {
+    value: 'dijkstra',
+    title: 'Dijkstra Legend',
+    entries: ['Current minimum', 'Candidate node', 'Superseded edge'],
+  },
+  {
+    value: 'topological-sort',
+    title: 'Topological Sort Legend',
+    entries: ['Ready node', 'Processing node', 'Removing edge'],
+  },
+  {
+    value: 'disjoint-set-union',
+    title: 'DSU Legend',
+    entries: ['Component A', 'Merged component', 'Rejected cycle'],
+  },
+  {
+    value: 'connected-components',
+    title: 'Connected Components Legend',
+    entries: ['Component 1', 'Component 3', 'Traversing edge'],
+  },
+  {
+    value: 'kruskal-mst',
+    title: 'Kruskal MST Legend',
+    entries: [
+      'Candidate endpoints',
+      'Accepted MST edge',
+      'Rejected cycle edge',
+    ],
+  },
+  {
+    value: 'dijkstra-shortest-paths',
+    title: 'Dijkstra Legend',
+    entries: [
+      'Current minimum',
+      'Relaxed candidate edge',
+      'Final shortest-path edge',
+    ],
+  },
+  {
+    value: 'multigraph',
+    title: 'Multi-Edge / Loop Legend',
+    entries: ['Candidate path', 'Selected path', 'Non-selected path'],
+  },
+];
+
 test.describe('Graph Viz desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -222,7 +278,41 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('toggles the built-in state legend without affecting the canvas', async ({
+  test('loads custom accurate legends for graph presets', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await page.getByRole('checkbox', { name: /^Legend$/ }).check();
+
+    const legendTitle = page.getByTestId('custom-legend-title-input');
+    const legendPreview = page.getByTestId('custom-export-legend');
+
+    for (const preset of presetLegends) {
+      await choosePreset(page, preset.value);
+      await expect(
+        page.getByRole('checkbox', { name: /^Legend$/ })
+      ).toBeChecked();
+      await expect(legendTitle).toHaveValue(preset.title);
+      await expect(legendPreview).toBeVisible();
+      await expect(
+        legendPreview.getByText('Nodes', { exact: true })
+      ).toBeVisible();
+      await expect(
+        legendPreview.getByText('Edges', { exact: true })
+      ).toBeVisible();
+
+      for (const entry of preset.entries) {
+        await expect(
+          legendPreview.getByText(entry, { exact: true })
+        ).toBeVisible();
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('supports unified editable legend preview and default reset', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -230,25 +320,75 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
-    const stateLegendToggle = page.getByLabel('Show State Legend');
-    const stateLegend = page.getByTestId('graph-state-legend');
+    const legendToggle = page.getByRole('checkbox', { name: /^Legend$/ });
+    const legendTitle = page.getByTestId('custom-legend-title-input');
+    const legendPosition = page.getByTestId('custom-legend-position-select');
+    const legendPreview = page.getByTestId('custom-export-legend');
 
-    await expect(stateLegendToggle).toBeVisible();
-    await expect(stateLegend).toBeHidden();
+    await expect(page.getByLabel('Show State Legend')).toBeHidden();
+    await expect(legendToggle).toBeVisible();
+    await expect(legendToggle).not.toBeChecked();
+    await expect(legendPreview).toBeHidden();
 
-    await stateLegendToggle.check();
-    await expect(stateLegend).toBeVisible();
-    await expect(stateLegend.getByText('Default node')).toBeVisible();
-    await expect(stateLegend.getByText('Active node')).toBeVisible();
-    await expect(stateLegend.getByText('Visited node')).toBeVisible();
-    await expect(stateLegend.getByText('Queued node')).toBeVisible();
-    await expect(stateLegend.getByText('Highlighted edge')).toBeVisible();
-    await expect(stateLegend.getByText('Selected edge')).toBeVisible();
+    await legendToggle.check();
+    await expect(legendPreview).toBeVisible();
+    for (const text of [
+      'Nodes',
+      'Default node',
+      'Active node',
+      'Visited node',
+      'Queued node',
+      'Edges',
+      'Highlighted edge',
+      'Selected edge',
+    ]) {
+      await expect(
+        legendPreview.locator('text').filter({ hasText: text })
+      ).toBeVisible();
+    }
+
+    await legendTitle.fill('Traversal Key');
+    await page.getByTestId('custom-legend-add-entry').click();
+    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier edge');
+    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await legendPosition.selectOption('top-left');
+
+    await expect(legendPreview).toHaveAttribute(
+      'transform',
+      /translate\(16 16\)/
+    );
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
+    ).toBeVisible();
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Frontier edge' })
+    ).toBeVisible();
+    await expect(
+      legendPreview.locator('line[stroke="#f59e0b"]')
+    ).toHaveAttribute('stroke', '#f59e0b');
     await expect(graphCanvas(page)).toBeVisible();
 
-    await stateLegendToggle.uncheck();
-    await expect(stateLegend).toBeHidden();
-    await expect(graphCanvas(page)).toBeVisible();
+    await page.getByTestId('custom-legend-reset').click();
+    await expect(legendToggle).toBeChecked();
+    await expect(legendTitle).toHaveValue('Legend');
+    await expect(legendPosition).toHaveValue('bottom-right');
+    await expect(page.getByTestId('custom-legend-entry-group-0')).toHaveValue(
+      'Nodes'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-0')).toHaveValue(
+      'Default node'
+    );
+    await expect(page.getByTestId('custom-legend-entry-kind-0')).toHaveValue(
+      'node'
+    );
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Nodes' })
+    ).toBeVisible();
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Edges' })
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });
@@ -279,8 +419,16 @@ while (true) {}
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
-    await expect(page.getByLabel('Show State Legend')).toBeChecked();
-    await expect(page.getByTestId('graph-state-legend')).toBeVisible();
+    await expect(
+      page.getByRole('checkbox', { name: /^Legend$/ })
+    ).toBeChecked();
+    await expect(page.getByTestId('custom-export-legend')).toBeVisible();
+    await expect(
+      page
+        .getByTestId('custom-export-legend')
+        .locator('text')
+        .filter({ hasText: 'Nodes' })
+    ).toBeVisible();
 
     await page
       .getByTestId('project-import-input')
@@ -294,7 +442,7 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('supports custom export legend preview and project round trip', async ({
+  test('supports editable legend preview and project round trip', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -303,9 +451,7 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
 
     const legendControls = page.getByTestId('custom-legend-controls');
-    const legendToggle = page.getByRole('checkbox', {
-      name: 'Custom Export Legend',
-    });
+    const legendToggle = page.getByRole('checkbox', { name: /^Legend$/ });
     const legendTitle = page.getByTestId('custom-legend-title-input');
     const legendPosition = page.getByTestId('custom-legend-position-select');
     const legendPreview = page.getByTestId('custom-export-legend');
@@ -322,8 +468,10 @@ while (true) {}
 
     await legendTitle.fill('Traversal Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
-    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier');
+    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
     await legendPosition.selectOption('top-left');
 
     await expect(
@@ -332,19 +480,31 @@ while (true) {}
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Frontier' })
     ).toBeVisible();
-    await expect(legendPreview.locator('rect[fill="#f59e0b"]')).toBeVisible();
+    await expect(
+      legendPreview.locator('line[stroke="#f59e0b"]')
+    ).toHaveAttribute('stroke', '#f59e0b');
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
     const downloadPath = await download.path();
     const exportedProject = JSON.parse(await fs.readFile(downloadPath, 'utf8'));
-    expect(exportedProject.settings.customLegend).toEqual({
+    expect(exportedProject.settings).not.toHaveProperty('showLegend');
+    expect(exportedProject.settings.customLegend).toMatchObject({
       enabled: true,
       title: 'Traversal Key',
-      entries: [{ label: 'Frontier', color: '#f59e0b' }],
       position: 'top-left',
     });
+    expect(exportedProject.settings.customLegend.entries).toEqual(
+      expect.arrayContaining([
+        {
+          group: 'Edges',
+          kind: 'edge',
+          label: 'Frontier',
+          color: '#f59e0b',
+        },
+      ])
+    );
 
     await legendToggle.uncheck();
     await legendTitle.fill('Temporary');
@@ -356,10 +516,16 @@ while (true) {}
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Traversal Key');
     await expect(legendPosition).toHaveValue('top-left');
-    await expect(page.getByTestId('custom-legend-entry-label-0')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-group-6')).toHaveValue(
+      'Edges'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-6')).toHaveValue(
       'Frontier'
     );
-    await expect(page.getByTestId('custom-legend-entry-color-0')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-kind-6')).toHaveValue(
+      'edge'
+    );
+    await expect(page.getByTestId('custom-legend-entry-color-6')).toHaveValue(
       '#f59e0b'
     );
     await expect(legendPreview).toBeVisible();
@@ -378,7 +544,10 @@ while (true) {}
       .setInputFiles(fixturePath('self-loop-project.graphviz.json'));
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
-    await expect(page.getByLabel('Show State Legend')).not.toBeChecked();
+    await expect(
+      page.getByRole('checkbox', { name: /^Legend$/ })
+    ).not.toBeChecked();
+    await expect(page.getByTestId('custom-export-legend')).toBeHidden();
 
     const selfLoopEdge = graphCanvas(page).locator(
       'path[marker-end="url(#graphstudio-arrow)"]'
@@ -474,11 +643,13 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
     await expect(page.getByTestId('slideshow-export-button')).toBeEnabled();
 
-    await page.getByRole('checkbox', { name: 'Custom Export Legend' }).check();
+    await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');
-    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-6').fill('Critical path');
+    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
 
     await page.getByRole('button', { name: 'Export MP4' }).click();

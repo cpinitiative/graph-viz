@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import {
+  CUSTOM_LEGEND_KINDS,
   CUSTOM_LEGEND_POSITIONS,
   DEFAULT_CUSTOM_LEGEND,
 } from './lib/customLegend';
@@ -13,12 +14,12 @@ const LAYOUT_OPTIONS = [
 const PRESET_OPTIONS = [
   ['bfs', 'BFS'],
   ['dfs', 'DFS'],
-  ['dijkstra', 'Dijkstra'],
-  ['kruskal-mst', 'Kruskal MST'],
-  ['dijkstra-shortest-paths', 'Dijkstra Shortest Paths'],
   ['topological-sort', 'Topological Sort'],
   ['disjoint-set-union', 'Disjoint Set Union'],
   ['connected-components', 'Connected Components'],
+  ['kruskal-mst', 'Kruskal MST'],
+  ['dijkstra', 'Dijkstra'],
+  ['dijkstra-shortest-paths', 'Dijkstra Shortest Paths'],
   ['multigraph', 'Multi-Edge / Loop'],
 ];
 
@@ -46,6 +47,11 @@ const CUSTOM_LEGEND_POSITION_LABELS = {
   'top-right': 'Top right',
   'bottom-left': 'Bottom left',
   'bottom-right': 'Bottom right',
+};
+
+const CUSTOM_LEGEND_KIND_LABELS = {
+  node: 'Node',
+  edge: 'Edge',
 };
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
@@ -172,8 +178,6 @@ const LeftSidebar = ({
   setSnapEnabled,
   showGrid,
   setShowGrid,
-  showLegend,
-  setShowLegend,
   customLegend = DEFAULT_CUSTOM_LEGEND,
   setCustomLegend,
   lockCanvas,
@@ -225,6 +229,8 @@ const LeftSidebar = ({
         ? [...current.entries]
         : [];
       entries[index] = {
+        group: '',
+        kind: 'node',
         label: '',
         color: '#64748B',
         ...(entries[index] ?? {}),
@@ -243,7 +249,12 @@ const LeftSidebar = ({
         ...current,
         entries: [
           ...(Array.isArray(current.entries) ? current.entries : []),
-          { label: 'New entry', color: '#64748B' },
+          {
+            group: 'Nodes',
+            kind: 'node',
+            label: 'New entry',
+            color: '#64748B',
+          },
         ],
       };
     });
@@ -259,6 +270,12 @@ const LeftSidebar = ({
         : [];
       return { ...current, entries };
     });
+  };
+  const resetLegendDefaults = () => {
+    setCustomLegend?.(prev => ({
+      ...DEFAULT_CUSTOM_LEGEND,
+      enabled: Boolean(prev?.enabled),
+    }));
   };
 
   return (
@@ -391,16 +408,11 @@ const LeftSidebar = ({
             checked={lockCanvas}
             onChange={setLockCanvas}
           />
-          <ToggleRow
-            label="Show State Legend"
-            checked={showLegend}
-            onChange={setShowLegend}
-          />
         </div>
       </div>
 
       <div className="space-y-3">
-        <SectionTitle>Presets</SectionTitle>
+        <SectionTitle>Examples</SectionTitle>
         <select
           aria-label="Load graph preset"
           onChange={event => {
@@ -409,7 +421,7 @@ const LeftSidebar = ({
           }}
           className="w-full rounded-md border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-dark-surface-container dark:text-dark-on-surface md:py-2"
         >
-          <option value="">Load a preset...</option>
+          <option value="">Choose algorithm...</option>
           {PRESET_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -458,7 +470,7 @@ const LeftSidebar = ({
           data-testid="custom-legend-controls"
         >
           <ToggleRow
-            label="Custom Export Legend"
+            label="Legend"
             checked={Boolean(customLegend.enabled)}
             onChange={enabled => patchCustomLegend({ enabled })}
           />
@@ -470,7 +482,7 @@ const LeftSidebar = ({
               <input
                 type="text"
                 value={customLegend.title ?? DEFAULT_CUSTOM_LEGEND.title}
-                aria-label="Custom Legend Title"
+                aria-label="Legend Title"
                 data-testid="custom-legend-title-input"
                 onChange={event =>
                   patchCustomLegend({ title: event.target.value })
@@ -484,7 +496,7 @@ const LeftSidebar = ({
               </span>
               <select
                 value={customLegend.position ?? DEFAULT_CUSTOM_LEGEND.position}
-                aria-label="Custom Legend Position"
+                aria-label="Legend Position"
                 data-testid="custom-legend-position-select"
                 onChange={event =>
                   patchCustomLegend({ position: event.target.value })
@@ -500,50 +512,103 @@ const LeftSidebar = ({
             </label>
           </div>
           <div className="space-y-1.5">
+            <div className="text-[10px] font-medium uppercase text-outline dark:text-dark-outline">
+              Entries
+            </div>
             {legendEntries.map((entry, index) => (
               <div
                 key={`custom-legend-entry-${index}`}
-                className="grid grid-cols-[1fr_2.5rem_1.75rem] items-center gap-1"
+                className="grid grid-cols-[1fr_1fr] gap-1 rounded bg-surface-container-low p-1 dark:bg-dark-surface"
               >
-                <input
-                  type="text"
-                  value={entry.label ?? ''}
-                  aria-label={`Custom Legend Entry ${index + 1} Label`}
-                  data-testid={`custom-legend-entry-label-${index}`}
-                  onChange={event =>
-                    updateLegendEntry(index, { label: event.target.value })
-                  }
-                  className={compactInputClass}
-                />
+                <label className="space-y-1">
+                  <span className="text-[9px] font-medium uppercase text-outline dark:text-dark-outline">
+                    Group
+                  </span>
+                  <input
+                    type="text"
+                    value={entry.group ?? ''}
+                    aria-label={`Legend Entry ${index + 1} Group`}
+                    data-testid={`custom-legend-entry-group-${index}`}
+                    onChange={event =>
+                      updateLegendEntry(index, { group: event.target.value })
+                    }
+                    className={compactInputClass}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[9px] font-medium uppercase text-outline dark:text-dark-outline">
+                    Label
+                  </span>
+                  <input
+                    type="text"
+                    value={entry.label ?? ''}
+                    aria-label={`Legend Entry ${index + 1} Label`}
+                    data-testid={`custom-legend-entry-label-${index}`}
+                    onChange={event =>
+                      updateLegendEntry(index, { label: event.target.value })
+                    }
+                    className={compactInputClass}
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[9px] font-medium uppercase text-outline dark:text-dark-outline">
+                    Kind
+                  </span>
+                  <select
+                    value={entry.kind ?? 'node'}
+                    aria-label={`Legend Entry ${index + 1} Kind`}
+                    data-testid={`custom-legend-entry-kind-${index}`}
+                    onChange={event =>
+                      updateLegendEntry(index, { kind: event.target.value })
+                    }
+                    className={compactInputClass}
+                  >
+                    {CUSTOM_LEGEND_KINDS.map(kind => (
+                      <option key={kind} value={kind}>
+                        {CUSTOM_LEGEND_KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <input
                   type="color"
                   value={entry.color ?? '#64748B'}
-                  aria-label={`Custom Legend Entry ${index + 1} Color`}
+                  aria-label={`Legend Entry ${index + 1} Color`}
                   data-testid={`custom-legend-entry-color-${index}`}
                   onChange={event =>
                     updateLegendEntry(index, { color: event.target.value })
                   }
-                  className="h-8 w-full rounded border border-outline-variant/30 bg-white p-0.5 dark:border-dark-outline-variant/30 dark:bg-gray-800"
+                  className="mt-4 h-8 w-full rounded border border-outline-variant/30 bg-white p-0.5 dark:border-dark-outline-variant/30 dark:bg-gray-800"
                 />
                 <button
                   type="button"
-                  aria-label={`Remove Custom Legend Entry ${index + 1}`}
+                  aria-label={`Remove Legend Entry ${index + 1}`}
                   data-testid={`custom-legend-remove-entry-${index}`}
                   onClick={() => removeLegendEntry(index)}
-                  className="h-8 rounded bg-surface-container-high text-xs font-semibold text-on-surface hover:bg-outline-variant/20 dark:bg-dark-surface-container-high dark:text-dark-on-surface"
+                  className="col-span-2 h-8 rounded bg-surface-container-high text-xs font-semibold text-on-surface hover:bg-outline-variant/20 dark:bg-dark-surface-container-high dark:text-dark-on-surface"
                 >
-                  -
+                  Remove
                 </button>
               </div>
             ))}
-            <button
-              type="button"
-              className={dataButtonClass}
-              data-testid="custom-legend-add-entry"
-              onClick={addLegendEntry}
-            >
-              Add Legend Entry
-            </button>
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                className={dataButtonClass}
+                data-testid="custom-legend-add-entry"
+                onClick={addLegendEntry}
+              >
+                Add Entry
+              </button>
+              <button
+                type="button"
+                className={dataButtonClass}
+                data-testid="custom-legend-reset"
+                onClick={resetLegendDefaults}
+              >
+                Reset Default
+              </button>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-1">

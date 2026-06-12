@@ -14,7 +14,6 @@ const DEFAULT_SETTINGS = {
   edgeRouting: EDGE_ROUTING.straight,
   snapEnabled: true,
   showGrid: false,
-  showLegend: false,
   customLegend: DEFAULT_CUSTOM_LEGEND,
   lockCanvas: true,
   viewState: null,
@@ -140,6 +139,13 @@ const sanitizeSettings = settings => {
   const globalInput = isRecord(input.globalSettings)
     ? input.globalSettings
     : {};
+  const hasCustomLegend = isRecord(input.customLegend);
+  const customLegend = hasCustomLegend
+    ? normalizeCustomLegend(input.customLegend)
+    : normalizeCustomLegend({
+        ...DEFAULT_CUSTOM_LEGEND,
+        enabled: input.showLegend === true,
+      });
   return {
     edgeRouting:
       input.edgeRouting === EDGE_ROUTING.bezier
@@ -150,8 +156,7 @@ const sanitizeSettings = settings => {
       DEFAULT_SETTINGS.snapEnabled
     ),
     showGrid: booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid),
-    showLegend: booleanOrDefault(input.showLegend, DEFAULT_SETTINGS.showLegend),
-    customLegend: normalizeCustomLegend(input.customLegend),
+    customLegend,
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
     globalSettings: {

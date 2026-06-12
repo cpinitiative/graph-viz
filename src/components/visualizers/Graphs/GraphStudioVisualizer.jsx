@@ -18,7 +18,10 @@ import {
 } from './graphStudio/hooks/useGraphStudioSelection';
 import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
 import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
-import { DEFAULT_CUSTOM_LEGEND } from './graphStudio/lib/customLegend';
+import {
+  DEFAULT_CUSTOM_LEGEND,
+  normalizeCustomLegend,
+} from './graphStudio/lib/customLegend';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
 
@@ -62,7 +65,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
-  const [showLegend, setShowLegend] = useState(false);
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const {
     viewState,
@@ -208,8 +210,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSnapEnabled,
     showGrid,
     setShowGrid,
-    showLegend,
-    setShowLegend,
     customLegend,
     setCustomLegend,
     lockCanvas,
@@ -261,6 +261,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
     setViewFromNodes(nextGraph.nodes);
+    setCustomLegend(prev =>
+      normalizeCustomLegend({
+        ...DEFAULT_CUSTOM_LEGEND,
+        ...(preset.legend ?? {}),
+        enabled: Boolean(prev?.enabled),
+      })
+    );
     setStatus(`Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}`);
   };
 
@@ -276,8 +283,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setSnapEnabled,
       showGrid,
       setShowGrid,
-      showLegend,
-      setShowLegend,
       customLegend,
       setCustomLegend,
       lockCanvas,
@@ -312,7 +317,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       viewState,
       setViewState,
       showGrid,
-      showLegend,
       customLegend,
       snapEnabled,
       lockCanvas,

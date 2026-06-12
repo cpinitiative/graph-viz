@@ -27,8 +27,6 @@ export const useGraphStudioImportExport = ({
   setSnapEnabled,
   showGrid,
   setShowGrid,
-  showLegend,
-  setShowLegend,
   customLegend,
   setCustomLegend,
   lockCanvas,
@@ -99,7 +97,6 @@ export const useGraphStudioImportExport = ({
         edgeRouting,
         snapEnabled,
         showGrid,
-        showLegend,
         customLegend: normalizeCustomLegend(customLegend),
         lockCanvas,
         viewState,
@@ -117,7 +114,6 @@ export const useGraphStudioImportExport = ({
     lockCanvas,
     setStatus,
     showGrid,
-    showLegend,
     snapEnabled,
     steps,
     viewState,
@@ -137,7 +133,6 @@ export const useGraphStudioImportExport = ({
         setEdgeRouting(project.settings.edgeRouting);
         setSnapEnabled(project.settings.snapEnabled);
         setShowGrid(project.settings.showGrid);
-        setShowLegend(project.settings.showLegend);
         setCustomLegend(project.settings.customLegend);
         setLockCanvas(project.settings.lockCanvas);
         setGlobalSettings(project.settings.globalSettings);
@@ -165,7 +160,6 @@ export const useGraphStudioImportExport = ({
       setLockCanvas,
       setMode,
       setShowGrid,
-      setShowLegend,
       setCustomLegend,
       setSnapEnabled,
       setStatus,
