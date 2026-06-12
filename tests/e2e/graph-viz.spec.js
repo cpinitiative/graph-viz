@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs/promises';
 import { fileURLToPath } from 'url';
 
 const unexpectedConsoleTypes = new Set(['error']);
@@ -293,6 +294,79 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('supports custom export legend preview and project round trip', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const legendControls = page.getByTestId('custom-legend-controls');
+    const legendToggle = page.getByRole('checkbox', {
+      name: 'Custom Export Legend',
+    });
+    const legendTitle = page.getByTestId('custom-legend-title-input');
+    const legendPosition = page.getByTestId('custom-legend-position-select');
+    const legendPreview = page.getByTestId('custom-export-legend');
+
+    await expect(legendControls).toBeVisible();
+    await expect(legendToggle).not.toBeChecked();
+    await expect(legendPreview).toBeHidden();
+
+    await legendToggle.check();
+    await expect(legendPreview).toBeVisible();
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Legend' })
+    ).toBeVisible();
+
+    await legendTitle.fill('Traversal Key');
+    await page.getByTestId('custom-legend-add-entry').click();
+    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
+    await legendPosition.selectOption('top-left');
+
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
+    ).toBeVisible();
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Frontier' })
+    ).toBeVisible();
+    await expect(legendPreview.locator('rect[fill="#f59e0b"]')).toBeVisible();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByTestId('project-export-button').click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    const exportedProject = JSON.parse(await fs.readFile(downloadPath, 'utf8'));
+    expect(exportedProject.settings.customLegend).toEqual({
+      enabled: true,
+      title: 'Traversal Key',
+      entries: [{ label: 'Frontier', color: '#f59e0b' }],
+      position: 'top-left',
+    });
+
+    await legendToggle.uncheck();
+    await legendTitle.fill('Temporary');
+    await legendPosition.selectOption('bottom-right');
+    await expect(legendPreview).toBeHidden();
+
+    await page.getByTestId('project-import-input').setInputFiles(downloadPath);
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(legendToggle).toBeChecked();
+    await expect(legendTitle).toHaveValue('Traversal Key');
+    await expect(legendPosition).toHaveValue('top-left');
+    await expect(page.getByTestId('custom-legend-entry-label-0')).toHaveValue(
+      'Frontier'
+    );
+    await expect(page.getByTestId('custom-legend-entry-color-0')).toHaveValue(
+      '#f59e0b'
+    );
+    await expect(legendPreview).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
   test('imports and renders a directed self-loop edge', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
@@ -399,6 +473,13 @@ api.edge('e0', '#f59e0b');
 
     await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
     await expect(page.getByTestId('slideshow-export-button')).toBeEnabled();
+
+    await page.getByRole('checkbox', { name: 'Custom Export Legend' }).check();
+    await page.getByTestId('custom-legend-title-input').fill('Export Key');
+    await page.getByTestId('custom-legend-add-entry').click();
+    await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
+    await expect(page.getByTestId('custom-export-legend')).toBeVisible();
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
