@@ -456,6 +456,7 @@ while (true) {}
     const legendEditor = page.getByTestId('custom-legend-editor');
     const legendTitle = page.getByTestId('custom-legend-title-input');
     const legendPosition = page.getByTestId('custom-legend-position-select');
+    const legendPlacement = page.getByTestId('custom-legend-placement-select');
     const legendPreview = page.getByTestId('custom-export-legend');
 
     await expect(page.getByLabel('Show State Legend')).toBeHidden();
@@ -465,8 +466,9 @@ while (true) {}
       '6 entries'
     );
     await expect(page.getByTestId('custom-legend-summary')).toContainText(
-      'Bottom right'
+      'Auto'
     );
+    await expect(legendPlacement).toHaveValue('auto');
     await expect(legendEditor).toBeHidden();
     await expect(legendToggle).not.toBeChecked();
     await expect(legendPreview).toBeHidden();
@@ -509,12 +511,13 @@ while (true) {}
     await page.getByTestId('custom-legend-entry-label-6').fill('Frontier edge');
     await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
     await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
-    await legendPosition.selectOption('top-left');
+    await legendPlacement.selectOption('top-left');
 
     await expect(legendPreview).toHaveAttribute(
       'transform',
       /translate\(16 16\)/
     );
+    await expect(legendPosition).toHaveValue('top-left');
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
     ).toBeVisible();
@@ -529,7 +532,8 @@ while (true) {}
     await page.getByTestId('custom-legend-reset').click();
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Legend');
-    await expect(legendPosition).toHaveValue('bottom-right');
+    await expect(legendPosition).toHaveValue('auto');
+    await expect(legendPlacement).toHaveValue('auto');
     await expect(page.getByTestId('custom-legend-entry-group-0')).toHaveValue(
       'Nodes'
     );

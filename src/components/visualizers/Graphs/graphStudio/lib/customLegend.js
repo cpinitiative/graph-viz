@@ -1,11 +1,20 @@
 import { GRAPH_STATE_COLORS } from './stateColors';
 
 export const CUSTOM_LEGEND_POSITIONS = [
+  'auto',
   'top-left',
   'top-right',
   'bottom-left',
   'bottom-right',
 ];
+
+export const CUSTOM_LEGEND_POSITION_LABELS = {
+  auto: 'Auto',
+  'top-left': 'Top Left',
+  'top-right': 'Top Right',
+  'bottom-left': 'Bottom Left',
+  'bottom-right': 'Bottom Right',
+};
 
 export const CUSTOM_LEGEND_KINDS = ['node', 'edge'];
 
@@ -53,7 +62,7 @@ export const DEFAULT_CUSTOM_LEGEND_ENTRIES = [
 export const DEFAULT_CUSTOM_LEGEND = {
   enabled: false,
   title: 'Legend',
-  position: 'bottom-right',
+  position: 'auto',
   entries: DEFAULT_CUSTOM_LEGEND_ENTRIES,
 };
 
