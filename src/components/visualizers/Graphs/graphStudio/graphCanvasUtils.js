@@ -74,7 +74,7 @@ export const insetSegment = (from, to, directed, nodeRadius = NODE_RADIUS) => {
   const ux = dx / length;
   const uy = dy / length;
   const startInset = nodeRadius * 0.94;
-  const endInset = directed ? nodeRadius + 4 : nodeRadius * 0.94;
+  const endInset = directed ? nodeRadius : nodeRadius * 0.94;
   return {
     x1: from.x + ux * startInset,
     y1: from.y + uy * startInset,

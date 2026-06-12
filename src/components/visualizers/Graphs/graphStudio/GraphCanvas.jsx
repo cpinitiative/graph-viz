@@ -597,6 +597,9 @@ const GraphCanvas = ({
               selectedObject?.type === 'edge' &&
               String(selectedObject.id) === String(edge.id);
             const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
+            const endpointMoved =
+              diff.changedNodes.has(String(edge.from)) ||
+              diff.changedNodes.has(String(edge.to));
             const strokeWidth = edgeWidth;
             return (
               <GraphEdge
@@ -608,7 +611,9 @@ const GraphCanvas = ({
                 markerId={markerId}
                 labelPosition={labelPosition}
                 strokeWidth={strokeWidth}
-                shouldAnimate={diff.changedEdges.has(String(edge.id))}
+                shouldAnimate={
+                  endpointMoved || diff.changedEdges.has(String(edge.id))
+                }
                 onPointerDown={event => {
                   event.stopPropagation();
                   onSelectEdge(edge.id);
