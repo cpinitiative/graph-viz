@@ -22,7 +22,10 @@ const truncateLegendText = (value, maxLength = 34) => {
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
-const buildLegendRows = entries => {
+const buildLegendRows = (
+  entries,
+  { groupMaxLength = 28, entryMaxLength = 34 } = {}
+) => {
   const rows = [];
   let activeGroup = null;
   entries.forEach((entry, index) => {
@@ -31,7 +34,7 @@ const buildLegendRows = entries => {
       rows.push({
         type: 'group',
         key: `group-${index}-${group}`,
-        label: truncateLegendText(group, 28),
+        label: truncateLegendText(group, groupMaxLength),
       });
       activeGroup = group;
     }
@@ -39,10 +42,34 @@ const buildLegendRows = entries => {
       type: 'entry',
       key: `entry-${index}-${entry.label}`,
       entry,
-      label: truncateLegendText(entry.label, 34),
+      label: truncateLegendText(entry.label, entryMaxLength),
     });
   });
   return rows;
+};
+
+const resolveLegendPosition = position =>
+  position === 'auto' ? 'bottom-right' : position;
+
+const getLegendOrigin = ({
+  canvasSize,
+  boxWidth,
+  boxHeight,
+  margin,
+  position,
+}) => {
+  const maxX = Math.max(0, canvasSize.width - boxWidth);
+  const maxY = Math.max(0, canvasSize.height - boxHeight);
+  const leftX = Math.min(margin, maxX);
+  const topY = Math.min(margin, maxY);
+  const rightX = Math.max(0, maxX - margin);
+  const bottomY = Math.max(0, maxY - margin);
+  const resolvedPosition = resolveLegendPosition(position);
+
+  return {
+    x: resolvedPosition.includes('right') ? rightX : leftX,
+    y: resolvedPosition.includes('bottom') ? bottomY : topY,
+  };
 };
 
 const LegendSwatch = ({ entry }) => {
@@ -83,25 +110,58 @@ const Legend = ({ customLegend, canvasSize }) => {
     ...entry,
     label: truncateLegendText(entry.label, 34),
   }));
-  const rows = buildLegendRows(entries);
+  const initialRows = buildLegendRows(entries);
   const maxTextLength = Math.max(
     title.length,
-    ...rows.map(row => row.label.length),
+    ...initialRows.map(row => row.label.length),
     10
   );
-  const boxWidth = Math.min(300, Math.max(168, 48 + maxTextLength * 7));
+  const margin = Math.min(
+    16,
+    Math.max(
+      4,
+      Math.floor(Math.min(canvasSize.width, canvasSize.height) * 0.04)
+    )
+  );
+  const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
+  const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
+  const boxWidth = Math.min(
+    maxBoxWidth,
+    300,
+    Math.max(168, 48 + maxTextLength * 7)
+  );
+  const titleMaxLength = Math.max(4, Math.floor((boxWidth - 24) / 7));
+  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 48) / 7));
+  const fittedTitle = truncateLegendText(title, titleMaxLength);
+  const fittedEntries = legend.entries.map(entry => ({
+    ...entry,
+    label: truncateLegendText(entry.label, rowMaxLength),
+  }));
+  const rows = buildLegendRows(fittedEntries, {
+    groupMaxLength: rowMaxLength,
+    entryMaxLength: rowMaxLength,
+  });
   const rowsHeight = rows.reduce(
     (height, row) => height + (row.type === 'group' ? 18 : 22),
     0
   );
-  const boxHeight = 42 + rowsHeight;
-  const margin = 16;
-  const x = legend.position.includes('right')
-    ? Math.max(margin, canvasSize.width - boxWidth - margin)
-    : margin;
-  const y = legend.position.includes('bottom')
-    ? Math.max(margin, canvasSize.height - boxHeight - margin)
-    : margin;
+  const boxHeight = Math.min(maxBoxHeight, 42 + rowsHeight);
+  const availableRowsHeight = Math.max(0, boxHeight - 42);
+  const visibleRows = [];
+  let usedRowsHeight = 0;
+  for (const row of rows) {
+    const rowHeight = row.type === 'group' ? 18 : 22;
+    if (usedRowsHeight + rowHeight > availableRowsHeight) break;
+    visibleRows.push(row);
+    usedRowsHeight += rowHeight;
+  }
+  const { x, y } = getLegendOrigin({
+    canvasSize,
+    boxWidth,
+    boxHeight,
+    margin,
+    position: legend.position,
+  });
 
   return (
     <g
@@ -128,7 +188,7 @@ const Legend = ({ customLegend, canvasSize }) => {
         fontWeight="700"
         letterSpacing="0"
       >
-        {title}
+        {fittedTitle}
       </text>
       <line
         x1="12"
@@ -138,10 +198,10 @@ const Legend = ({ customLegend, canvasSize }) => {
         stroke="#E2E8F0"
         strokeWidth="1"
       />
-      {rows.map((row, index) => {
+      {visibleRows.map((row, index) => {
         const rowY =
           42 +
-          rows
+          visibleRows
             .slice(0, index)
             .reduce(
               (height, previous) =>

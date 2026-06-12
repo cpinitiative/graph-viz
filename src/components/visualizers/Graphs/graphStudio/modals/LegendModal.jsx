@@ -2,17 +2,11 @@ import { useEffect } from 'react';
 import {
   CUSTOM_LEGEND_FALLBACK_COLOR,
   CUSTOM_LEGEND_KINDS,
+  CUSTOM_LEGEND_POSITION_LABELS,
   CUSTOM_LEGEND_POSITIONS,
   DEFAULT_CUSTOM_LEGEND,
 } from '../lib/customLegend';
 import ModalCloseButton from './ModalCloseButton';
-
-const CUSTOM_LEGEND_POSITION_LABELS = {
-  'top-left': 'Top left',
-  'top-right': 'Top right',
-  'bottom-left': 'Bottom left',
-  'bottom-right': 'Bottom right',
-};
 
 const CUSTOM_LEGEND_KIND_LABELS = {
   node: 'Node',

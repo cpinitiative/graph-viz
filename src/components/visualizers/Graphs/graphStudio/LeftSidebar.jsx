@@ -1,5 +1,9 @@
 import { useRef } from 'react';
-import { DEFAULT_CUSTOM_LEGEND } from './lib/customLegend';
+import {
+  CUSTOM_LEGEND_POSITION_LABELS,
+  CUSTOM_LEGEND_POSITIONS,
+  DEFAULT_CUSTOM_LEGEND,
+} from './lib/customLegend';
 
 const MODE_OPTIONS = ['select', 'pan', 'draw'];
 const LAYOUT_OPTIONS = [
@@ -35,12 +39,8 @@ const checkboxClass =
   'h-5 w-5 rounded bg-surface-container-high text-blue-800 focus:ring-blue-800 focus:ring-offset-slate-800';
 const dataButtonClass =
   'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
-const CUSTOM_LEGEND_POSITION_LABELS = {
-  'top-left': 'Top left',
-  'top-right': 'Top right',
-  'bottom-left': 'Bottom left',
-  'bottom-right': 'Bottom right',
-};
+const compactSelectClass =
+  'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -202,11 +202,12 @@ const LeftSidebar = ({
   const legendEntries = Array.isArray(customLegend.entries)
     ? customLegend.entries
     : [];
-  const legendPosition =
-    customLegend.position ?? DEFAULT_CUSTOM_LEGEND.position;
+  const legendPosition = CUSTOM_LEGEND_POSITIONS.includes(customLegend.position)
+    ? customLegend.position
+    : DEFAULT_CUSTOM_LEGEND.position;
   const legendSummary = `${legendEntries.length} ${
     legendEntries.length === 1 ? 'entry' : 'entries'
-  } - ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Bottom right'}`;
+  } - ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -438,6 +439,30 @@ const LeftSidebar = ({
               Edit Legend
             </button>
           </div>
+          <label
+            className="block space-y-1 rounded bg-surface-container-low p-2 dark:bg-dark-surface"
+            htmlFor="custom-legend-sidebar-position"
+          >
+            <span className="text-[10px] font-semibold uppercase text-outline dark:text-dark-outline">
+              Placement
+            </span>
+            <select
+              id="custom-legend-sidebar-position"
+              value={legendPosition}
+              aria-label="Legend Placement"
+              data-testid="custom-legend-placement-select"
+              onChange={event =>
+                patchCustomLegend({ position: event.target.value })
+              }
+              className={compactSelectClass}
+            >
+              {CUSTOM_LEGEND_POSITIONS.map(position => (
+                <option key={position} value={position}>
+                  {CUSTOM_LEGEND_POSITION_LABELS[position]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="grid grid-cols-2 gap-1">
           <button
