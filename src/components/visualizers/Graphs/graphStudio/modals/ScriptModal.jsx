@@ -7,6 +7,7 @@ const ScriptModal = ({
   onClose,
   onSubmit,
   defaultScript,
+  error,
 }) => {
   if (!open) return null;
 
@@ -31,6 +32,14 @@ const ScriptModal = ({
             Write JS using `api.active(id)`, `api.visited(id)`, `api.edge(id,
             color)` or `api.push(patch)`.
           </p>
+          {error && (
+            <div
+              className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-950 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
           <textarea
             value={text}
             onChange={event => onTextChange(event.target.value)}

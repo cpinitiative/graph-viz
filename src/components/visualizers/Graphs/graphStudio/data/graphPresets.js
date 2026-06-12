@@ -104,12 +104,14 @@ export const GRAPH_PRESETS = {
         { id: 2, label: 'C', x: 500, y: 300, visible: true },
         { id: 3, label: 'D', x: 200, y: 400, visible: true },
         { id: 4, label: 'E', x: 400, y: 400, visible: true },
+        { id: 5, label: 'F', x: 600, y: 400, visible: true },
       ],
       edges: [
         { id: 'e0', from: 0, to: 1, directed: true, visible: true },
         { id: 'e1', from: 0, to: 2, directed: true, visible: true },
         { id: 'e2', from: 1, to: 3, directed: true, visible: true },
         { id: 'e3', from: 1, to: 4, directed: true, visible: true },
+        { id: 'e4', from: 2, to: 5, directed: true, visible: true },
       ],
     },
     steps: [
@@ -204,6 +206,26 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's7',
+        description: 'Explore F',
+        durationMs: 600,
+        nodeOverrides: {
+          0: { status: 'active', color: '#3b82f6' },
+          1: { status: 'visited', color: '#22c55e' },
+          2: { status: 'active', color: '#3b82f6' },
+          3: { status: 'visited', color: '#22c55e' },
+          4: { status: 'visited', color: '#22c55e' },
+          5: { status: 'active', color: '#3b82f6' },
+        },
+        edgeOverrides: {
+          e0: { color: '#22c55e' },
+          e1: { color: '#3b82f6' },
+          e2: { color: '#22c55e' },
+          e3: { color: '#22c55e' },
+          e4: { color: '#3b82f6' },
+        },
+      },
+      {
+        id: 's8',
         description: 'Finish DFS',
         durationMs: 600,
         nodeOverrides: {
@@ -212,12 +234,14 @@ export const GRAPH_PRESETS = {
           2: { status: 'visited', color: '#22c55e' },
           3: { status: 'visited', color: '#22c55e' },
           4: { status: 'visited', color: '#22c55e' },
+          5: { status: 'visited', color: '#22c55e' },
         },
         edgeOverrides: {
           e0: { color: '#22c55e' },
           e1: { color: '#22c55e' },
           e2: { color: '#22c55e' },
           e3: { color: '#22c55e' },
+          e4: { color: '#22c55e' },
         },
       },
     ],
@@ -601,11 +625,11 @@ export const GRAPH_PRESETS = {
     graph: {
       nodes: [
         { id: 0, label: 'S', x: 260, y: 520, visible: true },
-        { id: 1, label: 'A', x: 620, y: 300, visible: true },
-        { id: 2, label: 'B', x: 620, y: 760, visible: true },
-        { id: 3, label: 'C', x: 1020, y: 300, visible: true },
-        { id: 4, label: 'D', x: 1060, y: 760, visible: true },
-        { id: 5, label: 'T', x: 1480, y: 520, visible: true },
+        { id: 1, label: 'A', x: 600, y: 340, visible: true },
+        { id: 2, label: 'B', x: 600, y: 700, visible: true },
+        { id: 3, label: 'C', x: 980, y: 340, visible: true },
+        { id: 4, label: 'D', x: 980, y: 700, visible: true },
+        { id: 5, label: 'T', x: 1340, y: 520, visible: true },
       ],
       edges: [
         {

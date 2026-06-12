@@ -20,6 +20,19 @@ import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
 import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
+
+const PRESET_STATUS_LABELS = {
+  bfs: 'BFS',
+  dfs: 'DFS',
+  dijkstra: 'Dijkstra',
+  'kruskal-mst': 'Kruskal MST',
+  'dijkstra-shortest-paths': 'Dijkstra Shortest Paths',
+  'topological-sort': 'Topological Sort',
+  'disjoint-set-union': 'Disjoint Set Union',
+  'connected-components': 'Connected Components',
+  multigraph: 'Multi-Edge / Loop',
+};
+
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
     () =>
@@ -168,6 +181,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setIsScriptOpen,
     scriptText,
     setScriptText,
+    scriptError,
     runScript,
     isExportVideoOpen,
     exportVideoLabelPos,
@@ -243,7 +257,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
     setViewFromNodes(nextGraph.nodes);
-    setStatus(`Applied ${presetName.toUpperCase()} preset`);
+    setStatus(`Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}`);
   };
 
   const layoutProps = {
@@ -365,6 +379,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         onTextChange: setScriptText,
         onClose: () => setIsScriptOpen(false),
         onSubmit: runScript,
+        error: scriptError,
       },
       exportVideo: {
         open: isExportVideoOpen,

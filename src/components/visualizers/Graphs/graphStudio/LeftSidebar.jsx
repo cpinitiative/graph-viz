@@ -7,9 +7,9 @@ const LAYOUT_OPTIONS = [
   ['force', 'Force'],
 ];
 const PRESET_OPTIONS = [
-  ['bfs', 'BFS Preset'],
-  ['dfs', 'DFS Preset'],
-  ['dijkstra', 'Dijkstra Preset'],
+  ['bfs', 'BFS'],
+  ['dfs', 'DFS'],
+  ['dijkstra', 'Dijkstra'],
   ['kruskal-mst', 'Kruskal MST'],
   ['dijkstra-shortest-paths', 'Dijkstra Shortest Paths'],
   ['topological-sort', 'Topological Sort'],
