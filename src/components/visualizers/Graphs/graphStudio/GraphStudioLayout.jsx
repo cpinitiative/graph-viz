@@ -13,6 +13,7 @@ import PropertyPanel from './PropertyPanel';
 import TimelinePanel from './TimelinePanel';
 import { DEFAULT_SCRIPT } from './data/defaultScript';
 import ExportVideoModal from './modals/ExportVideoModal';
+import LegendModal from './modals/LegendModal';
 import ParserModal from './modals/ParserModal';
 import ScriptModal from './modals/ScriptModal';
 
@@ -133,6 +134,12 @@ const ModalStack = ({ modals }) => (
       onLabelPosChange={modals.exportVideo.onLabelPosChange}
       onClose={modals.exportVideo.onClose}
       onExport={modals.exportVideo.onExport}
+    />
+    <LegendModal
+      open={modals.legend.open}
+      customLegend={modals.legend.customLegend}
+      setCustomLegend={modals.legend.setCustomLegend}
+      onClose={modals.legend.onClose}
     />
   </>
 );
