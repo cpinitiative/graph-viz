@@ -50,6 +50,7 @@ export const useGraphStudioImportExport = ({
   const [parserText, setParserText] = useState('');
   const [isScriptOpen, setIsScriptOpen] = useState(false);
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
+  const [scriptError, setScriptError] = useState('');
   const isScriptRunningRef = useRef(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
@@ -237,9 +238,20 @@ export const useGraphStudioImportExport = ({
     viewState,
   ]);
 
+  const setScriptModalOpen = useCallback(open => {
+    setIsScriptOpen(open);
+    if (open) setScriptError('');
+  }, []);
+
+  const updateScriptText = useCallback(value => {
+    setScriptText(value);
+    setScriptError('');
+  }, []);
+
   const runScript = useCallback(async () => {
     if (isScriptRunningRef.current) return;
     isScriptRunningRef.current = true;
+    setScriptError('');
     setStatus('Running script...');
     try {
       const traceSteps = await runScriptTrace({
@@ -248,9 +260,12 @@ export const useGraphStudioImportExport = ({
       });
       replaceTimeline(baseGraph, traceSteps);
       setIsScriptOpen(false);
+      setScriptError('');
       setStatus(`Script generated ${traceSteps.length} frames`);
     } catch (error) {
-      setStatus(`Script error: ${error.message}`);
+      const message = `Script error: ${error.message}`;
+      setScriptError(message);
+      setStatus(message);
     } finally {
       isScriptRunningRef.current = false;
     }
@@ -276,9 +291,10 @@ export const useGraphStudioImportExport = ({
     setParserText,
     applyParserText,
     isScriptOpen,
-    setIsScriptOpen,
+    setIsScriptOpen: setScriptModalOpen,
     scriptText,
-    setScriptText,
+    setScriptText: updateScriptText,
+    scriptError,
     runScript,
     isExportVideoOpen,
     exportVideoLabelPos,

@@ -13,6 +13,7 @@ dist-ssr
 test-results
 playwright-report
 blob-report
+qa-screenshots
 *.local
 
 # Editor directories and files

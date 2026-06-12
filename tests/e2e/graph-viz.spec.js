@@ -174,9 +174,11 @@ while (true) {}
 `);
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(
-      page.getByText(
-        'Script error: Script timed out. Check for infinite loops or expensive work.'
-      )
+      page
+        .getByTestId('script-modal')
+        .getByText(
+          'Script error: Script timed out. Check for infinite loops or expensive work.'
+        )
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     await page.getByRole('button', { name: 'Cancel' }).click();
