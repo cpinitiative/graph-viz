@@ -21,7 +21,8 @@ https://graph-viz.usaco.guide
 - MP4 export for embedding animations in written or video material.
 - Edge-list import/export for simple graph structure exchange.
 - Script Mode for generating timeline frames from small JavaScript traces.
-- Editable canvas/export legend with default entries for built-in graph states.
+- Visual state legend for active, queued, visited, highlighted, and selected
+  elements.
 - Playwright E2E coverage for key editor, import/export, preset, and export
   workflows.
 
