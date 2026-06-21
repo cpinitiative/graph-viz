@@ -6,6 +6,7 @@ export const CUSTOM_LEGEND_POSITIONS = [
   'top-right',
   'bottom-left',
   'bottom-right',
+  'custom',
 ];
 
 export const CUSTOM_LEGEND_POSITION_LABELS = {
@@ -14,6 +15,7 @@ export const CUSTOM_LEGEND_POSITION_LABELS = {
   'top-right': 'Top Right',
   'bottom-left': 'Bottom Left',
   'bottom-right': 'Bottom Right',
+  custom: 'Custom',
 };
 
 export const CUSTOM_LEGEND_KINDS = ['node', 'edge'];
@@ -63,12 +65,21 @@ export const DEFAULT_CUSTOM_LEGEND = {
   enabled: false,
   title: 'Legend',
   position: 'auto',
+  customPosition: {
+    x: 0.75,
+    y: 0.15,
+  },
   entries: DEFAULT_CUSTOM_LEGEND_ENTRIES,
 };
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
+const clampNormalizedCoordinate = value => {
+  const coordinate = Number(value);
+  if (!Number.isFinite(coordinate)) return null;
+  return Math.max(0, Math.min(1, coordinate));
+};
 
 export const isValidLegendColor = value =>
   typeof value === 'string' && HEX_COLOR_PATTERN.test(value);
@@ -106,6 +117,14 @@ export const normalizeCustomLegend = value => {
     ? value.entries
     : DEFAULT_CUSTOM_LEGEND.entries;
   const entries = rawEntries.map(normalizeLegendEntry).filter(Boolean);
+  const customPositionValue =
+    value.customPosition !== null &&
+    typeof value.customPosition === 'object' &&
+    !Array.isArray(value.customPosition)
+      ? value.customPosition
+      : {};
+  const x = clampNormalizedCoordinate(customPositionValue.x);
+  const y = clampNormalizedCoordinate(customPositionValue.y);
 
   return {
     enabled:
@@ -117,5 +136,9 @@ export const normalizeCustomLegend = value => {
     position: CUSTOM_LEGEND_POSITIONS.includes(value.position)
       ? value.position
       : DEFAULT_CUSTOM_LEGEND.position,
+    customPosition: {
+      x: x ?? DEFAULT_CUSTOM_LEGEND.customPosition.x,
+      y: y ?? DEFAULT_CUSTOM_LEGEND.customPosition.y,
+    },
   };
 };

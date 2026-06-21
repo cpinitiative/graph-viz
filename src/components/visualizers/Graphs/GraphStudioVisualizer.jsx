@@ -345,6 +345,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setViewState,
       showGrid,
       customLegend,
+      setCustomLegend,
       snapEnabled,
       lockCanvas,
       edgeRouting,

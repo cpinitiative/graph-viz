@@ -92,6 +92,7 @@ const getLegendOrigin = ({
   boxHeight,
   margin,
   position,
+  customPosition,
 }) => {
   const maxX = Math.max(0, canvasSize.width - boxWidth);
   const maxY = Math.max(0, canvasSize.height - boxHeight);
@@ -100,6 +101,13 @@ const getLegendOrigin = ({
   const rightX = Math.max(0, maxX - margin);
   const bottomY = Math.max(0, maxY - margin);
   const resolvedPosition = resolveLegendPosition(position);
+
+  if (resolvedPosition === 'custom') {
+    return {
+      x: leftX + (rightX - leftX) * customPosition.x,
+      y: topY + (bottomY - topY) * customPosition.y,
+    };
+  }
 
   return {
     x: resolvedPosition.includes('right') ? rightX : leftX,
@@ -134,8 +142,10 @@ const LegendSwatch = ({ entry }) => {
   );
 };
 
-const Legend = ({ customLegend, canvasSize }) => {
+const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
   const legend = normalizeCustomLegend(customLegend);
+  const dragStateRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
   if (!legend.enabled || canvasSize.width <= 0 || canvasSize.height <= 0) {
     return null;
   }
@@ -196,14 +206,84 @@ const Legend = ({ customLegend, canvasSize }) => {
     boxHeight,
     margin,
     position: legend.position,
+    customPosition: legend.customPosition,
   });
+  const leftX = Math.min(margin, Math.max(0, canvasSize.width - boxWidth));
+  const topY = Math.min(margin, Math.max(0, canvasSize.height - boxHeight));
+  const rightX = Math.max(0, Math.max(0, canvasSize.width - boxWidth) - margin);
+  const bottomY = Math.max(
+    0,
+    Math.max(0, canvasSize.height - boxHeight) - margin
+  );
+  const updateCustomPosition = event => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const svgBounds = svgRef.current?.getBoundingClientRect();
+    if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
+    const scaleX = canvasSize.width / svgBounds.width;
+    const scaleY = canvasSize.height / svgBounds.height;
+    const nextX =
+      dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
+    const nextY =
+      dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
+    const normalizedX =
+      rightX > leftX
+        ? Math.max(0, Math.min(1, (nextX - leftX) / (rightX - leftX)))
+        : 0;
+    const normalizedY =
+      bottomY > topY
+        ? Math.max(0, Math.min(1, (nextY - topY) / (bottomY - topY)))
+        : 0;
+    setCustomLegend?.(prev => ({
+      ...normalizeCustomLegend(prev),
+      position: 'custom',
+      customPosition: {
+        x: normalizedX,
+        y: normalizedY,
+      },
+    }));
+  };
+  const finishDragging = event => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragStateRef.current = null;
+    setIsDragging(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
 
   return (
     <g
       data-testid="custom-export-legend"
+      data-legend-position={legend.position}
+      data-custom-position-x={legend.customPosition.x}
+      data-custom-position-y={legend.customPosition.y}
       aria-label="Legend preview"
-      pointerEvents="none"
+      pointerEvents="all"
       transform={`translate(${x} ${y})`}
+      onPointerDown={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        dragStateRef.current = {
+          pointerId: event.pointerId,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          originX: x,
+          originY: y,
+        };
+        setIsDragging(true);
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerMove={updateCustomPosition}
+      onPointerUp={finishDragging}
+      onPointerCancel={finishDragging}
+      style={{
+        cursor: isDragging ? 'grabbing' : 'grab',
+        touchAction: 'none',
+      }}
     >
       <rect
         x="0"
@@ -292,6 +372,7 @@ const GraphCanvas = ({
   setViewState,
   showGrid,
   customLegend,
+  setCustomLegend,
   snapEnabled,
   lockCanvas,
   edgeRouting,
@@ -808,7 +889,12 @@ const GraphCanvas = ({
             />
           )}
         </g>
-        <Legend customLegend={customLegend} canvasSize={canvasSize} />
+        <Legend
+          customLegend={customLegend}
+          setCustomLegend={setCustomLegend}
+          canvasSize={canvasSize}
+          svgRef={svgRef}
+        />
       </svg>
     </div>
   );
