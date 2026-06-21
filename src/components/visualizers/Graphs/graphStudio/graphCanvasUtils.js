@@ -8,6 +8,10 @@ import {
 const MIN_ZOOM_FLOOR = 0.1;
 const MAX_ZOOM = 2.6;
 const EPSILON = 0.001;
+export const EDGE_LABEL_FONT_SIZE = 12;
+const EDGE_LABEL_HORIZONTAL_PADDING = 6;
+const EDGE_LABEL_HEIGHT = 18;
+const EDGE_LABEL_CHARACTER_WIDTH = 7.4;
 
 export const computeMinZoom = (viewportW, viewportH) => {
   if (!viewportW || !viewportH) return MIN_ZOOM_FLOOR;
@@ -169,8 +173,11 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
 
 export const measureLabelRect = (point, labelText) => {
   const text = String(labelText ?? '');
-  const width = Math.max(22, text.length * 6.9 + 10);
-  const height = 15;
+  const width = Math.max(
+    24,
+    text.length * EDGE_LABEL_CHARACTER_WIDTH + EDGE_LABEL_HORIZONTAL_PADDING * 2
+  );
+  const height = EDGE_LABEL_HEIGHT;
   return {
     left: point.x - width / 2,
     right: point.x + width / 2,
