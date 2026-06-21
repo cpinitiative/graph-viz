@@ -145,6 +145,27 @@ const closeLegendEditor = async page => {
   await expect(page.getByTestId('custom-legend-modal')).toBeHidden();
 };
 
+const openImportMenu = async page => {
+  await page.getByTestId('open-import-menu').click();
+  await expect(page.getByTestId('import-menu-modal')).toBeVisible();
+  return page.getByTestId('import-menu-modal');
+};
+
+const openExportMenu = async page => {
+  await page.getByTestId('open-export-menu').click();
+  await expect(page.getByTestId('export-menu-modal')).toBeVisible();
+  return page.getByTestId('export-menu-modal');
+};
+
+const closeExportMenu = async page => {
+  await page
+    .getByTestId('export-menu-modal')
+    .getByRole('button', { name: 'Close', exact: true })
+    .last()
+    .click();
+  await expect(page.getByTestId('export-menu-modal')).toBeHidden();
+};
+
 const fixturePath = name =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
@@ -366,7 +387,10 @@ test.describe('Graph Viz desktop smoke', () => {
     await frameDescription.fill('Smoke test frame');
     await expect(frameDescription).toHaveValue('Smoke test frame');
 
-    await page.getByRole('button', { name: 'Import Edge List' }).click();
+    const importMenu = await openImportMenu(page);
+    await importMenu
+      .getByRole('button', { name: 'Paste / Import Edge List' })
+      .click();
     await expect(page.getByText('Text-to-Graph Parser')).toBeVisible();
     await page.locator('textarea').last().fill('0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
@@ -627,14 +651,16 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
+    await openExportMenu(page);
     await expect(page.getByTestId('project-export-button')).toBeVisible();
-    await expect(page.getByTestId('project-import-button')).toBeVisible();
-
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.graphviz\.json$/);
+    await closeExportMenu(page);
 
+    await openImportMenu(page);
+    await expect(page.getByTestId('project-import-button')).toBeVisible();
     await page
       .getByTestId('project-import-input')
       .setInputFiles(fixturePath('sample-project.graphviz.json'));
@@ -658,6 +684,7 @@ while (true) {}
         .filter({ hasText: 'Nodes' })
     ).toBeVisible();
 
+    await openImportMenu(page);
     await page
       .getByTestId('project-import-input')
       .setInputFiles(fixturePath('invalid-project.graphviz.json'));
@@ -670,12 +697,93 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('opens consolidated import and export menus', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const importMenu = await openImportMenu(page);
+    await expect(
+      importMenu.getByRole('heading', { name: 'Import' })
+    ).toBeVisible();
+    await expect(
+      importMenu.getByRole('button', { name: 'Upload Project File' })
+    ).toBeVisible();
+    await expect(
+      importMenu.getByRole('button', { name: 'Paste Project JSON' })
+    ).toBeVisible();
+    await expect(
+      importMenu.getByRole('button', { name: 'Paste / Import Edge List' })
+    ).toBeVisible();
+    await importMenu.getByRole('button', { name: 'Cancel' }).click();
+    await expect(importMenu).toBeHidden();
+
+    const exportMenu = await openExportMenu(page);
+    await expect(
+      exportMenu.getByRole('heading', { name: 'Export' })
+    ).toBeVisible();
+    await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      /Edge list copied to clipboard|Clipboard unavailable/
+    );
+    const parserModal = page.getByTestId('parser-modal');
+    if (await parserModal.isVisible()) {
+      await expect(parserModal.locator('textarea')).not.toHaveValue('');
+      await parserModal.getByRole('button', { name: 'Cancel' }).click();
+    }
+    await closeExportMenu(page);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps import and export menus usable on mobile', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await page.getByTestId('mobile-tools-toggle').click();
+
+    const importButton = page.getByTestId('open-import-menu');
+    await importButton.scrollIntoViewIfNeeded();
+    await importButton.click();
+    const importMenu = page.getByTestId('import-menu-modal');
+    await expect(importMenu).toBeVisible();
+    await expect(
+      importMenu.getByRole('button', { name: 'Upload Project File' })
+    ).toBeVisible();
+    await importMenu.getByRole('button', { name: 'Cancel' }).click();
+
+    const exportButton = page.getByTestId('open-export-menu');
+    await exportButton.scrollIntoViewIfNeeded();
+    await exportButton.click();
+    const exportMenu = page.getByTestId('export-menu-modal');
+    await expect(exportMenu).toBeVisible();
+    await expect(exportMenu.getByLabel('PNG Scale')).toBeVisible();
+    await expect(exportMenu.getByLabel('Image Framing')).toBeVisible();
+    await exportMenu
+      .getByTestId('export-frame-range-controls')
+      .scrollIntoViewIfNeeded();
+    await expect(
+      exportMenu.getByTestId('export-frame-range-controls')
+    ).toBeVisible();
+
+    const exportDialogBox = await exportMenu.getByRole('dialog').boundingBox();
+    expect(exportDialogBox).not.toBeNull();
+    expect(exportDialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(exportDialogBox.x + exportDialogBox.width).toBeLessThanOrEqual(390);
+
+    expect(errors).toEqual([]);
+  });
+
   test('imports valid pasted project JSON', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
+    await openImportMenu(page);
     await page.getByTestId('project-paste-json-button').click();
     const modal = page.getByTestId('project-json-paste-modal');
     await expect(modal).toBeVisible();
@@ -710,6 +818,7 @@ while (true) {}
       .getByPlaceholder('Enter a description for this frame...')
       .inputValue();
 
+    await openImportMenu(page);
     await page.getByTestId('project-paste-json-button').click();
     const modal = page.getByTestId('project-json-paste-modal');
     const textarea = page.getByTestId('project-json-paste-textarea');
@@ -740,6 +849,7 @@ while (true) {}
     ).toHaveValue(originalDescription);
 
     await modal.getByRole('button', { name: 'Cancel' }).click();
+    await openImportMenu(page);
     await page.getByTestId('project-paste-json-button').click();
     await expect(textarea).toHaveValue('');
     await expect(modal.getByRole('alert')).toBeHidden();
@@ -792,6 +902,7 @@ while (true) {}
     ).toHaveAttribute('stroke', '#f59e0b');
 
     await closeLegendEditor(page);
+    await openExportMenu(page);
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
@@ -813,6 +924,7 @@ while (true) {}
         },
       ])
     );
+    await closeExportMenu(page);
 
     await legendToggle.uncheck();
     await expandLegendEditor(page);
@@ -820,8 +932,11 @@ while (true) {}
     await legendPosition.selectOption('bottom-right');
     await expect(legendPreview).toBeHidden();
 
+    await closeLegendEditor(page);
+    await openImportMenu(page);
     await page.getByTestId('project-import-input').setInputFiles(downloadPath);
     await expect(page.getByText('Project imported')).toBeVisible();
+    await expandLegendEditor(page);
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Traversal Key');
     await expect(legendPosition).toHaveValue('top-left');
@@ -848,6 +963,7 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
+    await openImportMenu(page);
     await page
       .getByTestId('project-import-input')
       .setInputFiles(fixturePath('self-loop-project.graphviz.json'));
@@ -897,6 +1013,7 @@ api.edge('loop', '#3b82f6');
     await edgeHitTarget.dispatchEvent('click');
     await expect(page.getByText('Edge Inspector')).toBeVisible();
 
+    await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
@@ -950,6 +1067,7 @@ api.edge('loop', '#3b82f6');
       'url(#graphstudio-arrow-64748b)'
     );
 
+    await openExportMenu(page);
     const defaultSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
@@ -964,6 +1082,7 @@ api.edge('loop', '#3b82f6');
     expect(defaultExportedSvg).toContain(
       'marker-end="url(#graphstudio-arrow-64748b)"'
     );
+    await closeExportMenu(page);
 
     await page.getByText('Frame 2').click();
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#3b82f6');
@@ -991,6 +1110,7 @@ api.edge('e0', '#f59e0b');
       graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b path')
     ).toHaveAttribute('fill', '#f59e0b');
 
+    await openExportMenu(page);
     const overrideSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
@@ -1005,6 +1125,7 @@ api.edge('e0', '#f59e0b');
     expect(overrideExportedSvg).toContain(
       'marker-end="url(#graphstudio-arrow-f59e0b)"'
     );
+    await closeExportMenu(page);
 
     const firstEdgeHitTarget = directedEdges
       .first()
@@ -1073,6 +1194,7 @@ api.edge('e0', '#f59e0b');
     const frameCounter = page.getByText(/^\d+ \/ \d+$/).first();
     const initialFrameCounter = await frameCounter.textContent();
 
+    await openExportMenu(page);
     await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
     await expect(page.getByTestId('slideshow-export-button')).toBeEnabled();
     await expect(page.getByTestId('svg-export-button')).toBeVisible();
@@ -1136,6 +1258,7 @@ api.edge('e0', '#f59e0b');
     const graphTransformBeforeFitExport =
       await graphTransformGroup.getAttribute('transform');
 
+    await closeExportMenu(page);
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await expandLegendEditor(page);
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
@@ -1147,6 +1270,7 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
     await closeLegendEditor(page);
 
+    await openExportMenu(page);
     await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
@@ -1174,10 +1298,10 @@ api.edge('e0', '#f59e0b');
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
-    await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeHidden();
 
+    await openExportMenu(page);
     await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
@@ -1199,7 +1323,9 @@ api.edge('e0', '#f59e0b');
     });
     await expect(frameCounter).toHaveText(initialFrameCounter);
 
+    await closeExportMenu(page);
     await choosePreset(page, 'bfs');
+    await openExportMenu(page);
     await page.getByRole('radio', { name: 'Custom range' }).check();
     await expect(
       page.getByRole('radio', { name: 'Custom range' })
