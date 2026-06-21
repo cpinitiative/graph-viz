@@ -168,6 +168,22 @@ export const serializeSvgElement = ({
     : `<?xml version="1.0" encoding="UTF-8"?>\n${svgData}`;
 };
 
+export const serializeCurrentFrameSvg = ({
+  svgElementId = DEFAULT_SVG_ELEMENT_ID,
+  framingMode = IMAGE_FRAMING.viewport,
+} = {}) => {
+  const svgEl = getGraphSvgElement(svgElementId);
+  const viewport = getViewportSize(svgEl);
+  return serializeSvgElement({
+    svgEl,
+    width: Math.round(viewport.width),
+    height: Math.round(viewport.height),
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    framingMode,
+  });
+};
+
 export const loadSvgImage = async svgData => {
   const img = new Image();
   const svgBlob = new Blob([svgData], {
@@ -235,14 +251,8 @@ export const exportCurrentFrameSvg = async ({
   framingMode = IMAGE_FRAMING.viewport,
 } = {}) => {
   await waitForFrameRender();
-  const svgEl = getGraphSvgElement(svgElementId);
-  const viewport = getViewportSize(svgEl);
-  const svgData = serializeSvgElement({
-    svgEl,
-    width: Math.round(viewport.width),
-    height: Math.round(viewport.height),
-    viewportWidth: viewport.width,
-    viewportHeight: viewport.height,
+  const svgData = serializeCurrentFrameSvg({
+    svgElementId,
     framingMode,
   });
 

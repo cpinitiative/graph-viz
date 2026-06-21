@@ -179,6 +179,22 @@ const openExportMenu = async page => {
   return page.getByTestId('export-menu-modal');
 };
 
+const expectExportPreview = async page => {
+  const previewSection = page.getByTestId('export-preview-section');
+  const previewImage = page.getByTestId('export-preview-image');
+  await expect(previewSection).toBeVisible();
+  await expect(previewImage).toBeVisible();
+  await expect
+    .poll(() =>
+      previewImage.evaluate(
+        image =>
+          image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+      )
+    )
+    .toBe(true);
+  return previewImage;
+};
+
 const closeExportMenu = async page => {
   await page
     .getByTestId('export-menu-modal')
@@ -784,6 +800,7 @@ while (true) {}
     await expect(exportMenu).toBeVisible();
     await expect(exportMenu.getByLabel('PNG Scale')).toBeVisible();
     await expect(exportMenu.getByLabel('Image Framing')).toBeVisible();
+    await expectExportPreview(page);
     await exportMenu
       .getByTestId('export-frame-range-controls')
       .scrollIntoViewIfNeeded();
@@ -795,6 +812,36 @@ while (true) {}
     expect(exportDialogBox).not.toBeNull();
     expect(exportDialogBox.x).toBeGreaterThanOrEqual(0);
     expect(exportDialogBox.x + exportDialogBox.width).toBeLessThanOrEqual(390);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('previews the current frame with the selected image framing', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const exportMenu = await openExportMenu(page);
+    const previewImage = await expectExportPreview(page);
+    const viewportPreviewUrl = await previewImage.getAttribute('src');
+    expect(viewportPreviewUrl).toMatch(/^data:image\/svg\+xml/);
+    await expect(
+      exportMenu.getByTestId('export-preview-section')
+    ).toContainText(
+      'Preview of the current frame using the selected image framing.'
+    );
+
+    await exportMenu.getByLabel('Image Framing').selectOption('fit');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'fit');
+    await expectExportPreview(page);
+    await expect
+      .poll(() => previewImage.getAttribute('src'))
+      .not.toBe(viewportPreviewUrl);
 
     expect(errors).toEqual([]);
   });
@@ -1319,6 +1366,12 @@ api.edge('e0', '#f59e0b');
     await dragLegend(page, { dx: -180, dy: -120 });
 
     await openExportMenu(page);
+    const previewImage = await expectExportPreview(page);
+    const previewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(previewSvgText).toContain('Export Key');
+    expect(previewSvgText).toContain('data-legend-position="custom"');
     const customSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
