@@ -1,4 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  getGraphSvgElement,
+  serializeCurrentFrameSvg,
+} from '../lib/timelineFrameCapture';
 import ModalCloseButton from './ModalCloseButton';
 
 const sectionClass =
@@ -27,6 +31,9 @@ const ExportModal = ({
   onExportFrameRangeChange,
   totalFrames,
 }) => {
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewStatus, setPreviewStatus] = useState('loading');
+
   useEffect(() => {
     if (!open) return undefined;
     const handleKeyDown = event => {
@@ -35,6 +42,62 @@ const ExportModal = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    let active = true;
+    let updateTimer = null;
+    let mutationObserver = null;
+    let resizeObserver = null;
+
+    const updatePreview = () => {
+      updateTimer = null;
+      try {
+        const svgData = serializeCurrentFrameSvg({
+          framingMode: imageFraming,
+        });
+        if (!active) return;
+        setPreviewUrl(
+          `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`
+        );
+        setPreviewStatus('ready');
+      } catch {
+        if (!active) return;
+        setPreviewUrl('');
+        setPreviewStatus('error');
+      }
+    };
+
+    const schedulePreviewUpdate = (delay = 80) => {
+      if (updateTimer !== null) return;
+      updateTimer = window.setTimeout(updatePreview, delay);
+    };
+
+    schedulePreviewUpdate(0);
+
+    try {
+      const svgEl = getGraphSvgElement();
+      mutationObserver = new MutationObserver(() => schedulePreviewUpdate());
+      mutationObserver.observe(svgEl, {
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+      resizeObserver = new ResizeObserver(() => schedulePreviewUpdate());
+      resizeObserver.observe(svgEl);
+    } catch {
+      // The scheduled update reports a useful empty state if the SVG is absent.
+    }
+
+    return () => {
+      active = false;
+      if (updateTimer !== null) window.clearTimeout(updateTimer);
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
+    };
+  }, [imageFraming, open]);
 
   if (!open) return null;
 
@@ -177,6 +240,43 @@ const ExportModal = ({
               >
                 Export SVG
               </button>
+            </div>
+          </section>
+
+          <section
+            className={`${sectionClass} md:col-span-2`}
+            data-testid="export-preview-section"
+          >
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
+                Preview
+              </h3>
+              <p className="mt-1 text-xs text-outline dark:text-dark-outline">
+                Preview of the current frame using the selected image framing.
+              </p>
+            </div>
+            <div
+              className="flex min-h-40 items-center justify-center overflow-hidden border border-[#CBD5E1] bg-[#F8F9FA] p-3 dark:border-[#475569] dark:bg-[#111827]"
+              data-preview-framing={imageFraming}
+              data-testid="export-preview-panel"
+            >
+              {previewStatus === 'ready' && previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Current frame export preview"
+                  className="block max-h-64 w-full object-contain"
+                  data-testid="export-preview-image"
+                />
+              ) : (
+                <p
+                  className="text-xs text-[#64748B] dark:text-[#CBD5E1]"
+                  data-testid="export-preview-status"
+                >
+                  {previewStatus === 'error'
+                    ? 'Preview unavailable.'
+                    : 'Preparing preview...'}
+                </p>
+              )}
             </div>
           </section>
 
