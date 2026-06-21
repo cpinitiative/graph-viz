@@ -6,7 +6,7 @@ const sectionClass =
 const actionClass =
   'min-h-[44px] rounded-md bg-surface-container px-4 py-3 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
 const selectClass =
-  'w-full rounded-md border border-outline-variant/40 bg-white px-3 py-2.5 text-sm font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
+  'w-full rounded-md border border-outline-variant/40 bg-white px-2.5 py-2 text-xs font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
 const numberInputClass =
   'w-full rounded-md border border-outline-variant/40 bg-white px-3 py-2.5 text-sm font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
 
@@ -132,9 +132,12 @@ const ExportModal = ({
                   className={selectClass}
                 >
                   <option value={1}>1x</option>
-                  <option value={2}>2x (recommended)</option>
-                  <option value={3}>3x (high quality)</option>
+                  <option value={2}>2x</option>
+                  <option value={3}>3x</option>
                 </select>
+                <span className="block text-[10px] leading-relaxed text-outline dark:text-dark-outline">
+                  2x is recommended for slides and docs.
+                </span>
               </label>
               <label className="space-y-1.5" htmlFor="image-framing-select">
                 <span className="block text-xs font-semibold text-on-surface dark:text-dark-on-surface">
@@ -148,9 +151,13 @@ const ExportModal = ({
                   onChange={event => onImageFramingChange?.(event.target.value)}
                   className={selectClass}
                 >
-                  <option value="viewport">Current viewport</option>
-                  <option value="fit">Fit graph to content</option>
+                  <option value="viewport">Viewport</option>
+                  <option value="fit">Fit graph</option>
                 </select>
+                <span className="block text-[10px] leading-relaxed text-outline dark:text-dark-outline">
+                  Viewport preserves the editor view; Fit graph crops to visible
+                  content.
+                </span>
               </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
