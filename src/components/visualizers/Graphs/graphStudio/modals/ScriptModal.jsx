@@ -28,7 +28,7 @@ const ScriptModal = ({
       data-testid="script-modal"
     >
       <div className="mx-4 flex max-h-[90vh] w-full max-w-3xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
           <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
             Script Mode (Trace Recorder)
           </h3>
@@ -55,7 +55,7 @@ const ScriptModal = ({
               aria-label="Load script example"
               value={selectedExample?.id ?? ''}
               onChange={handleExampleChange}
-              className="w-full rounded-md border border-outline-variant bg-white px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-dark-on-surface"
+              className="h-10 w-full rounded-md border border-outline-variant bg-white py-2 pl-3 pr-10 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-dark-on-surface"
             >
               <option value="">Choose an example...</option>
               {SCRIPT_EXAMPLES.map(example => (
@@ -82,10 +82,10 @@ const ScriptModal = ({
             value={text}
             onChange={event => onTextChange(event.target.value)}
             placeholder={defaultScript}
-            className="h-80 w-full resize-none rounded-md bg-white p-3 font-mono text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-dark-on-surface"
+            className="h-80 w-full resize-none rounded-md border border-outline-variant/30 bg-white px-3 py-2 font-mono text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface"
           />
         </div>
-        <div className="flex flex-col justify-end gap-2 rounded-b-xl bg-white/50 p-4 dark:bg-gray-800/50 sm:flex-row">
+        <div className="flex flex-col justify-end gap-2 border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900 sm:flex-row">
           <button
             type="button"
             className="rounded-md bg-surface-container px-4 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"

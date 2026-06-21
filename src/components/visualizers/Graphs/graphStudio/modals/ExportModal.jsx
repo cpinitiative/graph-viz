@@ -6,9 +6,9 @@ const sectionClass =
 const actionClass =
   'min-h-[44px] rounded-md bg-surface-container px-4 py-3 text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-800 dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
 const selectClass =
-  'w-full rounded-md border border-outline-variant/40 bg-white px-2.5 py-2 text-xs font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
+  'h-10 w-full rounded-md border border-outline-variant/40 bg-white py-2 pl-3 pr-10 text-sm font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
 const numberInputClass =
-  'w-full rounded-md border border-outline-variant/40 bg-white px-3 py-2.5 text-sm font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
+  'h-10 w-full rounded-md border border-outline-variant/40 bg-white px-3 py-2 text-sm font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-outline-variant/40 dark:bg-gray-800 dark:text-dark-on-surface';
 
 const ExportModal = ({
   open,
@@ -290,16 +290,6 @@ const ExportModal = ({
               </button>
             </div>
           </section>
-        </div>
-
-        <div className="flex justify-end border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900">
-          <button
-            type="button"
-            className="rounded-md bg-surface-container px-4 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-gray-800 dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"
-            onClick={onClose}
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>

@@ -14,7 +14,8 @@ const CUSTOM_LEGEND_KIND_LABELS = {
 };
 
 const inputClass =
-  'w-full rounded border border-outline-variant/30 bg-white px-3 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+  'h-10 w-full rounded border border-outline-variant/30 bg-white px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+const selectClass = `${inputClass} pr-10`;
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase text-outline dark:text-dark-outline';
 const dataButtonClass =
@@ -177,7 +178,7 @@ const LegendModal = ({
                 onChange={event =>
                   patchCustomLegend({ position: event.target.value })
                 }
-                className={inputClass}
+                className={selectClass}
               >
                 {CUSTOM_LEGEND_POSITIONS.map(position => (
                   <option key={position} value={position}>
@@ -266,7 +267,7 @@ const LegendModal = ({
                             kind: event.target.value,
                           })
                         }
-                        className={inputClass}
+                        className={selectClass}
                       >
                         {CUSTOM_LEGEND_KINDS.map(kind => (
                           <option key={kind} value={kind}>
@@ -291,7 +292,7 @@ const LegendModal = ({
                             color: event.target.value,
                           })
                         }
-                        className="h-9 w-full rounded border border-outline-variant/30 bg-white p-0.5 dark:border-dark-outline-variant/30 dark:bg-gray-800"
+                        className="h-10 w-full rounded border border-outline-variant/30 bg-white p-1 dark:border-dark-outline-variant/30 dark:bg-gray-800"
                       />
                     </label>
                     <button
@@ -300,7 +301,7 @@ const LegendModal = ({
                       aria-label={`Remove Legend Entry ${index + 1}`}
                       data-testid={`custom-legend-remove-entry-${index}`}
                       onClick={() => removeLegendEntry(index)}
-                      className="min-h-9 rounded bg-surface-container px-3 text-xs font-semibold text-on-surface hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"
+                      className="min-h-10 rounded bg-surface-container px-3 text-xs font-semibold text-on-surface hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"
                     >
                       X
                     </button>
