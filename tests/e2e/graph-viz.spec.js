@@ -830,9 +830,7 @@ while (true) {}
     expect(viewportPreviewUrl).toMatch(/^data:image\/svg\+xml/);
     await expect(
       exportMenu.getByTestId('export-preview-section')
-    ).toContainText(
-      'Preview of the current frame using the selected image framing.'
-    );
+    ).toContainText('Preview selection is for review only.');
 
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
     await expect(
@@ -842,6 +840,69 @@ while (true) {}
     await expect
       .poll(() => previewImage.getAttribute('src'))
       .not.toBe(viewportPreviewUrl);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('reviews only included export frames without changing the editor frame', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const frameCounter = page.getByText(/^\d+ \/ \d+$/).first();
+    const editorFrameBeforeReview = await frameCounter.textContent();
+    const exportMenu = await openExportMenu(page);
+    const frameList = exportMenu.getByTestId('export-preview-frame-list');
+    const frameItems = frameList.locator(
+      '[data-testid^="export-preview-frame-item-"]'
+    );
+
+    await expect(frameList).toBeVisible();
+    await expect(frameItems).toHaveCount(5);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toHaveAttribute('aria-current', 'true');
+    const previewImage = await expectExportPreview(page);
+    const firstFramePreviewUrl = await previewImage.getAttribute('src');
+
+    await exportMenu.getByTestId('export-preview-frame-item-1').click();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-1')
+    ).toHaveAttribute('aria-current', 'true');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-frame-index', '1');
+    await expectExportPreview(page);
+    await expect
+      .poll(() => previewImage.getAttribute('src'))
+      .not.toBe(firstFramePreviewUrl);
+    await expect(frameCounter).toHaveText(editorFrameBeforeReview);
+
+    await exportMenu.getByRole('radio', { name: 'Current frame' }).check();
+    await expect(frameItems).toHaveCount(1);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toBeVisible();
+
+    await exportMenu.getByRole('radio', { name: 'Custom range' }).check();
+    await exportMenu.getByLabel('Export end frame').fill('3');
+    await exportMenu.getByLabel('Export start frame').press('ArrowUp');
+    await expect(exportMenu.getByLabel('Export start frame')).toHaveValue('2');
+    await expect(frameItems).toHaveCount(2);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-1')
+    ).toBeVisible();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-2')
+    ).toBeVisible();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toHaveCount(0);
+    await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
     expect(errors).toEqual([]);
   });

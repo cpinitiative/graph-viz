@@ -16,6 +16,7 @@ const GraphNode = ({
   multiSelected,
   drawAnchor,
   shouldAnimate,
+  layoutIdPrefix = '',
   onPointerDown,
   onClick,
   mode,
@@ -41,7 +42,7 @@ const GraphNode = ({
               : palette.stroke
         }
         strokeWidth={selected ? 4 : multiSelected ? 3 : 2}
-        layoutId={`node-${node.id}`}
+        layoutId={`${layoutIdPrefix}node-${node.id}`}
         animate={{ cx: node.x, cy: node.y }}
         transition={
           shouldAnimate
