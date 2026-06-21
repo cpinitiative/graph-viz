@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
 
+const EDGE_LABEL_FONT_SIZE = 12;
+
 const GraphEdge = ({
   edge,
   pathD,
@@ -71,18 +73,18 @@ const GraphEdge = ({
         }}
       />
       {edge.label && labelPosition && (
-        <g pointerEvents="none">
+        <g pointerEvents="none" data-edge-label-id={edge.id} aria-hidden="true">
           <text
+            data-edge-label-text="true"
             x={labelPosition.x}
             y={labelPosition.y + 4}
             textAnchor="middle"
+            fill="#262626"
+            fontSize={EDGE_LABEL_FONT_SIZE}
+            fontWeight="700"
+            fontFamily="Arial, sans-serif"
             // Handles light mode (neutral-800) and dark mode (neutral-200)
             className="fill-neutral-800 font-bold transition-colors duration-200 dark:fill-neutral-200"
-            style={{
-              fontSize: '10px',
-              fontWeight: 700,
-              fontFamily: 'sans-serif',
-            }}
           >
             {edge.label}
           </text>

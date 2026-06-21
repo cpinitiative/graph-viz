@@ -868,11 +868,16 @@ while (true) {}
       'marker-end',
       'url(#graphstudio-arrow)'
     );
-    await expect(
-      graphCanvas(page)
-        .locator('text')
-        .filter({ hasText: /^loop$/ })
-    ).toBeVisible();
+    const selfLoopLabel = graphCanvas(page).locator(
+      '[data-edge-label-id="loop"]'
+    );
+    const selfLoopLabelText = selfLoopLabel.locator(
+      '[data-edge-label-text="true"]'
+    );
+    await expect(selfLoopLabelText).toBeVisible();
+    await expect(selfLoopLabelText).toHaveText('loop');
+    await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
+    await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
@@ -891,6 +896,18 @@ api.edge('loop', '#3b82f6');
       .first();
     await edgeHitTarget.dispatchEvent('click');
     await expect(page.getByText('Edge Inspector')).toBeVisible();
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const exportedSvg = await fs.readFile(svgPath, 'utf8');
+    expect(exportedSvg).toContain('data-edge-label-text="true"');
+    expect(exportedSvg).toContain('font-size="12"');
+    expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
