@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import {
   CUSTOM_LEGEND_POSITION_LABELS,
   CUSTOM_LEGEND_POSITIONS,
@@ -41,10 +40,6 @@ const dataButtonClass =
   'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
 const compactSelectClass =
   'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
-const compactNumberInputClass =
-  'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
-const rangeRadioClass =
-  'h-3.5 w-3.5 border-outline-variant text-blue-800 focus:ring-blue-800';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -178,21 +173,8 @@ const LeftSidebar = ({
   onDrawEdge,
   drawFrom,
   onAutoLayout,
-  onOpenParser,
-  onExportText,
-  onExportProject,
-  onExportSvg,
-  onExportPng,
-  pngScale = 2,
-  onPngScaleChange,
-  imageFraming = 'viewport',
-  onImageFramingChange,
-  onImportProjectFile,
-  onOpenProjectJsonPaste,
-  onExportVideo,
-  onExportSlideshow,
-  exportFrameRange,
-  onExportFrameRangeChange,
+  onOpenImportMenu,
+  onOpenExportMenu,
   onOpenLegendEditor,
   isLegendEditorOpen = false,
   onOpenScript,
@@ -207,7 +189,6 @@ const LeftSidebar = ({
   onZoomIn,
   onZoomOut,
 }) => {
-  const projectImportInputRef = useRef(null);
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
       ? `Source: node ${drawFrom}. Click the target node.`
@@ -221,13 +202,6 @@ const LeftSidebar = ({
   const legendSummary = `${legendEntries.length} ${
     legendEntries.length === 1 ? 'entry' : 'entries'
   } - ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
-  const maxFrame = Math.max(1, totalFrames);
-  const frameRange = {
-    mode: exportFrameRange?.mode ?? 'all',
-    startFrame: exportFrameRange?.startFrame ?? 1,
-    endFrame: exportFrameRange?.endFrame ?? maxFrame,
-  };
-  const isCustomFrameRange = frameRange.mode === 'range';
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -389,48 +363,7 @@ const LeftSidebar = ({
       </div>
 
       <div className="space-y-3">
-        <SectionTitle>Import</SectionTitle>
-        <div className="grid grid-cols-1 gap-1">
-          <button
-            type="button"
-            className={dataButtonClass}
-            onClick={onOpenParser}
-          >
-            Import Edge List
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="project-import-button"
-            onClick={() => projectImportInputRef.current?.click()}
-          >
-            Import Project
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="project-paste-json-button"
-            onClick={onOpenProjectJsonPaste}
-          >
-            Paste Project JSON
-          </button>
-          <input
-            ref={projectImportInputRef}
-            type="file"
-            accept=".json,.graphviz.json,application/json"
-            aria-label="Import Project JSON"
-            data-testid="project-import-input"
-            className="sr-only"
-            onChange={event => {
-              onImportProjectFile?.(event.target.files?.[0]);
-              event.target.value = '';
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <SectionTitle>Export</SectionTitle>
+        <SectionTitle>Legend</SectionTitle>
         <div
           className="space-y-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
           data-testid="custom-legend-controls"
@@ -492,169 +425,26 @@ const LeftSidebar = ({
             </select>
           </label>
         </div>
-        <div
-          className="space-y-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
-          data-testid="export-frame-range-controls"
-        >
-          <div className="text-[10px] font-semibold uppercase text-outline dark:text-dark-outline">
-            Export Frames
-          </div>
-          <div className="space-y-1">
-            {[
-              ['all', 'All frames'],
-              ['current', 'Current frame'],
-              ['range', 'Custom range'],
-            ].map(([value, label]) => (
-              <label
-                key={value}
-                className="flex cursor-pointer items-center gap-2 text-[11px] font-medium text-on-surface dark:text-dark-on-surface"
-              >
-                <input
-                  type="radio"
-                  name="export-frame-range-mode"
-                  value={value}
-                  checked={frameRange.mode === value}
-                  onChange={() => onExportFrameRangeChange?.({ mode: value })}
-                  className={rangeRadioClass}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <label
-              className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
-              htmlFor="export-frame-range-start"
-            >
-              <span>Start</span>
-              <input
-                id="export-frame-range-start"
-                type="number"
-                min="1"
-                max={maxFrame}
-                value={frameRange.startFrame}
-                aria-label="Export start frame"
-                data-testid="export-frame-start-input"
-                disabled={!isCustomFrameRange}
-                onChange={event =>
-                  onExportFrameRangeChange?.({
-                    startFrame: event.target.value,
-                  })
-                }
-                className={compactNumberInputClass}
-              />
-            </label>
-            <label
-              className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
-              htmlFor="export-frame-range-end"
-            >
-              <span>End</span>
-              <input
-                id="export-frame-range-end"
-                type="number"
-                min="1"
-                max={maxFrame}
-                value={frameRange.endFrame}
-                aria-label="Export end frame"
-                data-testid="export-frame-end-input"
-                disabled={!isCustomFrameRange}
-                onChange={event =>
-                  onExportFrameRangeChange?.({
-                    endFrame: event.target.value,
-                  })
-                }
-                className={compactNumberInputClass}
-              />
-            </label>
-          </div>
-        </div>
-        <div
-          className="grid grid-cols-2 gap-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
-          data-testid="image-export-controls"
-        >
-          <label
-            className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
-            htmlFor="png-scale-select"
-          >
-            <span>PNG Scale</span>
-            <select
-              id="png-scale-select"
-              value={pngScale}
-              aria-label="PNG Scale"
-              data-testid="png-scale-select"
-              onChange={event => onPngScaleChange?.(Number(event.target.value))}
-              className={compactSelectClass}
-            >
-              <option value={1}>1x</option>
-              <option value={2}>2x (recommended)</option>
-              <option value={3}>3x (high quality)</option>
-            </select>
-          </label>
-          <label
-            className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
-            htmlFor="image-framing-select"
-          >
-            <span>Image Framing</span>
-            <select
-              id="image-framing-select"
-              value={imageFraming}
-              aria-label="Image Framing"
-              data-testid="image-framing-select"
-              onChange={event => onImageFramingChange?.(event.target.value)}
-              className={compactSelectClass}
-            >
-              <option value="viewport">Current viewport</option>
-              <option value="fit">Fit graph to content</option>
-            </select>
-          </label>
-        </div>
-        <div className="grid grid-cols-2 gap-1">
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle>Data</SectionTitle>
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             className={dataButtonClass}
-            onClick={onExportText}
+            data-testid="open-import-menu"
+            onClick={onOpenImportMenu}
           >
-            Export Edge List
+            Import...
           </button>
           <button
             type="button"
             className={dataButtonClass}
-            data-testid="project-export-button"
-            onClick={onExportProject}
+            data-testid="open-export-menu"
+            onClick={onOpenExportMenu}
           >
-            Export Project
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="svg-export-button"
-            onClick={onExportSvg}
-          >
-            Export SVG
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="png-export-button"
-            onClick={onExportPng}
-          >
-            Export PNG
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            onClick={onExportVideo}
-          >
-            Export MP4
-          </button>
-          <button
-            type="button"
-            className={dataButtonClass}
-            data-testid="slideshow-export-button"
-            disabled={!totalFrames}
-            onClick={onExportSlideshow}
-          >
-            Export Slideshow
+            Export...
           </button>
         </div>
       </div>

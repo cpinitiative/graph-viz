@@ -12,7 +12,9 @@ import LeftSidebar from './LeftSidebar';
 import PropertyPanel from './PropertyPanel';
 import TimelinePanel from './TimelinePanel';
 import { DEFAULT_SCRIPT } from './data/defaultScript';
+import ExportModal from './modals/ExportModal';
 import ExportVideoModal from './modals/ExportVideoModal';
+import ImportModal from './modals/ImportModal';
 import LegendModal from './modals/LegendModal';
 import ParserModal from './modals/ParserModal';
 import ProjectJsonPasteModal from './modals/ProjectJsonPasteModal';
@@ -114,8 +116,39 @@ const CanvasStage = ({ canvas, status }) => (
   </motion.div>
 );
 
-const ModalStack = ({ modals }) => (
+const ModalStack = ({
+  modals,
+  sidebar,
+  isImportMenuOpen,
+  isExportMenuOpen,
+  onCloseImportMenu,
+  onCloseExportMenu,
+}) => (
   <>
+    <ImportModal
+      open={isImportMenuOpen}
+      onClose={onCloseImportMenu}
+      onOpenParser={sidebar.onOpenParser}
+      onImportProjectFile={sidebar.onImportProjectFile}
+      onOpenProjectJsonPaste={sidebar.onOpenProjectJsonPaste}
+    />
+    <ExportModal
+      open={isExportMenuOpen}
+      onClose={onCloseExportMenu}
+      onExportText={sidebar.onExportText}
+      onExportProject={sidebar.onExportProject}
+      onExportSvg={sidebar.onExportSvg}
+      onExportPng={sidebar.onExportPng}
+      pngScale={sidebar.pngScale}
+      onPngScaleChange={sidebar.onPngScaleChange}
+      imageFraming={sidebar.imageFraming}
+      onImageFramingChange={sidebar.onImageFramingChange}
+      onExportVideo={sidebar.onExportVideo}
+      onExportSlideshow={sidebar.onExportSlideshow}
+      exportFrameRange={sidebar.exportFrameRange}
+      onExportFrameRangeChange={sidebar.onExportFrameRangeChange}
+      totalFrames={sidebar.totalFrames}
+    />
     <ParserModal
       open={modals.parser.open}
       text={modals.parser.text}
@@ -167,6 +200,21 @@ const GraphStudioLayout = ({
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
+  const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const sidebarProps = {
+    ...sidebar,
+    onOpenImportMenu: () => setIsImportMenuOpen(true),
+    onOpenExportMenu: () => setIsExportMenuOpen(true),
+  };
+  const modalStackProps = {
+    modals,
+    sidebar,
+    isImportMenuOpen,
+    isExportMenuOpen,
+    onCloseImportMenu: () => setIsImportMenuOpen(false),
+    onCloseExportMenu: () => setIsExportMenuOpen(false),
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -212,7 +260,7 @@ const GraphStudioLayout = ({
             closeLabel="Dismiss tools overlay"
             onClose={() => setShowSidebar(false)}
           >
-            <LeftSidebar {...sidebar} />
+            <LeftSidebar {...sidebarProps} />
           </MobileOverlay>
         )}
 
@@ -234,7 +282,7 @@ const GraphStudioLayout = ({
           <TimelinePanel {...timeline} />
         </div>
 
-        <ModalStack modals={modals} />
+        <ModalStack {...modalStackProps} />
       </div>
     );
   }
@@ -245,7 +293,7 @@ const GraphStudioLayout = ({
         <Panel defaultSize="76%" minSize="52%">
           <PanelGroup orientation="horizontal" className="h-full">
             <Panel defaultSize="18%" minSize="14%">
-              <LeftSidebar {...sidebar} />
+              <LeftSidebar {...sidebarProps} />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel minSize="40%" defaultSize="60%">
@@ -262,7 +310,7 @@ const GraphStudioLayout = ({
           <TimelinePanel {...timeline} />
         </Panel>
       </PanelGroup>
-      <ModalStack modals={modals} />
+      <ModalStack {...modalStackProps} />
     </div>
   );
 };
