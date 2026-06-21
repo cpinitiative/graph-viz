@@ -59,6 +59,9 @@ export const useGraphStudioImportExport = ({
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
+  const [isProjectJsonPasteOpen, setIsProjectJsonPasteOpen] = useState(false);
+  const [projectJsonPasteText, setProjectJsonPasteText] = useState('');
+  const [projectJsonPasteError, setProjectJsonPasteError] = useState('');
   const [isScriptOpen, setIsScriptOpen] = useState(false);
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
   const [scriptError, setScriptError] = useState('');
@@ -183,36 +186,29 @@ export const useGraphStudioImportExport = ({
     }
   }, [setStatus]);
 
-  const importProjectFile = useCallback(
-    async file => {
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const project = parseProjectJson(text);
-        replaceTimeline(
-          project.graph,
-          project.timeline.steps,
-          project.timeline.currentFrame
-        );
-        setEdgeRouting(project.settings.edgeRouting);
-        setSnapEnabled(project.settings.snapEnabled);
-        setShowGrid(project.settings.showGrid);
-        setCustomLegend(project.settings.customLegend);
-        setLockCanvas(project.settings.lockCanvas);
-        setGlobalSettings(project.settings.globalSettings);
-        if (project.settings.viewState) {
-          setViewState(project.settings.viewState);
-          // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
-          window.setTimeout(() => setViewState(project.settings.viewState), 0);
-        }
-        setMode('select');
-        clearSelection?.();
-        clearDrawState?.();
-        resetUndoHistory?.();
-        setStatus('Project imported');
-      } catch (error) {
-        setStatus(`Project import error: ${error.message}`);
+  const applyProjectPayload = useCallback(
+    project => {
+      replaceTimeline(
+        project.graph,
+        project.timeline.steps,
+        project.timeline.currentFrame
+      );
+      setEdgeRouting(project.settings.edgeRouting);
+      setSnapEnabled(project.settings.snapEnabled);
+      setShowGrid(project.settings.showGrid);
+      setCustomLegend(project.settings.customLegend);
+      setLockCanvas(project.settings.lockCanvas);
+      setGlobalSettings(project.settings.globalSettings);
+      if (project.settings.viewState) {
+        setViewState(project.settings.viewState);
+        // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
+        window.setTimeout(() => setViewState(project.settings.viewState), 0);
       }
+      setMode('select');
+      clearSelection?.();
+      clearDrawState?.();
+      resetUndoHistory?.();
+      setStatus('Project imported');
     },
     [
       clearDrawState,
@@ -230,6 +226,59 @@ export const useGraphStudioImportExport = ({
       setViewState,
     ]
   );
+
+  const importProjectJsonText = useCallback(
+    text => {
+      const project = parseProjectJson(text);
+      applyProjectPayload(project);
+    },
+    [applyProjectPayload]
+  );
+
+  const importProjectFile = useCallback(
+    async file => {
+      if (!file) return;
+      try {
+        importProjectJsonText(await file.text());
+      } catch (error) {
+        setStatus(`Project import error: ${error.message}`);
+      }
+    },
+    [importProjectJsonText, setStatus]
+  );
+
+  const openProjectJsonPasteModal = useCallback(() => {
+    setProjectJsonPasteText('');
+    setProjectJsonPasteError('');
+    setIsProjectJsonPasteOpen(true);
+  }, []);
+
+  const closeProjectJsonPasteModal = useCallback(() => {
+    setIsProjectJsonPasteOpen(false);
+    setProjectJsonPasteText('');
+    setProjectJsonPasteError('');
+  }, []);
+
+  const updateProjectJsonPasteText = useCallback(text => {
+    setProjectJsonPasteText(text);
+    setProjectJsonPasteError('');
+  }, []);
+
+  const importPastedProjectJson = useCallback(() => {
+    try {
+      if (!projectJsonPasteText.trim()) {
+        throw new Error('Paste project JSON before importing.');
+      }
+      importProjectJsonText(projectJsonPasteText);
+      setIsProjectJsonPasteOpen(false);
+      setProjectJsonPasteText('');
+      setProjectJsonPasteError('');
+    } catch (error) {
+      const message = `Project import error: ${error.message}`;
+      setProjectJsonPasteError(message);
+      setStatus(message);
+    }
+  }, [importProjectJsonText, projectJsonPasteText, setStatus]);
 
   const exportVideo = useCallback(
     async labelPos => {
@@ -377,6 +426,13 @@ export const useGraphStudioImportExport = ({
     parserText,
     setParserText,
     applyParserText,
+    isProjectJsonPasteOpen,
+    projectJsonPasteText,
+    projectJsonPasteError,
+    openProjectJsonPasteModal,
+    closeProjectJsonPasteModal,
+    setProjectJsonPasteText: updateProjectJsonPasteText,
+    importPastedProjectJson,
     isScriptOpen,
     setIsScriptOpen: setScriptModalOpen,
     scriptText,

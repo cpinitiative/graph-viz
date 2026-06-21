@@ -232,6 +232,55 @@ const presetLegends = [
   },
 ];
 
+const pastedProject = {
+  format: 'graph-viz-project',
+  version: 1,
+  exportedAt: '2026-06-21T00:00:00.000Z',
+  graph: {
+    nodes: [
+      { id: 'A', label: 'Pasted A', x: 320, y: 280, visible: true },
+      { id: 'B', label: 'Pasted B', x: 560, y: 280, visible: true },
+    ],
+    edges: [
+      {
+        id: 'AB',
+        from: 'A',
+        to: 'B',
+        directed: true,
+        label: '1',
+        color: '#64748B',
+        visible: true,
+        duration: 450,
+      },
+    ],
+  },
+  timeline: {
+    currentFrame: 0,
+    steps: [
+      {
+        id: 'step-0',
+        description: 'Pasted JSON import test',
+        durationMs: 600,
+        nodeOverrides: {},
+        edgeOverrides: {},
+      },
+    ],
+  },
+  settings: {
+    edgeRouting: 'straight',
+    snapEnabled: true,
+    showGrid: false,
+    lockCanvas: true,
+    viewState: null,
+    globalSettings: {
+      forceStrength: 1,
+      edgeCurvature: 46,
+      nodeSize: 24,
+      edgeWidth: 2.2,
+    },
+  },
+};
+
 test.describe('Graph Viz desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -607,6 +656,83 @@ while (true) {}
     await expect(
       page.getByPlaceholder('Enter a description for this frame...')
     ).toHaveValue('Imported fixture frame two');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('imports valid pasted project JSON', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page.getByTestId('project-paste-json-button').click();
+    const modal = page.getByTestId('project-json-paste-modal');
+    await expect(modal).toBeVisible();
+    await expect(modal.getByText('Import Project JSON')).toBeVisible();
+
+    await page
+      .getByTestId('project-json-paste-textarea')
+      .fill(JSON.stringify(pastedProject));
+    await page.getByTestId('project-json-paste-submit').click();
+
+    await expect(modal).toBeHidden();
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Enter a description for this frame...')
+    ).toHaveValue('Pasted JSON import test');
+    await expect(
+      graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
+    ).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps pasted project JSON errors inside the modal', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    const originalDescription = await page
+      .getByPlaceholder('Enter a description for this frame...')
+      .inputValue();
+
+    await page.getByTestId('project-paste-json-button').click();
+    const modal = page.getByTestId('project-json-paste-modal');
+    const textarea = page.getByTestId('project-json-paste-textarea');
+    await expect(modal).toBeVisible();
+
+    await page.getByTestId('project-json-paste-submit').click();
+    await expect(
+      modal.getByText(
+        'Project import error: Paste project JSON before importing.'
+      )
+    ).toBeVisible();
+
+    await textarea.fill('{ bad json');
+    await expect(modal.getByRole('alert')).toBeHidden();
+    await page.getByTestId('project-json-paste-submit').click();
+
+    await expect(modal).toBeVisible();
+    await expect(
+      modal.getByText('Project import error: Invalid JSON')
+    ).toBeVisible();
+    await expect(page.getByTestId('graph-studio-status')).toBeVisible();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Project import error: Invalid JSON'
+    );
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Enter a description for this frame...')
+    ).toHaveValue(originalDescription);
+
+    await modal.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByTestId('project-paste-json-button').click();
+    await expect(textarea).toHaveValue('');
+    await expect(modal.getByRole('alert')).toBeHidden();
 
     expect(errors).toEqual([]);
   });

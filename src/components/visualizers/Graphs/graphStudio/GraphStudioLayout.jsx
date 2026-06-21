@@ -15,6 +15,7 @@ import { DEFAULT_SCRIPT } from './data/defaultScript';
 import ExportVideoModal from './modals/ExportVideoModal';
 import LegendModal from './modals/LegendModal';
 import ParserModal from './modals/ParserModal';
+import ProjectJsonPasteModal from './modals/ProjectJsonPasteModal';
 import ScriptModal from './modals/ScriptModal';
 
 const PANEL_TOGGLE_CLASS =
@@ -104,7 +105,10 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
 const CanvasStage = ({ canvas, status }) => (
   <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
     <GraphCanvas {...canvas} />
-    <div className="absolute bottom-3 left-3 z-20 rounded bg-surface-container-low/90 px-2 py-1 text-[11px] text-on-surface">
+    <div
+      className="absolute bottom-3 left-3 z-20 rounded bg-surface-container-low/90 px-2 py-1 text-[11px] text-on-surface"
+      data-testid="graph-studio-status"
+    >
       {status}
     </div>
   </motion.div>
@@ -118,6 +122,14 @@ const ModalStack = ({ modals }) => (
       onTextChange={modals.parser.onTextChange}
       onClose={modals.parser.onClose}
       onSubmit={modals.parser.onSubmit}
+    />
+    <ProjectJsonPasteModal
+      open={modals.projectJsonPaste.open}
+      text={modals.projectJsonPaste.text}
+      error={modals.projectJsonPaste.error}
+      onTextChange={modals.projectJsonPaste.onTextChange}
+      onClose={modals.projectJsonPaste.onClose}
+      onSubmit={modals.projectJsonPaste.onSubmit}
     />
     <ScriptModal
       open={modals.script.open}

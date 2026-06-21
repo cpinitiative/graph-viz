@@ -184,6 +184,7 @@ const LeftSidebar = ({
   onExportSvg,
   onExportPng,
   onImportProjectFile,
+  onOpenProjectJsonPaste,
   onExportVideo,
   onExportSlideshow,
   exportFrameRange,
@@ -400,6 +401,14 @@ const LeftSidebar = ({
             onClick={() => projectImportInputRef.current?.click()}
           >
             Import Project
+          </button>
+          <button
+            type="button"
+            className={dataButtonClass}
+            data-testid="project-paste-json-button"
+            onClick={onOpenProjectJsonPaste}
+          >
+            Paste Project JSON
           </button>
           <input
             ref={projectImportInputRef}
