@@ -187,6 +187,11 @@ const LegendModal = ({
               </select>
             </label>
           </div>
+          {legend.position === 'custom' && (
+            <p className="text-[10px] text-outline dark:text-dark-outline">
+              Drag the legend on the canvas to place it.
+            </p>
+          )}
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">

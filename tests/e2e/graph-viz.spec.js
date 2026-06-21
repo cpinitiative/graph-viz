@@ -103,6 +103,28 @@ const dragFirstGraphNode = async page => {
   await page.mouse.up();
 };
 
+const dragLegend = async (page, { dx = -160, dy = -100 } = {}) => {
+  const legend = page.getByTestId('custom-export-legend');
+  await expect(legend).toBeVisible();
+  const box = await legend.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + dx,
+    box.y + box.height / 2 + dy,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+
+  await expect(legend).toHaveAttribute('data-legend-position', 'custom');
+  return {
+    x: Number(await legend.getAttribute('data-custom-position-x')),
+    y: Number(await legend.getAttribute('data-custom-position-y')),
+  };
+};
+
 const setRangeValue = async (page, label, value) => {
   await page.getByLabel(label).evaluate((input, nextValue) => {
     input.value = String(nextValue);
@@ -889,8 +911,6 @@ while (true) {}
     await page.getByTestId('custom-legend-entry-label-6').fill('Frontier');
     await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
     await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
-    await legendPosition.selectOption('top-left');
-
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
     ).toBeVisible();
@@ -902,6 +922,18 @@ while (true) {}
     ).toHaveAttribute('stroke', '#f59e0b');
 
     await closeLegendEditor(page);
+    const draggedPosition = await dragLegend(page);
+    expect(draggedPosition.x).toBeGreaterThanOrEqual(0);
+    expect(draggedPosition.x).toBeLessThanOrEqual(1);
+    expect(draggedPosition.y).toBeGreaterThanOrEqual(0);
+    expect(draggedPosition.y).toBeLessThanOrEqual(1);
+    await expandLegendEditor(page);
+    await expect(legendPosition).toHaveValue('custom');
+    await expect(
+      page.getByText('Drag the legend on the canvas to place it.')
+    ).toBeVisible();
+    await closeLegendEditor(page);
+
     await openExportMenu(page);
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();
@@ -912,8 +944,16 @@ while (true) {}
     expect(exportedProject.settings.customLegend).toMatchObject({
       enabled: true,
       title: 'Traversal Key',
-      position: 'top-left',
+      position: 'custom',
     });
+    expect(exportedProject.settings.customLegend.customPosition.x).toBeCloseTo(
+      draggedPosition.x,
+      5
+    );
+    expect(exportedProject.settings.customLegend.customPosition.y).toBeCloseTo(
+      draggedPosition.y,
+      5
+    );
     expect(exportedProject.settings.customLegend.entries).toEqual(
       expect.arrayContaining([
         {
@@ -939,7 +979,7 @@ while (true) {}
     await expandLegendEditor(page);
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Traversal Key');
-    await expect(legendPosition).toHaveValue('top-left');
+    await expect(legendPosition).toHaveValue('custom');
     await expect(page.getByTestId('custom-legend-entry-group-6')).toHaveValue(
       'Edges'
     );
@@ -953,6 +993,13 @@ while (true) {}
       '#f59e0b'
     );
     await expect(legendPreview).toBeVisible();
+    await expect(legendPreview).toHaveAttribute('transform', /translate\(/);
+    expect(
+      Number(await legendPreview.getAttribute('data-custom-position-x'))
+    ).toBeCloseTo(draggedPosition.x, 5);
+    expect(
+      Number(await legendPreview.getAttribute('data-custom-position-y'))
+    ).toBeCloseTo(draggedPosition.y, 5);
 
     expect(errors).toEqual([]);
   });
@@ -1269,13 +1316,21 @@ api.edge('e0', '#f59e0b');
     await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
     await closeLegendEditor(page);
+    await dragLegend(page, { dx: -180, dy: -120 });
 
     await openExportMenu(page);
-    await expectDownloadFrom({
+    const customSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
       filenamePattern: /\.svg$/,
     });
+    const customSvgPath = await customSvgDownload.path();
+    expect(customSvgPath).not.toBeNull();
+    const customSvgText = await fs.readFile(customSvgPath, 'utf8');
+    expect(customSvgText).toContain('data-legend-position="custom"');
+    expect(customSvgText).toMatch(
+      /data-testid="custom-export-legend"[^>]+transform="translate\([^"]+\)"/
+    );
     const threeXDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('png-export-button'),
