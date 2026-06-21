@@ -16,7 +16,7 @@ import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
-const DEFAULT_EDGE_COLOR = '#77777766';
+const DEFAULT_EDGE_COLOR = '#64748B';
 const SELECTED_EDGE_COLORS = {
   light: '#171717',
   dark: '#F5F5F5',

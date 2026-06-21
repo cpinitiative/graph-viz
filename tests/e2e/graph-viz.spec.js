@@ -927,9 +927,7 @@ api.edge('loop', '#3b82f6');
 
     await choosePreset(page, 'dfs');
 
-    const marker = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-77777766'
-    );
+    const marker = graphCanvas(page).locator('marker#graphstudio-arrow-64748b');
     await expect(marker).toHaveAttribute('markerWidth', '12');
     await expect(marker).toHaveAttribute('markerHeight', '12');
     await expect(marker).toHaveAttribute('refX', '10');
@@ -938,18 +936,18 @@ api.edge('loop', '#3b82f6');
     await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
 
     const markerTriangle = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-77777766 path'
+      'marker#graphstudio-arrow-64748b path'
     );
-    await expect(markerTriangle).toHaveAttribute('fill', '#77777766');
+    await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
 
     const directedEdges = graphCanvas(page).locator(
       'path[marker-end^="url(#graphstudio-arrow-"]'
     );
     await expect(directedEdges.first()).toBeVisible();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#77777766');
+    await expect(directedEdges.first()).toHaveAttribute('stroke', '#64748B');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-77777766)'
+      'url(#graphstudio-arrow-64748b)'
     );
 
     const defaultSvgDownload = await expectDownloadFrom({
@@ -960,11 +958,11 @@ api.edge('loop', '#3b82f6');
     const defaultSvgPath = await defaultSvgDownload.path();
     expect(defaultSvgPath).not.toBeNull();
     const defaultExportedSvg = await fs.readFile(defaultSvgPath, 'utf8');
-    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-77777766"');
-    expect(defaultExportedSvg).toContain('data-edge-color="#77777766"');
-    expect(defaultExportedSvg).toContain('fill="#77777766"');
+    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-64748b"');
+    expect(defaultExportedSvg).toContain('data-edge-color="#64748B"');
+    expect(defaultExportedSvg).toContain('fill="#64748B"');
     expect(defaultExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-77777766)"'
+      'marker-end="url(#graphstudio-arrow-64748b)"'
     );
 
     await page.getByText('Frame 2').click();
