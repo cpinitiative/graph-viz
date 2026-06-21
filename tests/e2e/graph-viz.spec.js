@@ -874,14 +874,9 @@ while (true) {}
     const selfLoopLabelText = selfLoopLabel.locator(
       '[data-edge-label-text="true"]'
     );
-    const selfLoopLabelBackground = selfLoopLabel.locator(
-      '[data-edge-label-background="true"]'
-    );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
     await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
-    await expect(selfLoopLabelBackground).toBeVisible();
-    await expect(selfLoopLabelBackground).toHaveAttribute('fill', '#FFFFFF');
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
 
     await page.getByText('Frame 2').click();
@@ -910,9 +905,9 @@ api.edge('loop', '#3b82f6');
     const svgPath = await svgDownload.path();
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
-    expect(exportedSvg).toContain('data-edge-label-background="true"');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
     expect(exportedSvg).toContain('font-size="12"');
+    expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('project-export-button').click();

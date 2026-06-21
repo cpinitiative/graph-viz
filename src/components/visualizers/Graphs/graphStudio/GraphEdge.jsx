@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { EDGE_LABEL_FONT_SIZE, measureLabelRect } from './graphCanvasUtils';
+
+const EDGE_LABEL_FONT_SIZE = 12;
 
 const GraphEdge = ({
   edge,
@@ -13,11 +14,6 @@ const GraphEdge = ({
   onClick,
   strokeWidth,
 }) => {
-  const labelRect =
-    edge.label && labelPosition
-      ? measureLabelRect(labelPosition, edge.label)
-      : null;
-
   // Determine line color dynamically based on selection state.
   // Uses transparent fallback or edge color if not selected.
   const getLineStroke = () => {
@@ -76,20 +72,8 @@ const GraphEdge = ({
               : 'none',
         }}
       />
-      {edge.label && labelPosition && labelRect && (
+      {edge.label && labelPosition && (
         <g pointerEvents="none" data-edge-label-id={edge.id} aria-hidden="true">
-          <rect
-            data-edge-label-background="true"
-            x={labelRect.left}
-            y={labelRect.top}
-            width={labelRect.width}
-            height={labelRect.height}
-            rx="3"
-            fill="#FFFFFF"
-            stroke="#D4D4D4"
-            strokeWidth="0.75"
-            className="fill-white stroke-neutral-300 transition-colors duration-200 dark:fill-neutral-900 dark:stroke-neutral-600"
-          />
           <text
             data-edge-label-text="true"
             x={labelPosition.x}
