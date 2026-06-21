@@ -5,6 +5,7 @@ const EDGE_LABEL_FONT_SIZE = 12;
 const GraphEdge = ({
   edge,
   pathD,
+  strokeColor,
   selected,
   multiSelected,
   shouldAnimate,
@@ -14,15 +15,6 @@ const GraphEdge = ({
   onClick,
   strokeWidth,
 }) => {
-  // Determine line color dynamically based on selection state.
-  // Uses transparent fallback or edge color if not selected.
-  const getLineStroke = () => {
-    if (selected || multiSelected) {
-      return 'currentColor'; // Defers to the text- color classes set below
-    }
-    return edge.color ?? '#77777766';
-  };
-
   return (
     <g style={{ cursor: 'pointer' }}>
       <path
@@ -37,7 +29,7 @@ const GraphEdge = ({
       <motion.path
         d={pathD}
         fill="none"
-        stroke={getLineStroke()}
+        stroke={strokeColor}
         strokeWidth={
           selected
             ? strokeWidth + 1.5
@@ -59,12 +51,7 @@ const GraphEdge = ({
             : { duration: 0 }
         }
         pointerEvents="none"
-        // Uses Tailwind classes to handle line color transitions for selected states
-        className={`transition-colors duration-200 ${
-          selected || multiSelected
-            ? 'text-neutral-900 dark:text-neutral-100'
-            : ''
-        }`}
+        className="transition-colors duration-200"
         style={{
           filter:
             selected || multiSelected
