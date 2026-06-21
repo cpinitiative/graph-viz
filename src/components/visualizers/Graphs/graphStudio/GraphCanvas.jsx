@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from '../../../../context/useTheme';
 import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
 import { NODE_RADIUS, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './constants';
@@ -15,6 +16,40 @@ import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
+const DEFAULT_EDGE_COLOR = '#64748B';
+const SELECTED_EDGE_COLORS = {
+  light: '#171717',
+  dark: '#F5F5F5',
+};
+
+const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
+  if (selected || multiSelected) {
+    return SELECTED_EDGE_COLORS[theme] ?? SELECTED_EDGE_COLORS.light;
+  }
+  return edge.color ?? DEFAULT_EDGE_COLOR;
+};
+
+const hashMarkerColor = color => {
+  let hash = 2166136261;
+  for (let index = 0; index < color.length; index += 1) {
+    hash ^= color.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const getArrowMarkerId = color => {
+  const normalizedColor = String(color).trim().toLowerCase();
+  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3,8})$/);
+  if (hexMatch) return `graphstudio-arrow-${hexMatch[1]}`;
+
+  const safeColor =
+    normalizedColor
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'color';
+  return `graphstudio-arrow-${safeColor}-${hashMarkerColor(normalizedColor)}`;
+};
 
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
@@ -274,6 +309,7 @@ const GraphCanvas = ({
   onNodeClickForDraw,
   onCanvasDoubleClick,
 }) => {
+  const { theme } = useTheme();
   const svgRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragRect, setDragRect] = useState(null);
@@ -301,6 +337,37 @@ const GraphCanvas = ({
     edgeCurvature,
     nodeRadius,
   ]);
+  const edgeVisualData = useMemo(
+    () =>
+      edgeRenderData.map(renderData => {
+        const { edge } = renderData;
+        const selected =
+          selectedObject?.type === 'edge' &&
+          String(selectedObject.id) === String(edge.id);
+        const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
+        const strokeColor = getEffectiveEdgeColor({
+          edge,
+          selected,
+          multiSelected,
+          theme,
+        });
+        return {
+          ...renderData,
+          selected,
+          multiSelected,
+          strokeColor,
+          markerId: getArrowMarkerId(strokeColor),
+        };
+      }),
+    [edgeRenderData, selectedNodeIds, selectedObject, theme]
+  );
+  const arrowMarkers = useMemo(() => {
+    const markers = new Map();
+    edgeVisualData.forEach(({ edge, markerId, strokeColor }) => {
+      if (edge.directed) markers.set(markerId, strokeColor);
+    });
+    return Array.from(markers, ([id, color]) => ({ id, color }));
+  }, [edgeVisualData]);
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
@@ -588,7 +655,6 @@ const GraphCanvas = ({
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
-  const markerId = 'graphstudio-arrow';
   return (
     <div className="relative h-full bg-white font-inter text-on-surface dark:bg-gray-900 dark:text-dark-on-surface">
       <svg
@@ -622,17 +688,21 @@ const GraphCanvas = ({
           >
             <circle cx="1.2" cy="1.2" r="1.2" fill="#e2e2e2" />
           </pattern>
-          <marker
-            id={markerId}
-            markerWidth="12"
-            markerHeight="12"
-            refX="10"
-            refY="6"
-            orient="auto"
-            markerUnits="userSpaceOnUse"
-          >
-            <path d="M0,0 L0,12 L10,6 z" fill="context-stroke" />
-          </marker>
+          {arrowMarkers.map(({ id, color }) => (
+            <marker
+              key={id}
+              id={id}
+              data-edge-color={color}
+              markerWidth="12"
+              markerHeight="12"
+              refX="10"
+              refY="6"
+              orient="auto"
+              markerUnits="userSpaceOnUse"
+            >
+              <path d="M0,0 L0,12 L10,6 z" fill={color} />
+            </marker>
+          ))}
         </defs>
         <rect
           width="100%"
@@ -653,39 +723,46 @@ const GraphCanvas = ({
             />
           )}
           <g data-export-content="true">
-            {edgeRenderData.map(({ edge, pathD, labelPosition }) => {
-              const selected =
-                selectedObject?.type === 'edge' &&
-                String(selectedObject.id) === String(edge.id);
-              const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
-              const endpointMoved =
-                diff.changedNodes.has(String(edge.from)) ||
-                diff.changedNodes.has(String(edge.to));
-              const strokeWidth = edgeWidth;
-              return (
-                <GraphEdge
-                  key={edge.id}
-                  edge={edge}
-                  pathD={pathD}
-                  selected={selected}
-                  multiSelected={multiSelected}
-                  markerId={markerId}
-                  labelPosition={labelPosition}
-                  strokeWidth={strokeWidth}
-                  shouldAnimate={
-                    endpointMoved || diff.changedEdges.has(String(edge.id))
-                  }
-                  onPointerDown={event => {
-                    event.stopPropagation();
-                    onSelectEdge(edge.id);
-                  }}
-                  onClick={event => {
-                    event.stopPropagation();
-                    onSelectEdge(edge.id);
-                  }}
-                />
-              );
-            })}
+            {edgeVisualData.map(
+              ({
+                edge,
+                pathD,
+                labelPosition,
+                selected,
+                multiSelected,
+                strokeColor,
+                markerId,
+              }) => {
+                const endpointMoved =
+                  diff.changedNodes.has(String(edge.from)) ||
+                  diff.changedNodes.has(String(edge.to));
+                const strokeWidth = edgeWidth;
+                return (
+                  <GraphEdge
+                    key={edge.id}
+                    edge={edge}
+                    pathD={pathD}
+                    strokeColor={strokeColor}
+                    selected={selected}
+                    multiSelected={multiSelected}
+                    markerId={markerId}
+                    labelPosition={labelPosition}
+                    strokeWidth={strokeWidth}
+                    shouldAnimate={
+                      endpointMoved || diff.changedEdges.has(String(edge.id))
+                    }
+                    onPointerDown={event => {
+                      event.stopPropagation();
+                      onSelectEdge(edge.id);
+                    }}
+                    onClick={event => {
+                      event.stopPropagation();
+                      onSelectEdge(edge.id);
+                    }}
+                  />
+                );
+              }
+            )}
             {graph.nodes
               .filter(node => node.visible !== false)
               .map(node => {
