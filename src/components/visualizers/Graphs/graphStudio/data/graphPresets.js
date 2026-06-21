@@ -525,12 +525,12 @@ export const GRAPH_PRESETS = {
     legend: KRUSKAL_LEGEND,
     graph: {
       nodes: [
-        { id: 0, label: 'A', x: 280, y: 420, visible: true },
-        { id: 1, label: 'B', x: 660, y: 260, visible: true },
-        { id: 2, label: 'C', x: 1040, y: 420, visible: true },
-        { id: 3, label: 'D', x: 660, y: 760, visible: true },
-        { id: 4, label: 'E', x: 1260, y: 760, visible: true },
-        { id: 5, label: 'F', x: 1660, y: 520, visible: true },
+        { id: 0, label: 'A', x: 600, y: 420, visible: true },
+        { id: 1, label: 'B', x: 750, y: 650, visible: true },
+        { id: 2, label: 'C', x: 900, y: 420, visible: true },
+        { id: 3, label: 'D', x: 1050, y: 650, visible: true },
+        { id: 4, label: 'E', x: 1200, y: 420, visible: true },
+        { id: 5, label: 'F', x: 1050, y: 850, visible: true },
       ],
       edges: [
         {
