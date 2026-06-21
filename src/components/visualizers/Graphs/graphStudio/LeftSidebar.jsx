@@ -39,7 +39,7 @@ const checkboxClass =
 const dataButtonClass =
   'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
 const compactSelectClass =
-  'w-full rounded border border-outline-variant/30 bg-white px-2 py-1.5 text-[10px] font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+  'w-full rounded border border-outline-variant/30 bg-white py-2 pl-3 pr-9 text-xs font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -319,7 +319,7 @@ const LeftSidebar = ({
               value={routing}
               aria-label="Edge routing"
               onChange={event => setRouting(event.target.value)}
-              className="w-full rounded-md border border-outline-variant/30 bg-white px-2 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
+              className="w-full rounded-md border border-outline-variant/30 bg-white py-2 pl-3 pr-10 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
             >
               <option value="straight">Straight</option>
               <option value="bezier">Bezier Avoid</option>
@@ -351,7 +351,7 @@ const LeftSidebar = ({
             if (event.target.value) onApplyPreset(event.target.value);
             event.target.value = '';
           }}
-          className="w-full rounded-md border border-outline-variant/30 bg-surface-container px-3 py-2 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-dark-surface-container dark:text-dark-on-surface md:py-2"
+          className="w-full rounded-md border border-outline-variant/30 bg-surface-container py-2 pl-3 pr-10 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-dark-surface-container dark:text-dark-on-surface md:py-2"
         >
           <option value="">Choose algorithm...</option>
           {PRESET_OPTIONS.map(([value, label]) => (

@@ -15,9 +15,9 @@ const helperTextClass =
   'text-[10px] leading-tight text-outline dark:text-dark-outline';
 const fieldLabelClass = 'text-xs text-on-surface dark:text-dark-on-surface';
 const inputClass =
-  'w-full border-b border-outline-variant/20 bg-surface-container-low px-0 py-3 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
+  'w-full border-b border-outline-variant/20 bg-surface-container-low px-3 py-3 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
 const selectClass =
-  'w-full border-b border-outline-variant/20 bg-surface-container-low px-0 py-3 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
+  'w-full border-b border-outline-variant/20 bg-surface-container-low py-3 pl-3 pr-10 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
 const actionButtonClass =
   'min-h-[44px] w-full rounded-md bg-surface-container px-3 py-3 text-left text-xs text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-2';
 const deleteButtonClass =
