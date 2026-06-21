@@ -7,8 +7,8 @@ import {
 } from '../graphStudioUtils';
 import { normalizeCustomLegend } from '../lib/customLegend';
 import {
-  DEFAULT_EXPORT_FRAME_RANGE,
   clampExportFrameRange,
+  DEFAULT_EXPORT_FRAME_RANGE,
   resolveExportFrameIndexes,
 } from '../lib/exportFrameRange';
 import { exportTimelineSlideshow } from '../lib/exportTimelineSlideshow';
@@ -19,8 +19,10 @@ import {
   parseProjectJson,
 } from '../lib/projectJson';
 import {
+  DEFAULT_PNG_SCALE,
   exportCurrentFramePng,
   exportCurrentFrameSvg,
+  IMAGE_FRAMING,
   waitForFrameRender,
 } from '../lib/timelineFrameCapture';
 
@@ -69,6 +71,8 @@ export const useGraphStudioImportExport = ({
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [exportVideoLabelPos, setExportVideoLabelPos] =
     useState('bottom-center');
+  const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
+  const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.viewport);
   const [exportFrameRangeState, setExportFrameRangeState] = useState(() => ({
     ...DEFAULT_EXPORT_FRAME_RANGE,
     endFrame: Math.max(1, steps.length),
@@ -167,24 +171,27 @@ export const useGraphStudioImportExport = ({
   const exportSvg = useCallback(async () => {
     setStatus('Exporting SVG...');
     try {
-      await exportCurrentFrameSvg();
+      await exportCurrentFrameSvg({ framingMode: imageFraming });
       setStatus('SVG exported');
     } catch (error) {
       console.error(error);
       setStatus(`SVG export error: ${error.message}`);
     }
-  }, [setStatus]);
+  }, [imageFraming, setStatus]);
 
   const exportPng = useCallback(async () => {
     setStatus('Exporting PNG...');
     try {
-      await exportCurrentFramePng();
+      await exportCurrentFramePng({
+        pngScale,
+        framingMode: imageFraming,
+      });
       setStatus('PNG exported');
     } catch (error) {
       console.error(error);
       setStatus(`PNG export error: ${error.message}`);
     }
-  }, [setStatus]);
+  }, [imageFraming, pngScale, setStatus]);
 
   const applyProjectPayload = useCallback(
     project => {
@@ -446,6 +453,10 @@ export const useGraphStudioImportExport = ({
     exportSlideshow,
     exportSvg,
     exportPng,
+    pngScale,
+    setPngScale,
+    imageFraming,
+    setImageFraming,
     exportText,
     exportProject,
     exportFrameRange,

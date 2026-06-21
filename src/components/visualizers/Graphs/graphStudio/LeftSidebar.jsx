@@ -183,6 +183,10 @@ const LeftSidebar = ({
   onExportProject,
   onExportSvg,
   onExportPng,
+  pngScale = 2,
+  onPngScaleChange,
+  imageFraming = 'viewport',
+  onImageFramingChange,
   onImportProjectFile,
   onOpenProjectJsonPaste,
   onExportVideo,
@@ -563,6 +567,46 @@ const LeftSidebar = ({
               />
             </label>
           </div>
+        </div>
+        <div
+          className="grid grid-cols-2 gap-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
+          data-testid="image-export-controls"
+        >
+          <label
+            className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
+            htmlFor="png-scale-select"
+          >
+            <span>PNG Scale</span>
+            <select
+              id="png-scale-select"
+              value={pngScale}
+              aria-label="PNG Scale"
+              data-testid="png-scale-select"
+              onChange={event => onPngScaleChange?.(Number(event.target.value))}
+              className={compactSelectClass}
+            >
+              <option value={1}>1x</option>
+              <option value={2}>2x (recommended)</option>
+              <option value={3}>3x (high quality)</option>
+            </select>
+          </label>
+          <label
+            className="space-y-1 text-[10px] font-semibold uppercase text-outline dark:text-dark-outline"
+            htmlFor="image-framing-select"
+          >
+            <span>Image Framing</span>
+            <select
+              id="image-framing-select"
+              value={imageFraming}
+              aria-label="Image Framing"
+              data-testid="image-framing-select"
+              onChange={event => onImageFramingChange?.(event.target.value)}
+              className={compactSelectClass}
+            >
+              <option value="viewport">Current viewport</option>
+              <option value="fit">Fit graph to content</option>
+            </select>
+          </label>
         </div>
         <div className="grid grid-cols-2 gap-1">
           <button

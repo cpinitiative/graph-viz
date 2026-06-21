@@ -652,68 +652,72 @@ const GraphCanvas = ({
               fill="url(#graphstudio-dot-grid)"
             />
           )}
-          {edgeRenderData.map(({ edge, pathD, labelPosition }) => {
-            const selected =
-              selectedObject?.type === 'edge' &&
-              String(selectedObject.id) === String(edge.id);
-            const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
-            const endpointMoved =
-              diff.changedNodes.has(String(edge.from)) ||
-              diff.changedNodes.has(String(edge.to));
-            const strokeWidth = edgeWidth;
-            return (
-              <GraphEdge
-                key={edge.id}
-                edge={edge}
-                pathD={pathD}
-                selected={selected}
-                multiSelected={multiSelected}
-                markerId={markerId}
-                labelPosition={labelPosition}
-                strokeWidth={strokeWidth}
-                shouldAnimate={
-                  endpointMoved || diff.changedEdges.has(String(edge.id))
-                }
-                onPointerDown={event => {
-                  event.stopPropagation();
-                  onSelectEdge(edge.id);
-                }}
-                onClick={event => {
-                  event.stopPropagation();
-                  onSelectEdge(edge.id);
-                }}
-              />
-            );
-          })}
-          {graph.nodes
-            .filter(node => node.visible !== false)
-            .map(node => {
+          <g data-export-content="true">
+            {edgeRenderData.map(({ edge, pathD, labelPosition }) => {
               const selected =
-                selectedObject?.type === 'node' &&
-                String(selectedObject.id) === String(node.id);
-              const multiSelected = selectedNodeIds.has(String(node.id));
+                selectedObject?.type === 'edge' &&
+                String(selectedObject.id) === String(edge.id);
+              const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
+              const endpointMoved =
+                diff.changedNodes.has(String(edge.from)) ||
+                diff.changedNodes.has(String(edge.to));
+              const strokeWidth = edgeWidth;
               return (
-                <GraphNode
-                  key={node.id}
-                  node={node}
-                  nodeRadius={nodeRadius}
+                <GraphEdge
+                  key={edge.id}
+                  edge={edge}
+                  pathD={pathD}
                   selected={selected}
                   multiSelected={multiSelected}
-                  drawAnchor={String(drawFrom) === String(node.id)}
-                  shouldAnimate={diff.changedNodes.has(String(node.id))}
-                  mode={mode}
-                  onPointerDown={event => handleNodePointerDown(event, node.id)}
+                  markerId={markerId}
+                  labelPosition={labelPosition}
+                  strokeWidth={strokeWidth}
+                  shouldAnimate={
+                    endpointMoved || diff.changedEdges.has(String(edge.id))
+                  }
+                  onPointerDown={event => {
+                    event.stopPropagation();
+                    onSelectEdge(edge.id);
+                  }}
                   onClick={event => {
                     event.stopPropagation();
-                    if (mode === 'draw') {
-                      onNodeClickForDraw(node.id);
-                      return;
-                    }
-                    onSelectNode(node.id, event.shiftKey || event.metaKey);
+                    onSelectEdge(edge.id);
                   }}
                 />
               );
             })}
+            {graph.nodes
+              .filter(node => node.visible !== false)
+              .map(node => {
+                const selected =
+                  selectedObject?.type === 'node' &&
+                  String(selectedObject.id) === String(node.id);
+                const multiSelected = selectedNodeIds.has(String(node.id));
+                return (
+                  <GraphNode
+                    key={node.id}
+                    node={node}
+                    nodeRadius={nodeRadius}
+                    selected={selected}
+                    multiSelected={multiSelected}
+                    drawAnchor={String(drawFrom) === String(node.id)}
+                    shouldAnimate={diff.changedNodes.has(String(node.id))}
+                    mode={mode}
+                    onPointerDown={event =>
+                      handleNodePointerDown(event, node.id)
+                    }
+                    onClick={event => {
+                      event.stopPropagation();
+                      if (mode === 'draw') {
+                        onNodeClickForDraw(node.id);
+                        return;
+                      }
+                      onSelectNode(node.id, event.shiftKey || event.metaKey);
+                    }}
+                  />
+                );
+              })}
+          </g>
           {dragRect && (
             <rect
               x={Math.min(dragRect.startX, dragRect.endX)}
