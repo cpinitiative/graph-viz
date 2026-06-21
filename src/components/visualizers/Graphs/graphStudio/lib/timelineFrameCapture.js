@@ -1,4 +1,12 @@
 export const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
+export const DEFAULT_PNG_SCALE = 2;
+export const MAX_PNG_DIMENSION = 4096;
+export const IMAGE_FRAMING = {
+  viewport: 'viewport',
+  fit: 'fit',
+};
+
+const FIT_CONTENT_PADDING = 80;
 
 const getDatedFrameFilename = extension => {
   const date = new Date().toISOString().slice(0, 10);
@@ -29,25 +37,118 @@ export const getGraphSvgElement = (svgElementId = DEFAULT_SVG_ELEMENT_ID) => {
   return svgEl;
 };
 
-export const serializeSvgElement = ({ svgEl, width, height }) => {
-  const origWidth = svgEl.getAttribute('width');
-  const origHeight = svgEl.getAttribute('height');
-  const origVersion = svgEl.getAttribute('version');
+const getViewportSize = svgEl => {
+  const rect = svgEl.getBoundingClientRect();
+  return {
+    width: Math.max(2, rect.width),
+    height: Math.max(2, rect.height),
+  };
+};
 
-  svgEl.setAttribute('width', width);
-  svgEl.setAttribute('height', height);
-  svgEl.setAttribute('version', '1.1');
+const transformBounds = (element, matrix) => {
+  const box = element.getBBox();
+  const points = [
+    new DOMPoint(box.x, box.y),
+    new DOMPoint(box.x + box.width, box.y),
+    new DOMPoint(box.x, box.y + box.height),
+    new DOMPoint(box.x + box.width, box.y + box.height),
+  ].map(point => point.matrixTransform(matrix));
+  const xs = points.map(point => point.x);
+  const ys = points.map(point => point.y);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+};
 
-  let svgData = new XMLSerializer().serializeToString(svgEl);
+const combineBounds = boundsList => ({
+  minX: Math.min(...boundsList.map(bounds => bounds.minX)),
+  minY: Math.min(...boundsList.map(bounds => bounds.minY)),
+  maxX: Math.max(...boundsList.map(bounds => bounds.maxX)),
+  maxY: Math.max(...boundsList.map(bounds => bounds.maxY)),
+});
 
-  if (origWidth === null) svgEl.removeAttribute('width');
-  else svgEl.setAttribute('width', origWidth);
+const expandBoundsToAspectRatio = (bounds, aspectRatio) => {
+  let width = bounds.maxX - bounds.minX + FIT_CONTENT_PADDING * 2;
+  let height = bounds.maxY - bounds.minY + FIT_CONTENT_PADDING * 2;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
 
-  if (origHeight === null) svgEl.removeAttribute('height');
-  else svgEl.setAttribute('height', origHeight);
+  if (width / height > aspectRatio) height = width / aspectRatio;
+  else width = height * aspectRatio;
 
-  if (origVersion === null) svgEl.removeAttribute('version');
-  else svgEl.setAttribute('version', origVersion);
+  return {
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
+  };
+};
+
+export const getFitContentViewBox = ({ svgEl, aspectRatio }) => {
+  const exportElements = [
+    svgEl.querySelector('[data-export-content="true"]'),
+    svgEl.querySelector('[data-testid="custom-export-legend"]'),
+  ].filter(Boolean);
+
+  const boundsList = exportElements.flatMap(element => {
+    try {
+      const matrix = element.getCTM();
+      if (!matrix) return [];
+      const bounds = transformBounds(element, matrix);
+      const values = Object.values(bounds);
+      return values.every(Number.isFinite) ? [bounds] : [];
+    } catch {
+      return [];
+    }
+  });
+
+  if (!boundsList.length) return null;
+  return expandBoundsToAspectRatio(combineBounds(boundsList), aspectRatio);
+};
+
+const formatViewBox = viewBox =>
+  [viewBox.x, viewBox.y, viewBox.width, viewBox.height]
+    .map(value => Number(value.toFixed(3)))
+    .join(' ');
+
+export const serializeSvgElement = ({
+  svgEl,
+  width,
+  height,
+  viewportWidth = width,
+  viewportHeight = height,
+  framingMode = IMAGE_FRAMING.viewport,
+}) => {
+  const exportSvg = svgEl.cloneNode(true);
+  const viewportAspectRatio = viewportWidth / viewportHeight;
+  const fitViewBox =
+    framingMode === IMAGE_FRAMING.fit
+      ? getFitContentViewBox({
+          svgEl,
+          aspectRatio: viewportAspectRatio,
+        })
+      : null;
+
+  exportSvg.setAttribute('width', width);
+  exportSvg.setAttribute('height', height);
+  exportSvg.setAttribute('version', '1.1');
+  exportSvg.setAttribute(
+    'viewBox',
+    formatViewBox(
+      fitViewBox ?? {
+        x: 0,
+        y: 0,
+        width: viewportWidth,
+        height: viewportHeight,
+      }
+    )
+  );
+  exportSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  let svgData = new XMLSerializer().serializeToString(exportSvg);
 
   if (!svgData.includes('xmlns=')) {
     svgData = svgData.replace(
@@ -88,31 +189,61 @@ export const loadSvgImage = async svgData => {
   }
 };
 
-export const loadSvgImageFromElement = async ({ svgEl, width, height }) => {
-  const svgData = serializeSvgElement({ svgEl, width, height });
+export const loadSvgImageFromElement = async ({
+  svgEl,
+  width,
+  height,
+  viewportWidth,
+  viewportHeight,
+  framingMode,
+}) => {
+  const svgData = serializeSvgElement({
+    svgEl,
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+    framingMode,
+  });
   return loadSvgImage(svgData);
 };
 
-export const createCaptureCanvas = svgEl => {
-  const rect = svgEl.getBoundingClientRect();
+export const createCaptureCanvas = (svgEl, { pngScale } = {}) => {
+  const viewport = getViewportSize(svgEl);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(2, Math.floor(rect.width / 2) * 2);
-  canvas.height = Math.max(2, Math.floor(rect.height / 2) * 2);
+  if (pngScale === undefined) {
+    canvas.width = Math.max(2, Math.floor(viewport.width / 2) * 2);
+    canvas.height = Math.max(2, Math.floor(viewport.height / 2) * 2);
+  } else {
+    const requestedScale = [1, 2, 3].includes(Number(pngScale))
+      ? Number(pngScale)
+      : DEFAULT_PNG_SCALE;
+    const cappedScale = Math.min(
+      requestedScale,
+      MAX_PNG_DIMENSION / Math.max(viewport.width, viewport.height)
+    );
+    canvas.width = Math.max(2, Math.round(viewport.width * cappedScale));
+    canvas.height = Math.max(2, Math.round(viewport.height * cappedScale));
+  }
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas rendering context unavailable');
-  return { canvas, ctx };
+  return { canvas, ctx, viewport };
 };
 
 export const exportCurrentFrameSvg = async ({
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
+  framingMode = IMAGE_FRAMING.viewport,
 } = {}) => {
   await waitForFrameRender();
   const svgEl = getGraphSvgElement(svgElementId);
-  const { canvas } = createCaptureCanvas(svgEl);
+  const viewport = getViewportSize(svgEl);
   const svgData = serializeSvgElement({
     svgEl,
-    width: canvas.width,
-    height: canvas.height,
+    width: Math.round(viewport.width),
+    height: Math.round(viewport.height),
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    framingMode,
   });
 
   downloadBlob({
@@ -123,14 +254,19 @@ export const exportCurrentFrameSvg = async ({
 
 export const exportCurrentFramePng = async ({
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
+  pngScale = DEFAULT_PNG_SCALE,
+  framingMode = IMAGE_FRAMING.viewport,
 } = {}) => {
   await waitForFrameRender();
   const svgEl = getGraphSvgElement(svgElementId);
-  const { canvas, ctx } = createCaptureCanvas(svgEl);
+  const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, { pngScale });
   const svgData = serializeSvgElement({
     svgEl,
     width: canvas.width,
     height: canvas.height,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+    framingMode,
   });
   const img = await loadSvgImage(svgData);
 

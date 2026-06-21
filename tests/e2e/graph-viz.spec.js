@@ -119,6 +119,16 @@ const expectDownloadFrom = async ({ page, locator, filenamePattern }) => {
   return download;
 };
 
+const readPngDimensions = async download => {
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const buffer = await fs.readFile(path);
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   const modal = page.getByTestId('custom-legend-modal');
@@ -994,6 +1004,11 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('svg-export-button')).toBeEnabled();
     await expect(page.getByTestId('png-export-button')).toBeVisible();
     await expect(page.getByTestId('png-export-button')).toBeEnabled();
+    await expect(page.getByTestId('image-export-controls')).toBeVisible();
+    const pngScaleSelect = page.getByTestId('png-scale-select');
+    const imageFramingSelect = page.getByTestId('image-framing-select');
+    await expect(pngScaleSelect).toHaveValue('2');
+    await expect(imageFramingSelect).toHaveValue('viewport');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All frames' })).toBeChecked();
     await expect(
@@ -1010,12 +1025,41 @@ api.edge('e0', '#f59e0b');
     });
     await expect(page.getByText('SVG exported')).toBeVisible();
 
-    await expectDownloadFrom({
+    const twoXDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('png-export-button'),
       filenamePattern: /\.png$/,
     });
     await expect(page.getByText('PNG exported')).toBeVisible();
+    const twoXDimensions = await readPngDimensions(twoXDownload);
+    expect(
+      Math.max(twoXDimensions.width, twoXDimensions.height)
+    ).toBeLessThanOrEqual(4096);
+
+    await pngScaleSelect.selectOption('1');
+    await expect(pngScaleSelect).toHaveValue('1');
+    const oneXDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+    const oneXDimensions = await readPngDimensions(oneXDownload);
+    expect(
+      Math.abs(twoXDimensions.width - oneXDimensions.width * 2)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(twoXDimensions.height - oneXDimensions.height * 2)
+    ).toBeLessThanOrEqual(1);
+
+    await pngScaleSelect.selectOption('3');
+    await expect(pngScaleSelect).toHaveValue('3');
+    await imageFramingSelect.selectOption('fit');
+    await expect(imageFramingSelect).toHaveValue('fit');
+    const graphTransformGroup = graphCanvas(page)
+      .locator('[data-export-content="true"]')
+      .locator('..');
+    const graphTransformBeforeFitExport =
+      await graphTransformGroup.getAttribute('transform');
 
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await expandLegendEditor(page);
@@ -1033,11 +1077,25 @@ api.edge('e0', '#f59e0b');
       locator: page.getByTestId('svg-export-button'),
       filenamePattern: /\.svg$/,
     });
-    await expectDownloadFrom({
+    const threeXDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('png-export-button'),
       filenamePattern: /\.png$/,
     });
+    const threeXDimensions = await readPngDimensions(threeXDownload);
+    expect(
+      Math.max(threeXDimensions.width, threeXDimensions.height)
+    ).toBeLessThanOrEqual(4096);
+    expect(
+      Math.abs(threeXDimensions.width - oneXDimensions.width * 3)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(threeXDimensions.height - oneXDimensions.height * 3)
+    ).toBeLessThanOrEqual(1);
+    await expect(graphTransformGroup).toHaveAttribute(
+      'transform',
+      graphTransformBeforeFitExport
+    );
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
