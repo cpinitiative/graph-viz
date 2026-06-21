@@ -45,6 +45,7 @@ const TimelinePanel = ({
   onDuplicateStep,
   onDeleteStep,
   onMoveStep,
+  onOpenFrameBrowser,
 }) => {
   return (
     <div
@@ -56,6 +57,14 @@ const TimelinePanel = ({
           Timeline
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={toolbarButtonClass}
+            data-testid="open-frame-browser"
+            onClick={onOpenFrameBrowser}
+          >
+            Frames
+          </button>
           <button
             type="button"
             className={toolbarButtonClass}

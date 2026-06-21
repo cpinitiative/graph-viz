@@ -39,5 +39,23 @@ test.describe('Graph Viz mobile smoke', () => {
     await expect(page.getByText('Timeline')).toBeVisible();
     await page.getByRole('button', { name: '+ Keyframe' }).click();
     await expect(page.getByText('Frame 2')).toBeVisible();
+
+    await page.getByTestId('open-frame-browser').click();
+    const frameBrowser = page.getByTestId('frame-browser');
+    await expect(frameBrowser).toBeVisible();
+    await expect(page.getByTestId('frame-browser-card-0')).toBeVisible();
+    await expect(page.getByTestId('frame-browser-card-1')).toBeVisible();
+
+    const browserBounds = await frameBrowser.boundingBox();
+    expect(browserBounds.x).toBeGreaterThanOrEqual(0);
+    expect(browserBounds.width).toBeLessThanOrEqual(393);
+
+    await page.getByTestId('frame-browser-card-1').click();
+    await expect(page.getByTestId('frame-browser-card-1')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+    await page.getByRole('button', { name: 'Close frame browser' }).click();
+    await expect(frameBrowser).toBeHidden();
   });
 });

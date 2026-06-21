@@ -467,6 +467,57 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('opens the frame browser and navigates timeline frames', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'dijkstra');
+
+    const frameBrowser = page.getByTestId('frame-browser');
+    const frameDescription = page.getByPlaceholder(
+      'Enter a description for this frame...'
+    );
+
+    await page.getByTestId('open-frame-browser').click();
+    await expect(frameBrowser).toBeVisible();
+    await expect(page.getByTestId('frame-browser-card-0')).toBeVisible();
+    await expect(page.getByTestId('frame-browser-card-1')).toBeVisible();
+    await expect(page.getByTestId('frame-browser-card-0')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+
+    const secondFrameDescription = await page
+      .getByTestId('frame-browser-card-1')
+      .locator('div')
+      .last()
+      .textContent();
+    await page.getByTestId('frame-browser-card-1').click();
+    await expect(page.getByTestId('frame-browser-card-0')).not.toHaveAttribute(
+      'aria-current'
+    );
+    await expect(page.getByTestId('frame-browser-card-1')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+    await expect(frameDescription).toHaveValue(secondFrameDescription.trim());
+
+    await page.getByRole('button', { name: 'Close frame browser' }).click();
+    await expect(frameBrowser).toBeHidden();
+
+    await frameDescription.fill('Updated from timeline editor');
+    await page.getByTestId('open-frame-browser').click();
+    await expect(page.getByTestId('frame-browser-card-1')).toContainText(
+      'Updated from timeline editor'
+    );
+    await page.getByRole('button', { name: 'Close frame browser' }).click();
+
+    expect(errors).toEqual([]);
+  });
+
   test('loads Script Mode examples without auto-running them', async ({
     page,
   }) => {

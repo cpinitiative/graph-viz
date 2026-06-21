@@ -7,6 +7,7 @@ import {
   Group as PanelGroup,
   Separator as PanelResizeHandle,
 } from 'react-resizable-panels';
+import FrameBrowser from './FrameBrowser';
 import GraphCanvas from './GraphCanvas';
 import LeftSidebar from './LeftSidebar';
 import PropertyPanel from './PropertyPanel';
@@ -200,6 +201,7 @@ const GraphStudioLayout = ({
   const [isMobile, setIsMobile] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
+  const [isFrameBrowserOpen, setIsFrameBrowserOpen] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const sidebarProps = {
@@ -215,6 +217,19 @@ const GraphStudioLayout = ({
     onCloseImportMenu: () => setIsImportMenuOpen(false),
     onCloseExportMenu: () => setIsExportMenuOpen(false),
   };
+  const timelineProps = {
+    ...timeline,
+    onOpenFrameBrowser: () => setIsFrameBrowserOpen(true),
+  };
+  const frameBrowser = (
+    <FrameBrowser
+      open={isFrameBrowserOpen}
+      steps={timeline.steps}
+      currentFrame={timeline.currentFrame}
+      onFrameChange={timeline.onFrameChange}
+      onClose={() => setIsFrameBrowserOpen(false)}
+    />
+  );
 
   useEffect(() => {
     const checkMobile = () => {
@@ -279,9 +294,10 @@ const GraphStudioLayout = ({
         </div>
 
         <div className="h-60 min-h-[240px] border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
-          <TimelinePanel {...timeline} />
+          <TimelinePanel {...timelineProps} />
         </div>
 
+        {frameBrowser}
         <ModalStack {...modalStackProps} />
       </div>
     );
@@ -307,9 +323,10 @@ const GraphStudioLayout = ({
         </Panel>
         <PanelResizeHandle className="graphstudio-resize-horizontal h-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50" />
         <Panel defaultSize="30%" minSize="22%">
-          <TimelinePanel {...timeline} />
+          <TimelinePanel {...timelineProps} />
         </Panel>
       </PanelGroup>
+      {frameBrowser}
       <ModalStack {...modalStackProps} />
     </div>
   );
