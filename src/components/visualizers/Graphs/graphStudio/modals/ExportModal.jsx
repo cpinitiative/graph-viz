@@ -15,6 +15,7 @@ const EMPTY_DIFF = {
 };
 const EMPTY_SELECTION = new Set();
 const noop = () => {};
+const PREVIEW_UPDATE_DELAY_MS = 400;
 
 const sectionClass =
   'space-y-4 border-b border-[#D7DEE8] bg-[#FFFFFF] p-5 last:border-b-0 dark:border-[#334155] dark:bg-[#111827]';
@@ -95,7 +96,9 @@ const ExportModal = ({
 }) => {
   const [previewFrameIndex, setPreviewFrameIndex] = useState(currentFrame);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [previewStatus, setPreviewStatus] = useState('loading');
+  const [previewStatus, setPreviewStatus] = useState('idle');
+  const [showDelayedPreviewStatus, setShowDelayedPreviewStatus] =
+    useState(false);
   const [editorViewport, setEditorViewport] = useState({
     width: 0,
     height: 0,
@@ -128,6 +131,31 @@ const ExportModal = ({
   const previewGraph = useMemo(
     () => getFrameGraph?.(previewFrameIndex) ?? null,
     [getFrameGraph, previewFrameIndex]
+  );
+  const previewRenderKey = useMemo(
+    () =>
+      JSON.stringify({
+        frame: previewFrameIndex,
+        graph: previewGraph,
+        viewState: previewCanvas?.viewState,
+        showGrid: Boolean(previewCanvas?.showGrid),
+        customLegend: previewCanvas?.customLegend,
+        edgeRouting: previewCanvas?.edgeRouting,
+        edgeCurvature: previewCanvas?.edgeCurvature,
+        nodeRadius: previewCanvas?.nodeRadius,
+        edgeWidth: previewCanvas?.edgeWidth,
+      }),
+    [
+      previewCanvas?.customLegend,
+      previewCanvas?.edgeCurvature,
+      previewCanvas?.edgeRouting,
+      previewCanvas?.edgeWidth,
+      previewCanvas?.nodeRadius,
+      previewCanvas?.showGrid,
+      previewCanvas?.viewState,
+      previewFrameIndex,
+      previewGraph,
+    ]
   );
   const selectedStep = steps[previewFrameIndex];
   const isCustomFrameRange = frameRange.mode === 'range';
@@ -198,11 +226,15 @@ const ExportModal = ({
     if (!open || !previewGraph || editorViewport.width <= 0) return undefined;
 
     let active = true;
+    let delayedStatusTimer = null;
 
     const updatePreview = async () => {
       try {
-        await Promise.resolve();
-        if (active) setPreviewStatus('loading');
+        setPreviewStatus('updating');
+        setShowDelayedPreviewStatus(false);
+        delayedStatusTimer = window.setTimeout(() => {
+          if (active) setShowDelayedPreviewStatus(true);
+        }, PREVIEW_UPDATE_DELAY_MS);
         await waitForFrameRender();
         const svgData = serializeCurrentFrameSvg({
           svgElementId: PREVIEW_SVG_ELEMENT_ID,
@@ -212,26 +244,37 @@ const ExportModal = ({
         setPreviewUrl(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`
         );
+        if (delayedStatusTimer !== null) {
+          window.clearTimeout(delayedStatusTimer);
+          delayedStatusTimer = null;
+        }
         setPreviewStatus('ready');
+        setShowDelayedPreviewStatus(false);
       } catch {
         if (!active) return;
-        setPreviewUrl('');
+        if (delayedStatusTimer !== null) {
+          window.clearTimeout(delayedStatusTimer);
+          delayedStatusTimer = null;
+        }
         setPreviewStatus('error');
+        setShowDelayedPreviewStatus(false);
       }
     };
 
     updatePreview();
     return () => {
       active = false;
+      if (delayedStatusTimer !== null) {
+        window.clearTimeout(delayedStatusTimer);
+      }
     };
   }, [
     editorViewport.height,
     editorViewport.width,
     imageFraming,
     open,
-    previewCanvas,
-    previewFrameIndex,
     previewGraph,
+    previewRenderKey,
   ]);
 
   if (!open) return null;
@@ -293,9 +336,9 @@ const ExportModal = ({
               data-preview-frame-index={previewFrameIndex}
               data-testid="export-preview-panel"
             >
-              {previewStatus === 'ready' && previewUrl ? (
+              {previewUrl ? (
                 <div
-                  className="flex h-full w-full items-center justify-center"
+                  className="relative flex h-full w-full items-center justify-center"
                   data-testid="export-preview-current-frame"
                 >
                   <img
@@ -304,6 +347,14 @@ const ExportModal = ({
                     className="block max-h-full max-w-full object-contain"
                     data-testid="export-preview-image"
                   />
+                  {previewStatus === 'updating' && showDelayedPreviewStatus && (
+                    <div
+                      className="absolute bottom-2 right-2 border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B] shadow-sm"
+                      data-testid="export-preview-status"
+                    >
+                      Updating preview…
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div

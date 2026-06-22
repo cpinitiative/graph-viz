@@ -877,6 +877,10 @@ while (true) {}
     const firstFramePreviewUrl = await previewImage.getAttribute('src');
 
     await exportMenu.getByTestId('export-preview-frame-item-1').click();
+    await expect(previewImage).toHaveAttribute('src', firstFramePreviewUrl);
+    await expect(exportMenu.getByTestId('export-preview-status')).toHaveCount(
+      0
+    );
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-1')
     ).toHaveAttribute('aria-current', 'true');
@@ -1437,6 +1441,11 @@ api.edge('e0', '#f59e0b');
 
     await openExportMenu(page);
     const previewImage = await expectExportPreview(page);
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('Export Key');
     const previewSvgText = await previewImage.evaluate(async image =>
       (await fetch(image.src)).text()
     );
