@@ -893,13 +893,13 @@ while (true) {}
       .not.toBe(firstFramePreviewUrl);
     await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
-    await exportMenu.getByRole('radio', { name: 'Current frame' }).check();
+    await exportMenu.getByRole('radio', { name: 'Current' }).check();
     await expect(frameItems).toHaveCount(1);
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-0')
     ).toBeVisible();
 
-    await exportMenu.getByRole('radio', { name: 'Custom range' }).check();
+    await exportMenu.getByRole('radio', { name: 'Range' }).check();
     await expect(exportMenu.getByLabel('Export start frame')).toBeVisible();
     await expect(exportMenu.getByLabel('Export end frame')).toBeVisible();
     await exportMenu.getByLabel('Export end frame').fill('3');
@@ -1375,13 +1375,11 @@ api.edge('e0', '#f59e0b');
     await expect(pngScaleSelect).toHaveValue('2');
     await expect(imageFramingSelect).toHaveValue('viewport');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'All frames' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
-      page.getByRole('radio', { name: 'Current frame' })
+      page.getByRole('radio', { name: 'Current' })
     ).not.toBeChecked();
-    await expect(
-      page.getByRole('radio', { name: 'Custom range' })
-    ).not.toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
     await expectDownloadFrom({
       page,
@@ -1499,10 +1497,8 @@ api.edge('e0', '#f59e0b');
     await expect(frameCounter).toHaveText(initialFrameCounter);
     await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('radio', { name: 'Current frame' }).check();
-    await expect(
-      page.getByRole('radio', { name: 'Current frame' })
-    ).toBeChecked();
+    await page.getByRole('radio', { name: 'Current' }).check();
+    await expect(page.getByRole('radio', { name: 'Current' })).toBeChecked();
     await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
@@ -1513,10 +1509,8 @@ api.edge('e0', '#f59e0b');
     await closeExportMenu(page);
     await choosePreset(page, 'bfs');
     await openExportMenu(page);
-    await page.getByRole('radio', { name: 'Custom range' }).check();
-    await expect(
-      page.getByRole('radio', { name: 'Custom range' })
-    ).toBeChecked();
+    await page.getByRole('radio', { name: 'Range' }).check();
+    await expect(page.getByRole('radio', { name: 'Range' })).toBeChecked();
     await page.getByLabel('Export start frame').fill('1');
     await page.getByLabel('Export end frame').fill('2');
     await expectDownloadFrom({

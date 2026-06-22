@@ -301,9 +301,6 @@ const ExportModal = ({
             >
               Export
             </h2>
-            <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
-              Preview and export project data, images, slides, or video.
-            </p>
           </div>
           <ModalCloseButton onClick={onClose} />
         </header>
@@ -426,120 +423,9 @@ const ExportModal = ({
 
           <aside className="min-h-0 overflow-y-visible border-[#CBD5E1] dark:border-[#334155] lg:overflow-y-auto">
             <section className={sectionClass}>
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                  Project Data
-                </h3>
-                <p className="mt-1 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                  Save the full project or copy its graph as an edge list.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className={actionClass}
-                  data-testid="project-export-button"
-                  onClick={onExportProject}
-                >
-                  Export Project
-                </button>
-                <button
-                  type="button"
-                  className={actionClass}
-                  onClick={onExportText}
-                >
-                  Export Edge List
-                </button>
-              </div>
-            </section>
-
-            <section className={sectionClass}>
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                  Current Frame Image
-                </h3>
-                <p className="mt-1 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                  Configure a crisp image of the active editor frame.
-                </p>
-              </div>
-              <div
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1"
-                data-testid="image-export-controls"
-              >
-                <label className="space-y-1.5" htmlFor="png-scale-select">
-                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                    PNG Scale
-                  </span>
-                  <select
-                    id="png-scale-select"
-                    value={pngScale}
-                    aria-label="PNG Scale"
-                    data-testid="png-scale-select"
-                    onChange={event =>
-                      onPngScaleChange?.(Number(event.target.value))
-                    }
-                    className={selectClass}
-                  >
-                    <option value={1}>1x</option>
-                    <option value={2}>2x</option>
-                    <option value={3}>3x</option>
-                  </select>
-                  <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                    2x is recommended for slides and docs.
-                  </span>
-                </label>
-                <label className="space-y-1.5" htmlFor="image-framing-select">
-                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                    Image Framing
-                  </span>
-                  <select
-                    id="image-framing-select"
-                    value={imageFraming}
-                    aria-label="Image Framing"
-                    data-testid="image-framing-select"
-                    onChange={event =>
-                      onImageFramingChange?.(event.target.value)
-                    }
-                    className={selectClass}
-                  >
-                    <option value="viewport">Viewport</option>
-                    <option value="fit">Fit graph</option>
-                  </select>
-                  <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                    Viewport preserves the editor view; Fit graph crops to
-                    visible content.
-                  </span>
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className={primaryActionClass}
-                  data-testid="png-export-button"
-                  onClick={onExportPng}
-                >
-                  Export PNG
-                </button>
-                <button
-                  type="button"
-                  className={actionClass}
-                  data-testid="svg-export-button"
-                  onClick={onExportSvg}
-                >
-                  Export SVG
-                </button>
-              </div>
-            </section>
-
-            <section className={sectionClass}>
-              <div>
-                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                  Timeline
-                </h3>
-                <p className="mt-1 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                  Choose the frames included in slideshow and video exports.
-                </p>
-              </div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+                Timeline
+              </h3>
               <div
                 className="space-y-3"
                 data-testid="export-frame-range-controls"
@@ -549,9 +435,9 @@ const ExportModal = ({
                 </div>
                 <div className="grid grid-cols-3 border border-[#CBD5E1] dark:border-[#475569]">
                   {[
-                    ['all', 'All frames'],
-                    ['current', 'Current frame'],
-                    ['range', 'Custom range'],
+                    ['all', 'All'],
+                    ['current', 'Current'],
+                    ['range', 'Range'],
                   ].map(([value, label]) => (
                     <label
                       key={value}
@@ -648,6 +534,95 @@ const ExportModal = ({
                   }}
                 >
                   Export MP4
+                </button>
+              </div>
+            </section>
+
+            <section className={sectionClass}>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+                Current Frame Image
+              </h3>
+              <div
+                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1"
+                data-testid="image-export-controls"
+              >
+                <label className="space-y-1.5" htmlFor="png-scale-select">
+                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                    PNG Scale
+                  </span>
+                  <select
+                    id="png-scale-select"
+                    value={pngScale}
+                    aria-label="PNG Scale"
+                    data-testid="png-scale-select"
+                    onChange={event =>
+                      onPngScaleChange?.(Number(event.target.value))
+                    }
+                    className={selectClass}
+                  >
+                    <option value={1}>1x</option>
+                    <option value={2}>2x recommended</option>
+                    <option value={3}>3x high quality</option>
+                  </select>
+                </label>
+                <label className="space-y-1.5" htmlFor="image-framing-select">
+                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                    Image Framing
+                  </span>
+                  <select
+                    id="image-framing-select"
+                    value={imageFraming}
+                    aria-label="Image Framing"
+                    data-testid="image-framing-select"
+                    onChange={event =>
+                      onImageFramingChange?.(event.target.value)
+                    }
+                    className={selectClass}
+                  >
+                    <option value="viewport">Viewport</option>
+                    <option value="fit">Fit graph</option>
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className={primaryActionClass}
+                  data-testid="png-export-button"
+                  onClick={onExportPng}
+                >
+                  Export PNG
+                </button>
+                <button
+                  type="button"
+                  className={actionClass}
+                  data-testid="svg-export-button"
+                  onClick={onExportSvg}
+                >
+                  Export SVG
+                </button>
+              </div>
+            </section>
+
+            <section className={sectionClass}>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+                Project Data
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className={actionClass}
+                  data-testid="project-export-button"
+                  onClick={onExportProject}
+                >
+                  Export Project
+                </button>
+                <button
+                  type="button"
+                  className={actionClass}
+                  onClick={onExportText}
+                >
+                  Export Edge List
                 </button>
               </div>
             </section>
