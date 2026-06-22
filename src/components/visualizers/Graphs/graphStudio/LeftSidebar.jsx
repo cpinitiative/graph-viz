@@ -197,15 +197,6 @@ const LeftSidebar = ({
       className="flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
       data-testid="left-sidebar"
     >
-      <div className="border-b border-[#D7DEE8] pb-4 dark:border-[#334155]">
-        <div className="font-manrope text-sm font-bold text-[#0F2747] dark:text-[#F8FAFC]">
-          Graph animation editor
-        </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-          Create and export graph animations for algorithm explanations.
-        </p>
-      </div>
-
       <SidebarSection>
         <SectionTitle>Tools</SectionTitle>
         <div className="grid grid-cols-2 gap-1 rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
