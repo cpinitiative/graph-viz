@@ -1,4 +1,5 @@
 import { SCRIPT_EXAMPLES } from '../data/scriptExamples';
+import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
 const ScriptModal = ({
@@ -50,12 +51,12 @@ const ScriptModal = ({
             >
               Load example
             </label>
-            <select
+            <NativeSelect
               id="script-example-select"
               aria-label="Load script example"
               value={selectedExample?.id ?? ''}
               onChange={handleExampleChange}
-              className="h-10 w-full rounded-md border border-outline-variant bg-white py-2 pl-3 pr-10 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-dark-on-surface"
+              size="regular"
             >
               <option value="">Choose an example...</option>
               {SCRIPT_EXAMPLES.map(example => (
@@ -63,7 +64,7 @@ const ScriptModal = ({
                   {example.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             {selectedExample && (
               <p className="text-xs leading-relaxed text-on-surface dark:text-dark-on-surface sm:col-start-2">
                 {selectedExample.description}

@@ -1,3 +1,4 @@
+import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
 const LABEL_POSITIONS = [
@@ -35,17 +36,17 @@ const ExportVideoModal = ({
             <label className="block text-xs font-medium text-on-surface dark:text-dark-on-surface">
               Label Position
             </label>
-            <select
+            <NativeSelect
               value={labelPos}
               onChange={event => onLabelPosChange(event.target.value)}
-              className="h-10 w-full rounded-md border border-outline-variant/30 bg-white py-2 pl-3 pr-10 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface"
+              size="regular"
             >
               {LABEL_POSITIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         </div>
         <div className="flex flex-col justify-end gap-2 border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900 sm:flex-row">

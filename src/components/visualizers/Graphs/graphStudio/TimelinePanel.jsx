@@ -4,6 +4,21 @@ const deleteButtonClass =
   'min-h-[32px] rounded-md bg-surface-container-high px-2.5 py-1.5 text-xs text-primary transition-colors hover:bg-surface-container-highest dark:bg-dark-surface-container-high dark:text-dark-primary dark:hover:bg-dark-surface-container-highest md:min-h-0';
 const moveButtonClass =
   'min-w-[32px] rounded-md bg-surface-container p-1.5 text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-w-0';
+const playbackButtonClass =
+  'flex min-h-[32px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2.5 py-1.5 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
+
+const PauseIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="6" y="4" width="4" height="16" />
+    <rect x="14" y="4" width="4" height="16" />
+  </svg>
+);
+
+const PlayIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <polygon points="5 3 19 12 5 21 5 3" />
+  </svg>
+);
 
 const ChevronLeftIcon = () => (
   <svg
@@ -45,6 +60,8 @@ const TimelinePanel = ({
   onDuplicateStep,
   onDeleteStep,
   onMoveStep,
+  onPlay,
+  isPlaying,
 }) => {
   return (
     <div
@@ -52,8 +69,30 @@ const TimelinePanel = ({
       data-testid="timeline-panel"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 bg-surface-container-low px-3 py-2 dark:bg-dark-surface-container-low">
-        <div className="font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
-          Timeline
+        <div className="flex items-center gap-2">
+          <div className="font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
+            Timeline
+          </div>
+          <button
+            type="button"
+            className={playbackButtonClass}
+            onClick={onPlay}
+          >
+            {isPlaying ? (
+              <>
+                <PauseIcon />
+                Pause
+              </>
+            ) : (
+              <>
+                <PlayIcon />
+                Play
+              </>
+            )}
+          </button>
+          <div className="text-[10px] font-semibold tabular-nums text-outline dark:text-dark-outline">
+            {currentFrame + 1} / {Math.max(1, steps.length)}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button

@@ -6,6 +6,7 @@ import {
   CUSTOM_LEGEND_POSITIONS,
   DEFAULT_CUSTOM_LEGEND,
 } from '../lib/customLegend';
+import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
 const CUSTOM_LEGEND_KIND_LABELS = {
@@ -14,8 +15,7 @@ const CUSTOM_LEGEND_KIND_LABELS = {
 };
 
 const inputClass =
-  'h-10 w-full rounded border border-outline-variant/30 bg-white px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
-const selectClass = `${inputClass} pr-10`;
+  'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-sm text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase text-outline dark:text-dark-outline';
 const dataButtonClass =
@@ -170,7 +170,7 @@ const LegendModal = ({
             </label>
             <label className="space-y-1.5" htmlFor="custom-legend-position">
               <span className={fieldLabelClass}>Position</span>
-              <select
+              <NativeSelect
                 id="custom-legend-position"
                 value={legend.position}
                 aria-label="Legend Position"
@@ -178,14 +178,14 @@ const LegendModal = ({
                 onChange={event =>
                   patchCustomLegend({ position: event.target.value })
                 }
-                className={selectClass}
+                size="regular"
               >
                 {CUSTOM_LEGEND_POSITIONS.map(position => (
                   <option key={position} value={position}>
                     {CUSTOM_LEGEND_POSITION_LABELS[position]}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
           </div>
           {legend.position === 'custom' && (
@@ -257,7 +257,7 @@ const LegendModal = ({
                       htmlFor={`custom-legend-entry-kind-${index}`}
                     >
                       <span className={fieldLabelClass}>Kind</span>
-                      <select
+                      <NativeSelect
                         id={`custom-legend-entry-kind-${index}`}
                         value={entry.kind ?? 'node'}
                         aria-label={`Legend Entry ${index + 1} Kind`}
@@ -267,14 +267,14 @@ const LegendModal = ({
                             kind: event.target.value,
                           })
                         }
-                        className={selectClass}
+                        size="regular"
                       >
                         {CUSTOM_LEGEND_KINDS.map(kind => (
                           <option key={kind} value={kind}>
                             {CUSTOM_LEGEND_KIND_LABELS[kind]}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </label>
                     <label
                       className="space-y-1"

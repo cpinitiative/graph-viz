@@ -3,6 +3,7 @@ import {
   CUSTOM_LEGEND_POSITIONS,
   DEFAULT_CUSTOM_LEGEND,
 } from './lib/customLegend';
+import NativeSelect from './NativeSelect';
 
 const MODE_OPTIONS = ['select', 'pan', 'draw'];
 const LAYOUT_OPTIONS = [
@@ -23,28 +24,32 @@ const PRESET_OPTIONS = [
 ];
 
 const sectionTitleClass =
-  'font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface';
+  'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const actionButtonBaseClass =
-  'min-h-[44px] rounded-md py-3 text-xs font-medium transition-colors md:min-h-0 md:py-2';
+  'min-h-[44px] rounded-sm border px-2.5 py-2.5 text-xs font-semibold transition-colors md:min-h-9 md:py-2';
 const actionButtonDefaultClass =
-  'bg-surface-container text-on-surface hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
+  'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const actionButtonPrimaryClass =
-  'bg-primary text-on-primary dark:bg-dark-primary dark:text-dark-on-primary';
+  'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:text-[#FFFFFF] dark:hover:bg-[#2563EB]';
 const iconButtonClass =
-  'min-w-[44px] rounded-md p-2 text-on-surface transition-colors hover:bg-surface-container-high dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-w-0 md:p-1.5';
+  'min-w-[44px] rounded-sm p-2 text-[#334155] transition-colors hover:bg-[#E2E8F0] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-w-8 md:p-1.5';
 const toggleRowClass =
-  'flex cursor-pointer items-center justify-between rounded-md bg-surface-container p-3 transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high md:p-2';
+  'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
-  'h-5 w-5 rounded bg-surface-container-high text-blue-800 focus:ring-blue-800 focus:ring-offset-slate-800';
+  'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const dataButtonClass =
-  'min-h-[44px] rounded bg-surface-container py-2 text-[10px] text-on-surface transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50 dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5 md:text-[10px]';
-const compactSelectClass =
-  'w-full rounded border border-outline-variant/30 bg-white py-2 pl-3 pr-9 text-xs font-medium text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface';
+  'min-h-[44px] rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
 const SectionTitle = ({ children }) => (
   <div className={sectionTitleClass}>{children}</div>
+);
+
+const SidebarSection = ({ children }) => (
+  <section className="space-y-2.5 border-b border-[#D7DEE8] py-4 first:pt-0 last:border-b-0 dark:border-[#334155]">
+    {children}
+  </section>
 );
 
 const ActionButton = ({
@@ -143,19 +148,6 @@ const ZoomInIcon = () => (
   </svg>
 );
 
-const StopIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <rect x="6" y="4" width="4" height="16" />
-    <rect x="14" y="4" width="4" height="16" />
-  </svg>
-);
-
-const PlayIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <polygon points="5 3 19 12 5 21 5 3" />
-  </svg>
-);
-
 const LeftSidebar = ({
   mode,
   setMode,
@@ -178,12 +170,7 @@ const LeftSidebar = ({
   onOpenLegendEditor,
   isLegendEditorOpen = false,
   onOpenScript,
-  selectedCount,
   onApplyPreset,
-  currentFrame,
-  totalFrames,
-  onPlay,
-  isPlaying,
   onCenterView,
   zoomPercent,
   onZoomIn,
@@ -201,7 +188,7 @@ const LeftSidebar = ({
     : DEFAULT_CUSTOM_LEGEND.position;
   const legendSummary = `${legendEntries.length} ${
     legendEntries.length === 1 ? 'entry' : 'entries'
-  } - ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
+  } · ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -212,21 +199,21 @@ const LeftSidebar = ({
 
   return (
     <div
-      className="flex h-full flex-col gap-4 overflow-auto bg-surface-container-low p-4 text-sm dark:bg-dark-surface md:gap-6 md:p-6"
+      className="flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
       data-testid="left-sidebar"
     >
-      <div className="space-y-3">
+      <SidebarSection>
         <SectionTitle>Tools</SectionTitle>
-        <div className="flex rounded-md bg-surface-container p-1 dark:bg-dark-surface-container">
+        <div className="flex rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
           {MODE_OPTIONS.map(item => (
             <button
               key={item}
               type="button"
               className={joinClasses(
-                'min-h-[44px] flex-1 rounded-md py-2 text-xs font-medium capitalize transition-colors md:min-h-0 md:py-1.5',
+                'min-h-[44px] flex-1 rounded-sm py-2 text-xs font-semibold capitalize transition-colors md:min-h-8 md:py-1.5',
                 mode === item
-                  ? 'bg-primary text-on-primary dark:bg-blue-800 dark:text-dark-on-primary'
-                  : 'text-on-surface hover:text-on-surface dark:text-dark-on-surface'
+                  ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#1D4ED8] dark:text-[#FFFFFF]'
+                  : 'text-[#475569] hover:bg-[#FFFFFF] hover:text-[#0F2747] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:hover:text-[#FFFFFF]'
               )}
               onClick={() => setMode(item)}
             >
@@ -244,14 +231,32 @@ const LeftSidebar = ({
           </ActionButton>
         </div>
         {mode === 'draw' && (
-          <p className="text-[10px] leading-snug text-outline dark:text-dark-outline">
+          <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
             {drawHelpText}
           </p>
         )}
-      </div>
+      </SidebarSection>
 
-      <div className="space-y-3">
-        <SectionTitle>Layout</SectionTitle>
+      <SidebarSection>
+        <SectionTitle>Presets</SectionTitle>
+        <NativeSelect
+          aria-label="Load graph preset"
+          onChange={event => {
+            if (event.target.value) onApplyPreset(event.target.value);
+            event.target.value = '';
+          }}
+        >
+          <option value="">Choose preset...</option>
+          {PRESET_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </NativeSelect>
+      </SidebarSection>
+
+      <SidebarSection>
+        <SectionTitle>Arrange</SectionTitle>
         <div className="grid grid-cols-3 gap-1">
           {LAYOUT_OPTIONS.map(([type, label]) => (
             <ActionButton
@@ -263,11 +268,11 @@ const LeftSidebar = ({
             </ActionButton>
           ))}
         </div>
-      </div>
+      </SidebarSection>
 
-      <div className="space-y-3">
+      <SidebarSection>
         <SectionTitle>View / Canvas</SectionTitle>
-        <div className="flex items-center justify-between rounded-md bg-surface-container p-2 dark:bg-dark-surface-container">
+        <div className="flex items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
           <IconButton title="Center View" onClick={onCenterView}>
             <CenterViewIcon />
           </IconButton>
@@ -275,7 +280,7 @@ const LeftSidebar = ({
             <IconButton title="Zoom Out" onClick={onZoomOut}>
               <ZoomOutIcon />
             </IconButton>
-            <span className="w-10 text-center text-xs font-medium text-on-surface dark:text-dark-on-surface">
+            <span className="w-10 text-center text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
               {zoomPercent}%
             </span>
             <IconButton title="Zoom In" onClick={onZoomIn}>
@@ -283,47 +288,19 @@ const LeftSidebar = ({
             </IconButton>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={joinClasses(
-              'flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-md py-3 text-xs font-semibold transition-colors md:min-h-0 md:py-2',
-              isPlaying
-                ? 'bg-surface-container-high text-primary hover:bg-surface-container-high dark:bg-dark-surface-container-high dark:text-dark-primary'
-                : 'bg-primary text-on-primary hover:bg-blue-700 dark:bg-blue-800 dark:text-dark-on-primary'
-            )}
-            onClick={onPlay}
-          >
-            {isPlaying ? (
-              <>
-                <StopIcon />
-                Stop
-              </>
-            ) : (
-              <>
-                <PlayIcon />
-                Play
-              </>
-            )}
-          </button>
-          <div className="flex min-h-[44px] items-center rounded-md bg-surface-container px-3 py-2 text-xs font-medium text-on-surface dark:bg-dark-surface-container dark:text-dark-on-surface md:min-h-0 md:py-2">
-            {currentFrame + 1} / {Math.max(1, totalFrames)}
-          </div>
-        </div>
         <div className="space-y-2">
-          <div className="rounded-md bg-surface-container p-3 dark:bg-dark-surface-container md:p-2">
-            <div className="mb-1.5 text-xs text-on-surface dark:text-dark-on-surface">
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]">
               Edge Routing
             </div>
-            <select
+            <NativeSelect
               value={routing}
               aria-label="Edge routing"
               onChange={event => setRouting(event.target.value)}
-              className="w-full rounded-md border border-outline-variant/30 bg-white py-2 pl-3 pr-10 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-gray-800 dark:text-dark-on-surface md:py-1.5"
             >
               <option value="straight">Straight</option>
               <option value="bezier">Bezier Avoid</option>
-            </select>
+            </NativeSelect>
           </div>
           <ToggleRow
             label="Dot Grid"
@@ -341,48 +318,27 @@ const LeftSidebar = ({
             onChange={setLockCanvas}
           />
         </div>
-      </div>
+      </SidebarSection>
 
-      <div className="space-y-3">
-        <SectionTitle>Examples</SectionTitle>
-        <select
-          aria-label="Load graph preset"
-          onChange={event => {
-            if (event.target.value) onApplyPreset(event.target.value);
-            event.target.value = '';
-          }}
-          className="w-full rounded-md border border-outline-variant/30 bg-surface-container py-2 pl-3 pr-10 text-xs text-on-surface focus:border-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/30 dark:bg-dark-surface-container dark:text-dark-on-surface md:py-2"
-        >
-          <option value="">Choose algorithm...</option>
-          {PRESET_OPTIONS.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-3">
+      <SidebarSection>
         <SectionTitle>Legend</SectionTitle>
-        <div
-          className="space-y-2 rounded-md bg-surface-container p-2 dark:bg-dark-surface-container"
-          data-testid="custom-legend-controls"
-        >
-          <div className="flex items-center justify-between gap-2 rounded bg-surface-container-low p-2 dark:bg-dark-surface">
+        <div className="space-y-2.5" data-testid="custom-legend-controls">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-on-surface dark:text-dark-on-surface">
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
                 <input
                   type="checkbox"
+                  aria-label="Legend"
                   checked={Boolean(customLegend.enabled)}
                   onChange={event =>
                     patchCustomLegend({ enabled: event.target.checked })
                   }
                   className={checkboxClass}
                 />
-                <span>Legend</span>
+                <span>Show legend</span>
               </label>
               <div
-                className="mt-1 truncate text-[10px] text-outline dark:text-dark-outline"
+                className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]"
                 data-testid="custom-legend-summary"
               >
                 {legendSummary}
@@ -395,19 +351,19 @@ const LeftSidebar = ({
               aria-controls="custom-legend-editor"
               data-testid="custom-legend-edit-toggle"
               onClick={onOpenLegendEditor}
-              className="min-h-8 rounded bg-surface-container-high px-3 text-[10px] font-semibold text-on-surface transition-colors hover:bg-outline-variant/20 dark:bg-dark-surface-container-high dark:text-dark-on-surface"
+              className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 text-[10px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]"
             >
-              Edit Legend
+              Edit
             </button>
           </div>
           <label
-            className="block space-y-1 rounded bg-surface-container-low p-2 dark:bg-dark-surface"
+            className="block space-y-1.5"
             htmlFor="custom-legend-sidebar-position"
           >
-            <span className="text-[10px] font-semibold uppercase text-outline dark:text-dark-outline">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]">
               Placement
             </span>
-            <select
+            <NativeSelect
               id="custom-legend-sidebar-position"
               value={legendPosition}
               aria-label="Legend Placement"
@@ -415,19 +371,18 @@ const LeftSidebar = ({
               onChange={event =>
                 patchCustomLegend({ position: event.target.value })
               }
-              className={compactSelectClass}
             >
               {CUSTOM_LEGEND_POSITIONS.map(position => (
                 <option key={position} value={position}>
                   {CUSTOM_LEGEND_POSITION_LABELS[position]}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
         </div>
-      </div>
+      </SidebarSection>
 
-      <div className="space-y-3">
+      <SidebarSection>
         <SectionTitle>Data</SectionTitle>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -447,20 +402,14 @@ const LeftSidebar = ({
             Export...
           </button>
         </div>
-      </div>
+      </SidebarSection>
 
-      <div className="space-y-3">
+      <SidebarSection>
         <SectionTitle>Advanced</SectionTitle>
         <ActionButton className="w-full" onClick={onOpenScript}>
           Script Mode
         </ActionButton>
-      </div>
-
-      <div className="mt-auto pt-4">
-        <div className="text-center text-[10px] text-outline dark:text-dark-outline">
-          {selectedCount} item(s) selected
-        </div>
-      </div>
+      </SidebarSection>
     </div>
   );
 };

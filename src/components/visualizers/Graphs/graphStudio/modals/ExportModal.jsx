@@ -9,6 +9,7 @@ import {
   serializeCurrentFrameSvg,
   waitForFrameRender,
 } from '../lib/timelineFrameCapture';
+import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
 const PREVIEW_SVG_ELEMENT_ID = 'graph-studio-export-preview-svg';
@@ -26,32 +27,8 @@ const actionClass =
   'min-h-[42px] border border-[#CBD5E1] bg-[#F8F9FA] px-3 py-2.5 text-sm font-semibold text-[#1E293B] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:hover:bg-[#334155]';
 const primaryActionClass =
   'min-h-[42px] border border-[#0F2747] bg-[#0F2747] px-3 py-2.5 text-sm font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] disabled:cursor-not-allowed disabled:opacity-50';
-const selectClass =
-  'h-10 w-full appearance-none border border-[#CBD5E1] bg-[#FFFFFF] py-2 pl-3 pr-12 text-sm font-medium text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC]';
 const numberInputClass =
   'h-10 w-full border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-sm font-medium text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:disabled:bg-[#0F172A]';
-
-const ExportSelect = ({ children, ...props }) => (
-  <div className="relative">
-    <select {...props} className={selectClass}>
-      {children}
-    </select>
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B] dark:text-[#CBD5E1]"
-      viewBox="0 0 20 20"
-      fill="none"
-    >
-      <path
-        d="M6 8L10 12L14 8"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-    </svg>
-  </div>
-);
 
 const ExportPreviewRenderer = ({ graph, viewport, canvas }) => {
   if (!graph || viewport.width <= 0 || viewport.height <= 0) return null;
@@ -629,7 +606,7 @@ const ExportModal = ({
                   <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
                     PNG Scale
                   </span>
-                  <ExportSelect
+                  <NativeSelect
                     id="png-scale-select"
                     value={pngScale}
                     aria-label="PNG Scale"
@@ -637,17 +614,18 @@ const ExportModal = ({
                     onChange={event =>
                       onPngScaleChange?.(Number(event.target.value))
                     }
+                    size="regular"
                   >
                     <option value={1}>1x</option>
                     <option value={2}>2x (recommended)</option>
                     <option value={3}>3x (high quality)</option>
-                  </ExportSelect>
+                  </NativeSelect>
                 </label>
                 <label className="space-y-1.5" htmlFor="image-framing-select">
                   <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
                     Image Framing
                   </span>
-                  <ExportSelect
+                  <NativeSelect
                     id="image-framing-select"
                     value={imageFraming}
                     aria-label="Image Framing"
@@ -655,10 +633,11 @@ const ExportModal = ({
                     onChange={event =>
                       onImageFramingChange?.(event.target.value)
                     }
+                    size="regular"
                   >
                     <option value="viewport">Viewport</option>
                     <option value="fit">Fit graph</option>
-                  </ExportSelect>
+                  </NativeSelect>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">

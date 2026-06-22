@@ -1,3 +1,5 @@
+import NativeSelect from './NativeSelect';
+
 const NODE_STATUS_OPTIONS = [
   ['default', 'Default'],
   ['active', 'Active'],
@@ -7,27 +9,26 @@ const NODE_STATUS_OPTIONS = [
 ];
 
 const panelClass =
-  'h-full space-y-4 overflow-y-auto bg-surface-container-low p-4 text-sm dark:bg-dark-surface md:space-y-6 md:p-4';
+  'h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
 const sectionTitleClass =
-  'font-manrope text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface';
-const bodyTextClass = 'text-xs text-on-surface dark:text-dark-on-surface';
+  'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
+const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const helperTextClass =
-  'text-[10px] leading-tight text-outline dark:text-dark-outline';
-const fieldLabelClass = 'text-xs text-on-surface dark:text-dark-on-surface';
+  'border-l-2 border-[#D6A84B] pl-2 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]';
+const fieldLabelClass =
+  'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const inputClass =
-  'w-full border-b border-outline-variant/20 bg-surface-container-low px-3 py-3 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
-const selectClass =
-  'w-full border-b border-outline-variant/20 bg-surface-container-low py-3 pl-3 pr-10 text-xs text-on-surface transition-colors focus:border-b-primary focus:outline-none focus:ring-0 dark:border-dark-outline-variant/20 dark:bg-gray-800 dark:text-dark-on-surface md:py-2';
+  'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const actionButtonClass =
-  'min-h-[44px] w-full rounded-md bg-surface-container px-3 py-3 text-left text-xs text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-2';
+  'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
 const deleteButtonClass =
-  'mt-4 min-h-[44px] w-full rounded-md bg-surface-container-high px-3 py-3 text-left text-xs text-primary transition-colors hover:bg-surface-container-highest dark:bg-dark-surface-container-high dark:text-dark-primary dark:hover:bg-dark-surface-container-highest md:min-h-0 md:py-2';
+  'mt-1 min-h-[44px] w-full rounded-sm border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEE2E2] dark:border-[#7F1D1D] dark:bg-[#450A0A] dark:text-[#FCA5A5] dark:hover:bg-[#7F1D1D] md:min-h-9 md:py-2';
 const listButtonClass =
-  'min-h-[44px] w-full truncate rounded bg-surface-container px-2 py-2 text-left text-xs text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high md:min-h-0 md:py-1.5';
+  'min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5';
 const toggleRowClass =
-  'flex cursor-pointer items-center justify-between rounded-md bg-surface-container p-3 transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high md:p-2';
+  'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
-  'h-5 w-5 rounded bg-surface-container-high text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800';
+  'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -38,10 +39,10 @@ const PanelShell = ({ children }) => (
 );
 
 const Section = ({ title, children }) => (
-  <div className="space-y-3">
+  <section className="space-y-3 border-b border-[#D7DEE8] pb-5 last:border-b-0 dark:border-[#334155]">
     <div className={sectionTitleClass}>{title}</div>
     {children}
-  </div>
+  </section>
 );
 
 const Field = ({ label, children }) => (
@@ -106,7 +107,7 @@ const RangeControl = ({ label, value, min, max, step, onChange }) => (
   <label className="block space-y-1.5">
     <div className="flex justify-between">
       <span className={fieldLabelClass}>{label}</span>
-      <span className="text-xs text-outline dark:text-dark-outline">
+      <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
         {value}
       </span>
     </div>
@@ -125,7 +126,7 @@ const RangeControl = ({ label, value, min, max, step, onChange }) => (
 const LinkedList = ({ items, emptyLabel, renderItem, onSelect }) => {
   if (!items?.length) {
     return (
-      <div className="text-xs italic text-outline dark:text-dark-outline">
+      <div className="text-xs italic text-[#64748B] dark:text-[#94A3B8]">
         {emptyLabel}
       </div>
     );
@@ -184,7 +185,7 @@ const NodeInspector = ({
     <PanelShell>
       <Section title="Node Inspector">
         <p className={helperTextClass}>
-          Label is shared across all frames. Status/color are per-frame.
+          Label: all frames · Status/color: current frame
         </p>
         <div className="space-y-4">
           <Field label="Label">
@@ -194,8 +195,7 @@ const NodeInspector = ({
             />
           </Field>
           <Field label="Status">
-            <select
-              className={selectClass}
+            <NativeSelect
               value={String(selectedNode.status ?? 'default')}
               onChange={event => onUpdateNode({ status: event.target.value })}
             >
@@ -204,7 +204,7 @@ const NodeInspector = ({
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </Field>
           <ColorField
             label="Highlight color"
@@ -252,8 +252,7 @@ const EdgeInspector = ({
     <PanelShell>
       <Section title="Edge Inspector">
         <p className={helperTextClass}>
-          Weight &amp; direction are shared across all frames. Color is
-          per-frame.
+          Weight/direction: all frames · Color: current frame
         </p>
         <div className="space-y-4">
           <Field label="Weight / Label">
@@ -334,9 +333,9 @@ const GlobalSettingsPanel = ({ globalSettings, onUpdateGlobal }) => (
         />
       </div>
     </Section>
-    <div className="rounded-md bg-surface-container p-3 dark:bg-dark-surface-container">
-      <div className="text-center text-xs text-on-surface dark:text-dark-on-surface">
-        Select a node or edge to view its properties.
+    <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
+      <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
+        Select a node or edge to inspect it.
       </div>
     </div>
   </PanelShell>
