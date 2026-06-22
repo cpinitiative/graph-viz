@@ -196,7 +196,10 @@ const TimelinePanel = ({
         </div>
       </div>
 
-      <div className="bg-surface-container-low p-3 dark:bg-dark-surface-container-low">
+      <div
+        className="bg-surface-container-low px-3 pb-4 pt-2 dark:bg-dark-surface-container-low"
+        data-testid="frame-description-row"
+      >
         <div className="flex items-center gap-3">
           <div className="whitespace-nowrap text-xs font-semibold text-on-surface dark:text-dark-on-surface">
             Frame Description:

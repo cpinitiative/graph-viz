@@ -517,6 +517,17 @@ test.describe('Graph Viz desktop smoke', () => {
     const frameDescription = page.getByPlaceholder(
       'Enter a description for this frame...'
     );
+    const descriptionRow = page.getByTestId('frame-description-row');
+    const timelinePanel = page.getByTestId('timeline-panel');
+    const descriptionBox = await descriptionRow.boundingBox();
+    const timelineBox = await timelinePanel.boundingBox();
+    expect(descriptionBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(
+      timelineBox.y +
+        timelineBox.height -
+        (descriptionBox.y + descriptionBox.height)
+    ).toBeGreaterThanOrEqual(0);
     await frameDescription.fill('Smoke test frame');
     await expect(frameDescription).toHaveValue('Smoke test frame');
 
