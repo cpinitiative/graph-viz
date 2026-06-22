@@ -862,7 +862,14 @@ while (true) {}
     );
 
     await expect(frameList).toBeVisible();
+    await expect(
+      exportMenu
+        .getByTestId('export-preview-section')
+        .getByTestId('export-preview-frame-list')
+    ).toBeVisible();
     await expect(frameItems).toHaveCount(5);
+    await expect(exportMenu.getByLabel('Export start frame')).toHaveCount(0);
+    await expect(exportMenu.getByLabel('Export end frame')).toHaveCount(0);
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-0')
     ).toHaveAttribute('aria-current', 'true');
@@ -889,6 +896,8 @@ while (true) {}
     ).toBeVisible();
 
     await exportMenu.getByRole('radio', { name: 'Custom range' }).check();
+    await expect(exportMenu.getByLabel('Export start frame')).toBeVisible();
+    await expect(exportMenu.getByLabel('Export end frame')).toBeVisible();
     await exportMenu.getByLabel('Export end frame').fill('3');
     await exportMenu.getByLabel('Export start frame').press('ArrowUp');
     await expect(exportMenu.getByLabel('Export start frame')).toHaveValue('2');

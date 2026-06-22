@@ -320,6 +320,57 @@ const ExportModal = ({
               Preview selection is for review only. Image exports continue to
               use the current editor frame.
             </p>
+
+            <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155] dark:text-[#E2E8F0]">
+                  Frame Review
+                </h4>
+                <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                  {includedFrameIndexes.length}{' '}
+                  {includedFrameIndexes.length === 1 ? 'frame' : 'frames'}
+                </span>
+              </div>
+              <div
+                className="flex gap-2 overflow-x-auto pb-1"
+                data-testid="export-preview-frame-list"
+              >
+                {includedFrameIndexes.map(frameIndex => {
+                  const step = steps[frameIndex];
+                  const isSelected = frameIndex === previewFrameIndex;
+                  return (
+                    <button
+                      key={step?.id ?? frameIndex}
+                      type="button"
+                      aria-current={isSelected ? 'true' : undefined}
+                      className={`min-h-[74px] w-[170px] flex-none border px-3 py-2.5 text-left transition-colors sm:w-[190px] ${
+                        isSelected
+                          ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#D97706] dark:bg-[#451A03] dark:text-[#FED7AA]'
+                          : 'border-[#CBD5E1] bg-[#FFFFFF] text-[#334155] hover:border-[#94A3B8] hover:bg-[#F8FAFC] dark:border-[#475569] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#64748B]'
+                      }`}
+                      data-selected={isSelected ? 'true' : 'false'}
+                      data-testid={`export-preview-frame-item-${frameIndex}`}
+                      onClick={() => setPreviewFrameIndex(frameIndex)}
+                    >
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="text-xs font-semibold">
+                          Frame {frameIndex + 1}
+                        </span>
+                        {Number.isFinite(Number(step?.durationMs)) && (
+                          <span className="text-[10px] opacity-70">
+                            {Number(step.durationMs)} ms
+                          </span>
+                        )}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed opacity-80">
+                        {step?.description ||
+                          `Timeline frame ${frameIndex + 1}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </section>
 
           <aside className="min-h-0 overflow-y-visible border-[#CBD5E1] dark:border-[#334155] lg:overflow-y-auto">
@@ -445,7 +496,7 @@ const ExportModal = ({
                 <div className="text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
                   Export Frames
                 </div>
-                <div className="grid gap-2">
+                <div className="grid grid-cols-3 border border-[#CBD5E1] dark:border-[#475569]">
                   {[
                     ['all', 'All frames'],
                     ['current', 'Current frame'],
@@ -453,7 +504,11 @@ const ExportModal = ({
                   ].map(([value, label]) => (
                     <label
                       key={value}
-                      className="flex min-h-[38px] cursor-pointer items-center gap-2 border border-[#CBD5E1] px-3 py-2 text-xs font-medium text-[#334155] dark:border-[#475569] dark:text-[#E2E8F0]"
+                      className={`relative flex min-h-[38px] cursor-pointer items-center justify-center border-r border-[#CBD5E1] px-2 py-2 text-center text-[11px] font-semibold last:border-r-0 dark:border-[#475569] ${
+                        frameRange.mode === value
+                          ? 'bg-[#0F2747] text-[#FFFFFF]'
+                          : 'bg-[#FFFFFF] text-[#475569] hover:bg-[#F1F5F9] dark:bg-[#111827] dark:text-[#CBD5E1] dark:hover:bg-[#1E293B]'
+                      }`}
                     >
                       <input
                         type="radio"
@@ -463,115 +518,64 @@ const ExportModal = ({
                         onChange={() =>
                           onExportFrameRangeChange?.({ mode: value })
                         }
-                        className="h-4 w-4 border-[#94A3B8] text-[#0F2747] focus:ring-[#0F2747]"
+                        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                       />
                       <span>{label}</span>
                     </label>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <label
-                    className="space-y-1.5"
-                    htmlFor="export-frame-range-start"
-                  >
-                    <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                      Start Frame
-                    </span>
-                    <input
-                      id="export-frame-range-start"
-                      type="number"
-                      min="1"
-                      max={maxFrame}
-                      value={frameRange.startFrame}
-                      aria-label="Export start frame"
-                      data-testid="export-frame-start-input"
-                      disabled={!isCustomFrameRange}
-                      onChange={event => {
-                        if (!event.target.value) return;
-                        onExportFrameRangeChange?.({
-                          startFrame: event.target.value,
-                        });
-                      }}
-                      className={numberInputClass}
-                    />
-                  </label>
-                  <label
-                    className="space-y-1.5"
-                    htmlFor="export-frame-range-end"
-                  >
-                    <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                      End Frame
-                    </span>
-                    <input
-                      id="export-frame-range-end"
-                      type="number"
-                      min="1"
-                      max={maxFrame}
-                      value={frameRange.endFrame}
-                      aria-label="Export end frame"
-                      data-testid="export-frame-end-input"
-                      disabled={!isCustomFrameRange}
-                      onChange={event => {
-                        if (!event.target.value) return;
-                        onExportFrameRangeChange?.({
-                          endFrame: event.target.value,
-                        });
-                      }}
-                      className={numberInputClass}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                    Frame Review
-                  </h4>
-                  <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                    {includedFrameIndexes.length}{' '}
-                    {includedFrameIndexes.length === 1 ? 'frame' : 'frames'}
-                  </span>
-                </div>
-                <div
-                  className="max-h-64 space-y-2 overflow-y-auto border border-[#CBD5E1] bg-[#F8F9FA] p-2 dark:border-[#475569] dark:bg-[#0F172A]"
-                  data-testid="export-preview-frame-list"
-                >
-                  {includedFrameIndexes.map(frameIndex => {
-                    const step = steps[frameIndex];
-                    const isSelected = frameIndex === previewFrameIndex;
-                    return (
-                      <button
-                        key={step?.id ?? frameIndex}
-                        type="button"
-                        aria-current={isSelected ? 'true' : undefined}
-                        className={`w-full border px-3 py-2.5 text-left transition-colors ${
-                          isSelected
-                            ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#D97706] dark:bg-[#451A03] dark:text-[#FED7AA]'
-                            : 'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:border-[#94A3B8] hover:bg-[#F8FAFC] dark:border-[#334155] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#64748B]'
-                        }`}
-                        data-selected={isSelected ? 'true' : 'false'}
-                        data-testid={`export-preview-frame-item-${frameIndex}`}
-                        onClick={() => setPreviewFrameIndex(frameIndex)}
-                      >
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold">
-                            Frame {frameIndex + 1}
-                          </span>
-                          {Number.isFinite(Number(step?.durationMs)) && (
-                            <span className="text-[10px] opacity-70">
-                              {Number(step.durationMs)} ms
-                            </span>
-                          )}
-                        </span>
-                        <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed opacity-80">
-                          {step?.description ||
-                            `Timeline frame ${frameIndex + 1}`}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {isCustomFrameRange && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label
+                      className="space-y-1.5"
+                      htmlFor="export-frame-range-start"
+                    >
+                      <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                        Start Frame
+                      </span>
+                      <input
+                        id="export-frame-range-start"
+                        type="number"
+                        min="1"
+                        max={maxFrame}
+                        value={frameRange.startFrame}
+                        aria-label="Export start frame"
+                        data-testid="export-frame-start-input"
+                        onChange={event => {
+                          if (!event.target.value) return;
+                          onExportFrameRangeChange?.({
+                            startFrame: event.target.value,
+                          });
+                        }}
+                        className={numberInputClass}
+                      />
+                    </label>
+                    <label
+                      className="space-y-1.5"
+                      htmlFor="export-frame-range-end"
+                    >
+                      <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                        End Frame
+                      </span>
+                      <input
+                        id="export-frame-range-end"
+                        type="number"
+                        min="1"
+                        max={maxFrame}
+                        value={frameRange.endFrame}
+                        aria-label="Export end frame"
+                        data-testid="export-frame-end-input"
+                        onChange={event => {
+                          if (!event.target.value) return;
+                          onExportFrameRangeChange?.({
+                            endFrame: event.target.value,
+                          });
+                        }}
+                        className={numberInputClass}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
