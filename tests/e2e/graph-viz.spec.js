@@ -715,6 +715,7 @@ while (true) {}
 
     await page.getByLabel('Enable Legend').check();
     await expect(legendPreview).toBeVisible();
+    await expect(legendPreview).toHaveAttribute('data-legend-theme', 'light');
     for (const text of [
       'Nodes',
       'Default node',
@@ -729,9 +730,36 @@ while (true) {}
         legendPreview.locator('text').filter({ hasText: text })
       ).toBeVisible();
     }
+    await expect(legendPreview.getByText('Nodes', { exact: true })).toHaveCount(
+      1
+    );
+    await expect(legendPreview.locator('circle').first()).toHaveAttribute(
+      'cy',
+      '0'
+    );
+    await expect(
+      legendPreview.locator('line[stroke="#F59E0B"]').first()
+    ).toHaveAttribute('y1', '0');
+
+    await closeLegendEditor(page);
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(legendPreview).toHaveAttribute('data-legend-theme', 'dark');
+    await expect(legendPreview.locator(':scope > rect')).toHaveAttribute(
+      'fill',
+      '#111827'
+    );
+    await expect(
+      legendPreview.getByText('Legend', { exact: true })
+    ).toHaveAttribute('fill', '#F8FAFC');
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(legendPreview).toHaveAttribute('data-legend-theme', 'light');
+    await expandLegendEditor(page);
 
     await legendTitle.fill('Traversal Key');
     await page.getByTestId('custom-legend-add-entry').click();
+    await expect(legendPreview.getByText('Nodes', { exact: true })).toHaveCount(
+      1
+    );
     await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
     await page.getByTestId('custom-legend-entry-label-6').fill('Frontier edge');
     await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');

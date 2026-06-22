@@ -21,6 +21,26 @@ const SELECTED_EDGE_COLORS = {
   light: '#171717',
   dark: '#F5F5F5',
 };
+const LEGEND_PALETTES = {
+  light: {
+    background: '#FFFFFF',
+    border: '#CBD5E1',
+    title: '#0F172A',
+    text: '#334155',
+    secondaryText: '#64748B',
+    separator: '#E2E8F0',
+    nodeStroke: '#334155',
+  },
+  dark: {
+    background: '#111827',
+    border: '#475569',
+    title: '#F8FAFC',
+    text: '#E2E8F0',
+    secondaryText: '#94A3B8',
+    separator: '#334155',
+    nodeStroke: '#CBD5E1',
+  },
+};
 
 const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
   if (selected || multiSelected) {
@@ -61,27 +81,43 @@ const buildLegendRows = (
   entries,
   { groupMaxLength = 28, entryMaxLength = 34 } = {}
 ) => {
-  const rows = [];
-  let activeGroup = null;
+  const groupedEntries = new Map();
   entries.forEach((entry, index) => {
-    const group = entry.group || '';
-    if (group && group !== activeGroup) {
+    const group = String(entry.group ?? '').trim();
+    const groupKey = group.toLowerCase();
+    if (!groupedEntries.has(groupKey)) {
+      groupedEntries.set(groupKey, {
+        label: group,
+        entries: [],
+      });
+    }
+    groupedEntries.get(groupKey).entries.push({ entry, index });
+  });
+
+  const rows = [];
+  Array.from(groupedEntries.values()).forEach((group, groupIndex) => {
+    if (group.label) {
       rows.push({
         type: 'group',
-        key: `group-${index}-${group}`,
-        label: truncateLegendText(group, groupMaxLength),
+        key: `group-${groupIndex}-${group.label}`,
+        label: truncateLegendText(group.label, groupMaxLength),
+        separated: groupIndex > 0,
       });
-      activeGroup = group;
     }
-    rows.push({
-      type: 'entry',
-      key: `entry-${index}-${entry.label}`,
-      entry,
-      label: truncateLegendText(entry.label, entryMaxLength),
+    group.entries.forEach(({ entry, index }) => {
+      rows.push({
+        type: 'entry',
+        key: `entry-${index}-${entry.label}`,
+        entry,
+        label: truncateLegendText(entry.label, entryMaxLength),
+      });
     });
   });
   return rows;
 };
+
+const getLegendRowHeight = row =>
+  row.type === 'group' ? (row.separated ? 24 : 18) : 22;
 
 const resolveLegendPosition = position =>
   position === 'auto' ? 'bottom-right' : position;
@@ -115,14 +151,14 @@ const getLegendOrigin = ({
   };
 };
 
-const LegendSwatch = ({ entry }) => {
+const LegendSwatch = ({ entry, nodeStroke }) => {
   if (entry.kind === 'edge') {
     return (
       <line
         x1="0"
-        y1="-3"
+        y1="0"
         x2="18"
-        y2="-3"
+        y2="0"
         stroke={entry.color}
         strokeWidth="3"
         strokeLinecap="square"
@@ -133,17 +169,19 @@ const LegendSwatch = ({ entry }) => {
   return (
     <circle
       cx="7"
-      cy="-4"
+      cy="0"
       r="6"
       fill={entry.color}
-      stroke="#334155"
+      stroke={nodeStroke}
       strokeWidth="1"
     />
   );
 };
 
 const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
+  const { theme } = useTheme();
   const legend = normalizeCustomLegend(customLegend);
+  const palette = LEGEND_PALETTES[theme] ?? LEGEND_PALETTES.light;
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   if (!legend.enabled || canvasSize.width <= 0 || canvasSize.height <= 0) {
@@ -187,7 +225,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
     entryMaxLength: rowMaxLength,
   });
   const rowsHeight = rows.reduce(
-    (height, row) => height + (row.type === 'group' ? 18 : 22),
+    (height, row) => height + getLegendRowHeight(row),
     0
   );
   const boxHeight = Math.min(maxBoxHeight, 42 + rowsHeight);
@@ -195,7 +233,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
   const visibleRows = [];
   let usedRowsHeight = 0;
   for (const row of rows) {
-    const rowHeight = row.type === 'group' ? 18 : 22;
+    const rowHeight = getLegendRowHeight(row);
     if (usedRowsHeight + rowHeight > availableRowsHeight) break;
     visibleRows.push(row);
     usedRowsHeight += rowHeight;
@@ -261,6 +299,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
       data-legend-position={legend.position}
       data-custom-position-x={legend.customPosition.x}
       data-custom-position-y={legend.customPosition.y}
+      data-legend-theme={theme}
       aria-label="Legend preview"
       pointerEvents="all"
       transform={`translate(${x} ${y})`}
@@ -290,14 +329,14 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
         y="0"
         width={boxWidth}
         height={boxHeight}
-        fill="#FFFFFF"
-        stroke="#CBD5E1"
+        fill={palette.background}
+        stroke={palette.border}
         strokeWidth="1"
       />
       <text
         x="12"
         y="20"
-        fill="#0F172A"
+        fill={palette.title}
         fontFamily="Arial, sans-serif"
         fontSize="12"
         fontWeight="700"
@@ -310,7 +349,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
         y1="28"
         x2={boxWidth - 12}
         y2="28"
-        stroke="#E2E8F0"
+        stroke={palette.separator}
         strokeWidth="1"
       />
       {visibleRows.map((row, index) => {
@@ -319,34 +358,44 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
           visibleRows
             .slice(0, index)
             .reduce(
-              (height, previous) =>
-                height + (previous.type === 'group' ? 18 : 22),
+              (height, previous) => height + getLegendRowHeight(previous),
               0
             );
         if (row.type === 'group') {
           return (
-            <text
-              key={row.key}
-              x="12"
-              y={rowY}
-              fill="#64748B"
-              fontFamily="Arial, sans-serif"
-              fontSize="10"
-              fontWeight="700"
-              letterSpacing="0"
-            >
-              {row.label}
-            </text>
+            <g key={row.key}>
+              {row.separated && (
+                <line
+                  x1="12"
+                  y1={rowY - 7}
+                  x2={boxWidth - 12}
+                  y2={rowY - 7}
+                  stroke={palette.separator}
+                  strokeWidth="1"
+                />
+              )}
+              <text
+                x="12"
+                y={rowY + (row.separated ? 5 : 0)}
+                fill={palette.secondaryText}
+                fontFamily="Arial, sans-serif"
+                fontSize="10"
+                fontWeight="700"
+                letterSpacing="0"
+              >
+                {row.label}
+              </text>
+            </g>
           );
         }
 
         return (
-          <g key={row.key} transform={`translate(12 ${rowY + 5})`}>
-            <LegendSwatch entry={row.entry} />
+          <g key={row.key} transform={`translate(12 ${rowY + 3})`}>
+            <LegendSwatch entry={row.entry} nodeStroke={palette.nodeStroke} />
             <text
               x="22"
-              y="2"
-              fill="#334155"
+              y="4"
+              fill={palette.text}
               fontFamily="Arial, sans-serif"
               fontSize="11"
               fontWeight="500"
