@@ -16,7 +16,7 @@ const NativeSelect = ({
     <select
       {...props}
       className={joinClasses(
-        'w-full appearance-none rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] pl-3 pr-10 font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#D6A84B] dark:focus:ring-[#D6A84B]',
+        'w-full appearance-none rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] pl-3 pr-10 font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]',
         SIZE_CLASSES[size] ?? SIZE_CLASSES.compact,
         className
       )}

@@ -365,6 +365,13 @@ test.describe('Graph Viz desktop smoke', () => {
     await expect(page.getByText('Tools')).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByTestId('timeline-panel').getByRole('button', { name: 'Play' })
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('left-sidebar').getByRole('button', { name: 'Play' })
+    ).toHaveCount(0);
+    await expect(page.getByText(/item\(s\) selected/)).toHaveCount(0);
 
     expect(errors).toEqual([]);
   });

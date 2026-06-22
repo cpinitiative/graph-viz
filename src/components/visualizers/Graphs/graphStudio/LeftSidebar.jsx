@@ -30,13 +30,13 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const actionButtonPrimaryClass =
-  'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#D6A84B] dark:bg-[#D6A84B] dark:text-[#111827] dark:hover:bg-[#E2B85D]';
+  'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:text-[#FFFFFF] dark:hover:bg-[#2563EB]';
 const iconButtonClass =
   'min-w-[44px] rounded-sm p-2 text-[#334155] transition-colors hover:bg-[#E2E8F0] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-w-8 md:p-1.5';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
-  'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#D6A84B] dark:focus:ring-[#D6A84B]';
+  'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const dataButtonClass =
   'min-h-[44px] rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9';
 
@@ -148,19 +148,6 @@ const ZoomInIcon = () => (
   </svg>
 );
 
-const StopIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <rect x="6" y="4" width="4" height="16" />
-    <rect x="14" y="4" width="4" height="16" />
-  </svg>
-);
-
-const PlayIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-    <polygon points="5 3 19 12 5 21 5 3" />
-  </svg>
-);
-
 const LeftSidebar = ({
   mode,
   setMode,
@@ -183,12 +170,7 @@ const LeftSidebar = ({
   onOpenLegendEditor,
   isLegendEditorOpen = false,
   onOpenScript,
-  selectedCount,
   onApplyPreset,
-  currentFrame,
-  totalFrames,
-  onPlay,
-  isPlaying,
   onCenterView,
   zoomPercent,
   onZoomIn,
@@ -230,7 +212,7 @@ const LeftSidebar = ({
               className={joinClasses(
                 'min-h-[44px] flex-1 rounded-sm py-2 text-xs font-semibold capitalize transition-colors md:min-h-8 md:py-1.5',
                 mode === item
-                  ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#D6A84B] dark:text-[#111827]'
+                  ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#1D4ED8] dark:text-[#FFFFFF]'
                   : 'text-[#475569] hover:bg-[#FFFFFF] hover:text-[#0F2747] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:hover:text-[#FFFFFF]'
               )}
               onClick={() => setMode(item)}
@@ -304,33 +286,6 @@ const LeftSidebar = ({
             <IconButton title="Zoom In" onClick={onZoomIn}>
               <ZoomInIcon />
             </IconButton>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={joinClasses(
-              'flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-sm border py-2.5 text-xs font-semibold transition-colors md:min-h-9 md:py-2',
-              isPlaying
-                ? 'border-[#CBD5E1] bg-[#E2E8F0] text-[#0F2747] hover:bg-[#CBD5E1] dark:border-[#475569] dark:bg-[#334155] dark:text-[#F8FAFC]'
-                : 'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#D6A84B] dark:bg-[#D6A84B] dark:text-[#111827]'
-            )}
-            onClick={onPlay}
-          >
-            {isPlaying ? (
-              <>
-                <StopIcon />
-                Stop
-              </>
-            ) : (
-              <>
-                <PlayIcon />
-                Play
-              </>
-            )}
-          </button>
-          <div className="flex min-h-[44px] items-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] md:min-h-9">
-            {currentFrame + 1} / {Math.max(1, totalFrames)}
           </div>
         </div>
         <div className="space-y-2">
@@ -455,12 +410,6 @@ const LeftSidebar = ({
           Script Mode
         </ActionButton>
       </SidebarSection>
-
-      <div className="mt-auto pt-4">
-        <div className="text-center text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-          {selectedCount} item(s) selected
-        </div>
-      </div>
     </div>
   );
 };
