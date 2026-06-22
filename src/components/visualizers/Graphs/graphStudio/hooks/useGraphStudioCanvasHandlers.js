@@ -71,7 +71,7 @@ export const useGraphStudioCanvasHandlers = ({
     nodeId => {
       if (drawFrom === null || drawFrom === undefined) {
         setDrawFrom(nodeId);
-        setStatus(`Draw mode: click target node (source is ${nodeId})`);
+        setStatus(`Draw Edge: source node ${nodeId} selected`);
         return;
       }
       if (String(drawFrom) === String(nodeId)) {
@@ -80,9 +80,7 @@ export const useGraphStudioCanvasHandlers = ({
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
-      setStatus(
-        `Edge ${drawFrom} → ${nodeId} added. Draw mode: click source node`
-      );
+      setStatus(`Edge ${drawFrom} → ${nodeId} added`);
     },
     [addEdge, drawFrom, setStatus]
   );
@@ -91,7 +89,10 @@ export const useGraphStudioCanvasHandlers = ({
     nextMode => {
       if (nextMode !== 'draw') setDrawFrom(null);
       else if (drawFrom === null || drawFrom === undefined) {
-        setStatus('Draw mode: click source node, then target node');
+        setStatus('Draw Edge: click a source node, then a target node');
+      }
+      if (nextMode === 'add') {
+        setStatus('Add Node: click the canvas to add a node');
       }
       setMode(nextMode);
     },
@@ -110,12 +111,12 @@ export const useGraphStudioCanvasHandlers = ({
       const sourceId = selectedNodeIds[0];
       setDrawFrom(sourceId);
       setMode('draw');
-      setStatus(`Draw mode: click target node (source is ${sourceId})`);
+      setStatus(`Draw Edge: source node ${sourceId} selected`);
       return;
     }
     setDrawFrom(null);
     setMode('draw');
-    setStatus('Draw mode: click source node, then target node');
+    setStatus('Draw Edge: click a source node, then a target node');
   }, [addEdge, selectedNodeIds, setMode, setStatus]);
 
   const onNodePointerDown = useCallback(

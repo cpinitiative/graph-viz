@@ -32,8 +32,15 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const PanelShell = ({ children }) => (
-  <div className={panelClass} data-testid="property-panel">
+const PanelShell = ({ title, inspectorType, children }) => (
+  <div
+    className={panelClass}
+    data-testid="property-panel"
+    data-inspector-type={inspectorType}
+  >
+    <div className="border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
+      <div className={sectionTitleClass}>{title}</div>
+    </div>
     {children}
   </div>
 );
@@ -153,8 +160,8 @@ const MultiSelectionPanel = ({
   onApplyToSelection,
   onDeleteSelection,
 }) => (
-  <PanelShell>
-    <Section title="Selection">
+  <PanelShell title="Selection Inspector" inspectorType="selection">
+    <Section title="Selected Nodes">
       <p className={bodyTextClass}>{selectedCount} items selected</p>
       <div className="space-y-2">
         <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
@@ -182,8 +189,8 @@ const NodeInspector = ({
   const nodeColor = selectedNode.color ?? '';
 
   return (
-    <PanelShell>
-      <Section title="Node Inspector">
+    <PanelShell title="Node Inspector" inspectorType="node">
+      <Section title="Node Properties">
         <p className={helperTextClass}>
           Label: all frames · Status/color: current frame
         </p>
@@ -249,8 +256,8 @@ const EdgeInspector = ({
   const edgeColor = selectedEdge.color ?? '#64748b';
 
   return (
-    <PanelShell>
-      <Section title="Edge Inspector">
+    <PanelShell title="Edge Inspector" inspectorType="edge">
+      <Section title="Edge Properties">
         <p className={helperTextClass}>
           Weight/direction: all frames · Color: current frame
         </p>
@@ -296,8 +303,8 @@ const EdgeInspector = ({
 };
 
 const GlobalSettingsPanel = ({ globalSettings, onUpdateGlobal }) => (
-  <PanelShell>
-    <Section title="Global Settings">
+  <PanelShell title="Canvas Inspector" inspectorType="canvas">
+    <Section title="Canvas Settings">
       <div className="space-y-4">
         <RangeControl
           label="Gravity (force)"
@@ -335,7 +342,7 @@ const GlobalSettingsPanel = ({ globalSettings, onUpdateGlobal }) => (
     </Section>
     <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
       <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
-        Select a node or edge to inspect it.
+        Select a node or edge to open its inspector.
       </div>
     </div>
   </PanelShell>

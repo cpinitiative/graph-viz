@@ -61,7 +61,12 @@ const GraphEdge = ({
         }}
       />
       {edge.label && labelPosition && (
-        <g pointerEvents="none" data-edge-label-id={edge.id} aria-hidden="true">
+        <g
+          pointerEvents="none"
+          data-edge-label-id={edge.id}
+          aria-hidden="true"
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        >
           <text
             data-edge-label-text="true"
             x={labelPosition.x}
@@ -71,6 +76,7 @@ const GraphEdge = ({
             fontSize={EDGE_LABEL_FONT_SIZE}
             fontWeight="700"
             fontFamily="Arial, sans-serif"
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
             // Handles light mode (neutral-800) and dark mode (neutral-200)
             className="fill-neutral-800 font-bold transition-colors duration-200 dark:fill-neutral-200"
           >

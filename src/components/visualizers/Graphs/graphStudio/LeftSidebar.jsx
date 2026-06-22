@@ -5,7 +5,12 @@ import {
 } from './lib/customLegend';
 import NativeSelect from './NativeSelect';
 
-const MODE_OPTIONS = ['select', 'pan', 'draw'];
+const TOOL_OPTIONS = [
+  { id: 'select', label: 'Select' },
+  { id: 'pan', label: 'Pan' },
+  { id: 'add', label: 'Add Node' },
+  { id: 'draw', label: 'Draw Edge' },
+];
 const LAYOUT_OPTIONS = [
   ['circle', 'Circle'],
   ['tree', 'Tree'],
@@ -29,8 +34,6 @@ const actionButtonBaseClass =
   'min-h-[44px] rounded-sm border px-2.5 py-2.5 text-xs font-semibold transition-colors md:min-h-9 md:py-2';
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
-const actionButtonPrimaryClass =
-  'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:text-[#FFFFFF] dark:hover:bg-[#2563EB]';
 const iconButtonClass =
   'min-w-[44px] rounded-sm p-2 text-[#334155] transition-colors hover:bg-[#E2E8F0] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-w-8 md:p-1.5';
 const toggleRowClass =
@@ -52,19 +55,12 @@ const SidebarSection = ({ children }) => (
   </section>
 );
 
-const ActionButton = ({
-  children,
-  className,
-  variant = 'default',
-  ...props
-}) => (
+const ActionButton = ({ children, className, ...props }) => (
   <button
     type="button"
     className={joinClasses(
       actionButtonBaseClass,
-      variant === 'primary'
-        ? actionButtonPrimaryClass
-        : actionButtonDefaultClass,
+      actionButtonDefaultClass,
       className
     )}
     {...props}
@@ -161,7 +157,6 @@ const LeftSidebar = ({
   setCustomLegend,
   lockCanvas,
   setLockCanvas,
-  onAddNode,
   onDrawEdge,
   drawFrom,
   onAutoLayout,
@@ -178,8 +173,8 @@ const LeftSidebar = ({
 }) => {
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
-      ? `Source: node ${drawFrom}. Click the target node.`
-      : 'Click the source node, then the target node. Select two nodes first to connect them instantly.';
+      ? `Source node ${drawFrom} selected. Click a target node.`
+      : 'Click a source node, then a target node.';
   const legendEntries = Array.isArray(customLegend.entries)
     ? customLegend.entries
     : [];
@@ -204,32 +199,31 @@ const LeftSidebar = ({
     >
       <SidebarSection>
         <SectionTitle>Tools</SectionTitle>
-        <div className="flex rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
-          {MODE_OPTIONS.map(item => (
+        <div className="grid grid-cols-2 gap-1 rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
+          {TOOL_OPTIONS.map(tool => (
             <button
-              key={item}
+              key={tool.id}
               type="button"
               className={joinClasses(
-                'min-h-[44px] flex-1 rounded-sm py-2 text-xs font-semibold capitalize transition-colors md:min-h-8 md:py-1.5',
-                mode === item
+                'min-h-[44px] rounded-sm px-2 py-2 text-xs font-semibold transition-colors md:min-h-8 md:py-1.5',
+                mode === tool.id
                   ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#1D4ED8] dark:text-[#FFFFFF]'
                   : 'text-[#475569] hover:bg-[#FFFFFF] hover:text-[#0F2747] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:hover:text-[#FFFFFF]'
               )}
-              onClick={() => setMode(item)}
+              aria-pressed={mode === tool.id}
+              onClick={() =>
+                tool.id === 'draw' ? onDrawEdge() : setMode(tool.id)
+              }
             >
-              {item}
+              {tool.label}
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ActionButton onClick={onAddNode}>Add Node</ActionButton>
-          <ActionButton
-            variant={mode === 'draw' ? 'primary' : 'default'}
-            onClick={onDrawEdge}
-          >
-            Draw Edge
-          </ActionButton>
-        </div>
+        {mode === 'add' && (
+          <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+            Click the canvas to add a node.
+          </p>
+        )}
         {mode === 'draw' && (
           <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
             {drawHelpText}
@@ -271,7 +265,7 @@ const LeftSidebar = ({
       </SidebarSection>
 
       <SidebarSection>
-        <SectionTitle>View / Canvas</SectionTitle>
+        <SectionTitle>View &amp; Canvas</SectionTitle>
         <div className="flex items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
           <IconButton title="Center View" onClick={onCenterView}>
             <CenterViewIcon />
@@ -299,7 +293,7 @@ const LeftSidebar = ({
               onChange={event => setRouting(event.target.value)}
             >
               <option value="straight">Straight</option>
-              <option value="bezier">Bezier Avoid</option>
+              <option value="bezier">Curved</option>
             </NativeSelect>
           </div>
           <ToggleRow
@@ -313,7 +307,7 @@ const LeftSidebar = ({
             onChange={setSnapEnabled}
           />
           <ToggleRow
-            label="Lock Canvas"
+            label="Lock View"
             checked={lockCanvas}
             onChange={setLockCanvas}
           />

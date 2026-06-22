@@ -211,7 +211,7 @@ const LegendModal = ({
               {legendEntries.map((entry, index) => (
                 <div
                   key={`custom-legend-entry-${index}`}
-                  className="grid gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface"
+                  className="grid gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest px-3 pb-3 pt-2 dark:border-dark-outline-variant/20 dark:bg-dark-surface"
                 >
                   <div className="grid gap-2 md:grid-cols-[minmax(120px,0.8fr)_minmax(180px,1fr)_120px_80px_44px] md:items-end">
                     <label

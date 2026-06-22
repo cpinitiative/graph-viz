@@ -10,21 +10,27 @@ const NavBar = () => {
   const isDarkMode = theme === 'dark';
 
   return (
-    <div className="flex items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center space-x-4">
-        <div className="mr-8 flex flex-nowrap items-center space-x-2 whitespace-nowrap py-2">
+    <div className="flex items-center justify-between border-b border-[#D7DEE8] bg-[#FFFFFF] px-4 dark:border-[#334155] dark:bg-[#111827]">
+      <div className="flex min-w-0 items-center">
+        <div className="flex min-w-0 items-center gap-3 py-2">
           <div className="h-8 w-8 shrink-0">
             <LogoSquare />
           </div>
-          <a
-            href="https://usaco.guide"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="text-xl font-medium tracking-tight">
-              Guide Graph Visualizer
-            </span>
-          </a>
+          <div className="min-w-0">
+            <a
+              href="https://usaco.guide"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <span className="text-lg font-semibold tracking-tight text-[#0F2747] dark:text-[#F8FAFC]">
+                Graph Studio
+              </span>
+            </a>
+            <p className="hidden text-[11px] leading-tight text-[#64748B] dark:text-[#94A3B8] md:block">
+              Create and export graph animations for algorithm explanations.
+            </p>
+          </div>
         </div>
       </div>
 

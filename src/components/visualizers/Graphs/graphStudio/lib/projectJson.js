@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS = {
   snapEnabled: true,
   showGrid: false,
   customLegend: DEFAULT_CUSTOM_LEGEND,
-  lockCanvas: true,
+  lockCanvas: false,
   viewState: null,
   globalSettings: {
     forceStrength: 1,
