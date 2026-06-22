@@ -26,11 +26,7 @@ const graphCanvas = page =>
     .or(page.locator('svg#graph-studio-canvas-svg'));
 
 const choosePreset = async (page, value) => {
-  const presetSelect = page
-    .getByLabel('Load graph preset')
-    .or(page.locator('select').nth(1));
-
-  await presetSelect.selectOption(value);
+  await page.getByLabel('Load graph preset').selectOption(value);
   await expect(graphCanvas(page)).toBeVisible();
 };
 
@@ -509,6 +505,7 @@ while (true) {}
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText('Presets', { exact: true })).toBeVisible();
 
     const frameDescription = page.getByPlaceholder(
       'Enter a description for this frame...'
