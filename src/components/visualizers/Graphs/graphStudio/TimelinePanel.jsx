@@ -197,7 +197,7 @@ const TimelinePanel = ({
       </div>
 
       <div
-        className="bg-surface-container-low px-3 pb-4 pt-2 dark:bg-dark-surface-container-low"
+        className="bg-surface-container-low px-3 pb-5 pt-1 dark:bg-dark-surface-container-low"
         data-testid="frame-description-row"
       >
         <div className="flex items-center gap-3">
