@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import GraphCanvas from '../GraphCanvas';
-import { resolveExportFrameIndexes } from '../lib/exportFrameRange';
+import {
+  clampExportFrameRange,
+  resolveExportFrameIndexes,
+} from '../lib/exportFrameRange';
 import {
   getGraphSvgElement,
   serializeCurrentFrameSvg,
@@ -125,7 +128,12 @@ const ExportModal = ({
     width: 0,
     height: 0,
   });
+  const [rangeDraft, setRangeDraft] = useState({
+    startFrame: String(exportFrameRange?.startFrame ?? 1),
+    endFrame: String(exportFrameRange?.endFrame ?? Math.max(1, totalFrames)),
+  });
   const wasOpenRef = useRef(false);
+  const activeRangeFieldRef = useRef(null);
 
   const maxFrame = Math.max(1, totalFrames);
   const frameRange = useMemo(
@@ -181,6 +189,53 @@ const ExportModal = ({
   );
   const selectedStep = steps[previewFrameIndex];
   const isCustomFrameRange = frameRange.mode === 'range';
+
+  useEffect(() => {
+    setRangeDraft(previousDraft => ({
+      startFrame:
+        activeRangeFieldRef.current === 'startFrame'
+          ? previousDraft.startFrame
+          : String(frameRange.startFrame),
+      endFrame:
+        activeRangeFieldRef.current === 'endFrame'
+          ? previousDraft.endFrame
+          : String(frameRange.endFrame),
+    }));
+  }, [frameRange.endFrame, frameRange.startFrame]);
+
+  const updateRangeDraft = (field, value) => {
+    if (!/^\d*$/.test(value)) return;
+    setRangeDraft(previousDraft => ({ ...previousDraft, [field]: value }));
+    if (value !== '') {
+      onExportFrameRangeChange?.({ [field]: value });
+    }
+  };
+
+  const normalizeRangeDraft = () => {
+    activeRangeFieldRef.current = null;
+    const normalizedRange = clampExportFrameRange(
+      {
+        ...frameRange,
+        startFrame:
+          rangeDraft.startFrame === ''
+            ? frameRange.startFrame
+            : rangeDraft.startFrame,
+        endFrame:
+          rangeDraft.endFrame === ''
+            ? frameRange.endFrame
+            : rangeDraft.endFrame,
+      },
+      totalFrames
+    );
+    setRangeDraft({
+      startFrame: String(normalizedRange.startFrame),
+      endFrame: String(normalizedRange.endFrame),
+    });
+    onExportFrameRangeChange?.({
+      startFrame: normalizedRange.startFrame,
+      endFrame: normalizedRange.endFrame,
+    });
+  };
 
   useEffect(() => {
     if (!open) {
@@ -387,8 +442,8 @@ const ExportModal = ({
               )}
             </div>
             <p className="mt-3 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-              Preview selection is for review only. Image exports continue to
-              use the current editor frame.
+              PNG/SVG export the current editor frame. Use the main timeline to
+              change it.
             </p>
 
             <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
@@ -494,18 +549,19 @@ const ExportModal = ({
                       </span>
                       <input
                         id="export-frame-range-start"
-                        type="number"
-                        min="1"
-                        max={maxFrame}
-                        value={frameRange.startFrame}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={rangeDraft.startFrame}
                         aria-label="Export start frame"
                         data-testid="export-frame-start-input"
-                        onChange={event => {
-                          if (!event.target.value) return;
-                          onExportFrameRangeChange?.({
-                            startFrame: event.target.value,
-                          });
+                        onFocus={() => {
+                          activeRangeFieldRef.current = 'startFrame';
                         }}
+                        onChange={event =>
+                          updateRangeDraft('startFrame', event.target.value)
+                        }
+                        onBlur={normalizeRangeDraft}
                         className={numberInputClass}
                       />
                     </label>
@@ -518,18 +574,19 @@ const ExportModal = ({
                       </span>
                       <input
                         id="export-frame-range-end"
-                        type="number"
-                        min="1"
-                        max={maxFrame}
-                        value={frameRange.endFrame}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={rangeDraft.endFrame}
                         aria-label="Export end frame"
                         data-testid="export-frame-end-input"
-                        onChange={event => {
-                          if (!event.target.value) return;
-                          onExportFrameRangeChange?.({
-                            endFrame: event.target.value,
-                          });
+                        onFocus={() => {
+                          activeRangeFieldRef.current = 'endFrame';
                         }}
+                        onChange={event =>
+                          updateRangeDraft('endFrame', event.target.value)
+                        }
+                        onBlur={normalizeRangeDraft}
                         className={numberInputClass}
                       />
                     </label>

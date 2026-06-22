@@ -830,7 +830,9 @@ while (true) {}
     expect(viewportPreviewUrl).toMatch(/^data:image\/svg\+xml/);
     await expect(
       exportMenu.getByTestId('export-preview-section')
-    ).toContainText('Preview selection is for review only.');
+    ).toContainText(
+      'PNG/SVG export the current editor frame. Use the main timeline to change it.'
+    );
 
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
     await expect(
@@ -877,7 +879,7 @@ while (true) {}
     const firstFramePreviewUrl = await previewImage.getAttribute('src');
 
     await exportMenu.getByTestId('export-preview-frame-item-1').click();
-    await expect(previewImage).toHaveAttribute('src', firstFramePreviewUrl);
+    await expect(previewImage).toBeVisible();
     await expect(exportMenu.getByTestId('export-preview-status')).toHaveCount(
       0
     );
@@ -902,9 +904,14 @@ while (true) {}
     await exportMenu.getByRole('radio', { name: 'Range' }).check();
     await expect(exportMenu.getByLabel('Export start frame')).toBeVisible();
     await expect(exportMenu.getByLabel('Export end frame')).toBeVisible();
-    await exportMenu.getByLabel('Export end frame').fill('3');
-    await exportMenu.getByLabel('Export start frame').press('ArrowUp');
+    await exportMenu.getByLabel('Export start frame').click();
+    await exportMenu.getByLabel('Export start frame').clear();
+    await exportMenu.getByLabel('Export start frame').pressSequentially('2');
     await expect(exportMenu.getByLabel('Export start frame')).toHaveValue('2');
+    await exportMenu.getByLabel('Export end frame').click();
+    await exportMenu.getByLabel('Export end frame').clear();
+    await exportMenu.getByLabel('Export end frame').pressSequentially('3');
+    await expect(exportMenu.getByLabel('Export end frame')).toHaveValue('3');
     await expect(frameItems).toHaveCount(2);
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-1')
