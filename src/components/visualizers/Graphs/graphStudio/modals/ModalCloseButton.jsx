@@ -1,11 +1,12 @@
 const ModalCloseButton = ({ onClick }) => (
   <button
     type="button"
-    className="-m-2 p-2 text-outline hover:text-on-surface dark:text-dark-outline dark:hover:text-dark-on-surface md:m-0 md:p-0"
+    className="-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-outline transition-colors hover:bg-[#F1F5F9] hover:text-on-surface dark:text-dark-outline dark:hover:bg-[#1E293B] dark:hover:text-dark-on-surface"
     onClick={onClick}
     aria-label="Close"
   >
     <svg
+      className="block"
       width="16"
       height="16"
       viewBox="0 0 24 24"
