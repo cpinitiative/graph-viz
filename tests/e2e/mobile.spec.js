@@ -11,7 +11,7 @@ test.describe('Graph Viz mobile smoke', () => {
   }) => {
     await page.goto('/');
 
-    await expect(page.getByText('Graph Studio')).toBeVisible();
+    await expect(page.getByText('Graph Studio').first()).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
 
@@ -26,14 +26,15 @@ test.describe('Graph Viz mobile smoke', () => {
 
     await page
       .getByTestId('mobile-properties-toggle')
-      .or(page.getByRole('button', { name: 'Open properties panel' }))
+      .or(page.getByRole('button', { name: 'Open inspector panel' }))
       .click();
-    await expect(page.getByText('Global Settings')).toBeVisible();
+    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(page.getByText('Canvas Settings')).toBeVisible();
     await expect(page.getByText('Gravity (force)')).toBeVisible();
     await page
-      .getByRole('button', { name: 'Dismiss properties overlay' })
+      .getByRole('button', { name: 'Dismiss inspector overlay' })
       .click();
-    await expect(page.getByText('Global Settings')).toBeHidden();
+    await expect(page.getByText('Canvas Inspector')).toBeHidden();
 
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();

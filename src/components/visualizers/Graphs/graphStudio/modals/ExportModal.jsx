@@ -69,7 +69,7 @@ const ExportPreviewRenderer = ({ graph, viewport, canvas }) => {
         onNodeMove={noop}
         onNodePointerUp={noop}
         onNodeClickForDraw={noop}
-        onCanvasDoubleClick={noop}
+        onCanvasAddNode={noop}
       />
     </div>
   );

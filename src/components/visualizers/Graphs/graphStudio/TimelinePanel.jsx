@@ -77,6 +77,7 @@ const TimelinePanel = ({
             type="button"
             className={playbackButtonClass}
             onClick={onPlay}
+            aria-label={isPlaying ? 'Pause timeline' : 'Play timeline'}
           >
             {isPlaying ? (
               <>
@@ -90,7 +91,10 @@ const TimelinePanel = ({
               </>
             )}
           </button>
-          <div className="text-[10px] font-semibold tabular-nums text-outline dark:text-dark-outline">
+          <div
+            className="text-[10px] font-semibold tabular-nums text-outline dark:text-dark-outline"
+            data-testid="timeline-frame-counter"
+          >
             {currentFrame + 1} / {Math.max(1, steps.length)}
           </div>
         </div>

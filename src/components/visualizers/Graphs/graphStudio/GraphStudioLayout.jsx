@@ -107,12 +107,16 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
 const CanvasStage = ({ canvas, status }) => (
   <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
     <GraphCanvas {...canvas} />
-    <div
-      className="absolute bottom-3 left-3 z-20 rounded bg-surface-container-low/90 px-2 py-1 text-[11px] text-on-surface"
-      data-testid="graph-studio-status"
-    >
-      {status}
-    </div>
+    {status && (
+      <div
+        className="absolute bottom-3 left-3 z-20 rounded-sm border border-[#D7DEE8] bg-[#F8F9FA] px-2 py-1 text-[11px] text-[#334155] shadow-sm dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]"
+        data-testid="graph-studio-status"
+        role="status"
+        aria-live="polite"
+      >
+        {status}
+      </div>
+    )}
   </motion.div>
 );
 
@@ -250,8 +254,8 @@ const GraphStudioLayout = ({
           <MobileHeaderButton
             label={
               showPropertyPanel
-                ? 'Close properties panel'
-                : 'Open properties panel'
+                ? 'Close inspector panel'
+                : 'Open inspector panel'
             }
             testId="mobile-properties-toggle"
             onClick={() => setShowPropertyPanel(!showPropertyPanel)}
@@ -273,7 +277,7 @@ const GraphStudioLayout = ({
         {showPropertyPanel && (
           <MobileOverlay
             side="right"
-            closeLabel="Dismiss properties overlay"
+            closeLabel="Dismiss inspector overlay"
             onClose={() => setShowPropertyPanel(false)}
           >
             <PropertyPanel {...property} />

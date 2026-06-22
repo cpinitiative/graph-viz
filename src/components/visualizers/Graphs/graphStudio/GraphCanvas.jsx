@@ -392,7 +392,7 @@ const GraphCanvas = ({
   onNodeMove,
   onNodePointerUp,
   onNodeClickForDraw,
-  onCanvasDoubleClick,
+  onCanvasAddNode,
 }) => {
   const { theme } = useTheme();
   const svgRef = useRef(null);
@@ -598,6 +598,10 @@ const GraphCanvas = ({
       y: event.clientY - bounds.top,
     };
     const world = toWorld(local, viewState);
+    if (mode === 'add') {
+      onCanvasAddNode(world);
+      return;
+    }
     if (mode === 'pan') {
       if (lockCanvas) return;
       pointerStateRef.current = {
@@ -717,7 +721,8 @@ const GraphCanvas = ({
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
   const handleNodePointerDown = (event, nodeId) => {
-    if (mode === 'draw') {
+    if (mode === 'pan') return;
+    if (mode === 'draw' || mode === 'add') {
       event.stopPropagation();
       return;
     }
@@ -748,6 +753,10 @@ const GraphCanvas = ({
         xmlns="http://www.w3.org/2000/svg"
         ref={svgRef}
         className="h-full w-full"
+        data-mode={mode}
+        data-view-x={viewState.x}
+        data-view-y={viewState.y}
+        data-view-zoom={viewState.zoom}
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -760,9 +769,17 @@ const GraphCanvas = ({
             y: event.clientY - bounds.top,
           };
           const world = toWorld(local, viewState);
-          onCanvasDoubleClick(world);
+          if (mode === 'select') onCanvasAddNode(world);
         }}
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          cursor:
+            mode === 'pan'
+              ? 'grab'
+              : mode === 'add' || mode === 'draw'
+                ? 'crosshair'
+                : 'default',
+        }}
       >
         <defs>
           <pattern
@@ -872,6 +889,7 @@ const GraphCanvas = ({
                     }
                     onClick={event => {
                       event.stopPropagation();
+                      if (mode === 'pan' || mode === 'add') return;
                       if (mode === 'draw') {
                         onNodeClickForDraw(node.id);
                         return;

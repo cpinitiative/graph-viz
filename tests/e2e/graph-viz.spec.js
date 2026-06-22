@@ -356,17 +356,31 @@ test.describe('Graph Viz desktop smoke', () => {
 
     await page.goto('/');
 
-    await expect(page).toHaveTitle(/Graph Visualizer/);
+    await expect(page).toHaveTitle(/Graph Studio/);
     await expect(
       page.getByTestId('graph-studio-root').or(page.locator('main'))
     ).toBeVisible();
-    await expect(page.getByText(/Guide Graph Visualizer/)).toBeVisible();
+    await expect(page.getByText('Graph Studio', { exact: true })).toBeVisible();
+    await expect(
+      page
+        .getByText(
+          'Create and export graph animations for algorithm explanations.'
+        )
+        .first()
+    ).toBeVisible();
     await expect(page.getByAltText('USACO Guide Logo')).toBeVisible();
     await expect(page.getByText('Tools')).toBeVisible();
+    for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
+      await expect(page.getByRole('button', { name: tool })).toBeVisible();
+    }
+    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(page.getByText('Canvas Settings')).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByTestId('timeline-panel').getByRole('button', { name: 'Play' })
+      page
+        .getByTestId('timeline-panel')
+        .getByRole('button', { name: 'Play timeline' })
     ).toBeVisible();
     await expect(
       page.getByTestId('left-sidebar').getByRole('button', { name: 'Play' })
@@ -393,15 +407,67 @@ test.describe('Graph Viz desktop smoke', () => {
     await themeToggle.click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
 
+    const graphNodes = graphCanvas(page).locator(
+      'g[data-export-content="true"] circle'
+    );
+    const initialNodeCount = await graphNodes.count();
     await page.getByRole('button', { name: 'Add Node' }).click();
+    await expect(
+      page.getByText('Click the canvas to add a node.')
+    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await expect(graphNodes).toHaveCount(initialNodeCount + 1);
     await expect(page.getByText(/Node \d+ added/)).toBeVisible();
+    await page.waitForTimeout(4200);
+    await expect(page.getByTestId('graph-studio-status')).toHaveCount(0);
     await expect(graphCanvas(page)).toBeVisible();
 
-    const drawInstructions = page.getByText(/Click the (source|target) node/);
+    await page.getByRole('button', { name: 'Select' }).click();
+    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await page.getByRole('button', { name: 'Draw Edge' }).click();
-    await expect(drawInstructions).toBeVisible();
-    await page.getByRole('button', { name: 'select' }).click();
-    await expect(drawInstructions).toBeHidden();
+    await expect(
+      page.getByText('Click a source node, then a target node.')
+    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await page.getByRole('button', { name: 'Select' }).click();
+    await expect(
+      page.getByText('Click a source node, then a target node.')
+    ).toBeHidden();
+
+    const lockView = page.getByRole('checkbox', { name: 'Lock View' });
+    await expect(lockView).not.toBeChecked();
+    const zoomBefore = Number(
+      await graphCanvas(page).getAttribute('data-view-zoom')
+    );
+    await page.getByRole('button', { name: 'Zoom In' }).click();
+    await expect
+      .poll(async () =>
+        Number(await graphCanvas(page).getAttribute('data-view-zoom'))
+      )
+      .toBeGreaterThan(zoomBefore);
+
+    await page.getByRole('button', { name: 'Pan' }).click();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
+    const viewBeforePan = [
+      await graphCanvas(page).getAttribute('data-view-x'),
+      await graphCanvas(page).getAttribute('data-view-y'),
+    ].join(',');
+    const canvasBox = await graphCanvas(page).boundingBox();
+    expect(canvasBox).not.toBeNull();
+    await page.mouse.move(canvasBox.x + 24, canvasBox.y + 24);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + 84, canvasBox.y + 64, { steps: 6 });
+    await page.mouse.up();
+    await expect
+      .poll(async () =>
+        [
+          await graphCanvas(page).getAttribute('data-view-x'),
+          await graphCanvas(page).getAttribute('data-view-y'),
+        ].join(',')
+      )
+      .not.toBe(viewBeforePan);
+    await page.getByRole('button', { name: 'Select' }).click();
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
       await page.getByRole('button', { name: layout }).click();
@@ -411,6 +477,32 @@ test.describe('Graph Viz desktop smoke', () => {
     for (const preset of ['bfs', 'dfs', 'dijkstra']) {
       await choosePreset(page, preset);
     }
+
+    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await graphNodes.first().click();
+    await expect(page.getByText('Node Inspector')).toBeVisible();
+    await graphCanvas(page)
+      .locator('path[stroke="rgba(0,0,0,0)"]')
+      .first()
+      .click();
+    await expect(page.getByText('Edge Inspector')).toBeVisible();
+    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+
+    await choosePreset(page, 'bfs');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    const initialFrameCounter = await frameCounter.textContent();
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+    await expect
+      .poll(async () => frameCounter.textContent(), { timeout: 3000 })
+      .not.toBe(initialFrameCounter);
+    await page.getByRole('button', { name: 'Pause timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Play timeline' })
+    ).toBeVisible();
 
     const frameLabels = page.getByText(/^Frame \d+$/);
     const initialFrameCount = await frameLabels.count();
@@ -997,6 +1089,10 @@ while (true) {}
     await expect(page.getByTestId('graph-studio-status')).toHaveText(
       'Project import error: Invalid JSON'
     );
+    await page.waitForTimeout(4200);
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Project import error: Invalid JSON'
+    );
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
       page.getByPlaceholder('Enter a description for this frame...')
@@ -1173,6 +1269,7 @@ while (true) {}
     await expect(selfLoopLabelText).toHaveText('loop');
     await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
+    await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');

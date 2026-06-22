@@ -10,7 +10,7 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     createInitialViewState(initialNodes)
   );
   const [viewResetCounter, setViewResetCounter] = useState(0);
-  const [lockCanvas, setLockCanvas] = useState(true);
+  const [lockCanvas, setLockCanvas] = useState(false);
 
   const setViewFromNodes = useCallback(nodes => {
     setViewState(createInitialViewState(nodes));

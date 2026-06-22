@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EDGE_ROUTING } from './graphStudio/constants';
 import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
 import GraphStudioLayout from './graphStudio/GraphStudioLayout';
@@ -36,6 +36,9 @@ const PRESET_STATUS_LABELS = {
   'connected-components': 'Connected Components',
   multigraph: 'Multi-Edge / Loop',
 };
+
+const STATUS_AUTO_DISMISS_MS = 4000;
+const ERROR_STATUS_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
@@ -82,7 +85,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   } = useGraphStudioView({
     initialNodes: seedTimeline.baseGraph.nodes,
   });
-  const [status, setStatus] = useState('Ready');
+  const [status, setStatusState] = useState('');
+  const setStatus = useCallback(nextStatus => {
+    setStatusState(String(nextStatus ?? ''));
+  }, []);
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
     edgeCurvature: 46,
@@ -122,7 +128,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     updateBaseEdge,
     setStepProperty,
     addNodeAt,
-    addNode,
     addEdge,
     deleteSelection,
     applyLayout,
@@ -262,6 +267,14 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     clearSelection,
     clearDrawState,
   ]);
+  useEffect(() => {
+    if (!status || ERROR_STATUS_PATTERN.test(status)) return undefined;
+    const timeout = window.setTimeout(
+      () => setStatusState(''),
+      STATUS_AUTO_DISMISS_MS
+    );
+    return () => window.clearTimeout(timeout);
+  }, [status]);
   const previousGraph = useMemo(() => {
     if (currentFrame <= 0) return computedGraph;
     return getFrameGraph(currentFrame - 1);
@@ -303,7 +316,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setCustomLegend,
       lockCanvas,
       setLockCanvas,
-      onAddNode: addNode,
       onAutoLayout: applyLayout,
       onOpenParser: () => setIsParserOpen(true),
       onExportText: exportText,
@@ -360,7 +372,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodeMove,
       onNodePointerUp,
       onNodeClickForDraw,
-      onCanvasDoubleClick: addNodeAt,
+      onCanvasAddNode: addNodeAt,
     },
     property: {
       selectedNode,
