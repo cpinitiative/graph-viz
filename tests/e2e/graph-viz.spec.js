@@ -831,7 +831,7 @@ while (true) {}
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
-      'Preview of the current frame using the selected image framing.'
+      'PNG/SVG export the current editor frame. Use the main timeline to change it.'
     );
 
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
@@ -842,6 +842,87 @@ while (true) {}
     await expect
       .poll(() => previewImage.getAttribute('src'))
       .not.toBe(viewportPreviewUrl);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('reviews only included export frames without changing the editor frame', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const frameCounter = page.getByText(/^\d+ \/ \d+$/).first();
+    const editorFrameBeforeReview = await frameCounter.textContent();
+    const exportMenu = await openExportMenu(page);
+    const frameList = exportMenu.getByTestId('export-preview-frame-list');
+    const frameItems = frameList.locator(
+      '[data-testid^="export-preview-frame-item-"]'
+    );
+
+    await expect(frameList).toBeVisible();
+    await expect(
+      exportMenu
+        .getByTestId('export-preview-section')
+        .getByTestId('export-preview-frame-list')
+    ).toBeVisible();
+    await expect(frameItems).toHaveCount(5);
+    await expect(exportMenu.getByLabel('Export start frame')).toHaveCount(0);
+    await expect(exportMenu.getByLabel('Export end frame')).toHaveCount(0);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toHaveAttribute('aria-current', 'true');
+    const previewImage = await expectExportPreview(page);
+    const firstFramePreviewUrl = await previewImage.getAttribute('src');
+
+    await exportMenu.getByTestId('export-preview-frame-item-1').click();
+    await expect(previewImage).toBeVisible();
+    await expect(exportMenu.getByTestId('export-preview-status')).toHaveCount(
+      0
+    );
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-1')
+    ).toHaveAttribute('aria-current', 'true');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-frame-index', '1');
+    await expectExportPreview(page);
+    await expect
+      .poll(() => previewImage.getAttribute('src'))
+      .not.toBe(firstFramePreviewUrl);
+    await expect(frameCounter).toHaveText(editorFrameBeforeReview);
+
+    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await expect(frameItems).toHaveCount(1);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toBeVisible();
+
+    await exportMenu.getByRole('radio', { name: 'Range' }).check();
+    await expect(exportMenu.getByLabel('Export start frame')).toBeVisible();
+    await expect(exportMenu.getByLabel('Export end frame')).toBeVisible();
+    await exportMenu.getByLabel('Export start frame').click();
+    await exportMenu.getByLabel('Export start frame').clear();
+    await exportMenu.getByLabel('Export start frame').pressSequentially('2');
+    await expect(exportMenu.getByLabel('Export start frame')).toHaveValue('2');
+    await exportMenu.getByLabel('Export end frame').click();
+    await exportMenu.getByLabel('Export end frame').clear();
+    await exportMenu.getByLabel('Export end frame').pressSequentially('3');
+    await expect(exportMenu.getByLabel('Export end frame')).toHaveValue('3');
+    await expect(frameItems).toHaveCount(2);
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-1')
+    ).toBeVisible();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-2')
+    ).toBeVisible();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-0')
+    ).toHaveCount(0);
+    await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
     expect(errors).toEqual([]);
   });
@@ -1301,13 +1382,11 @@ api.edge('e0', '#f59e0b');
     await expect(pngScaleSelect).toHaveValue('2');
     await expect(imageFramingSelect).toHaveValue('viewport');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
-    await expect(page.getByRole('radio', { name: 'All frames' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
-      page.getByRole('radio', { name: 'Current frame' })
+      page.getByRole('radio', { name: 'Current' })
     ).not.toBeChecked();
-    await expect(
-      page.getByRole('radio', { name: 'Custom range' })
-    ).not.toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
     await expectDownloadFrom({
       page,
@@ -1367,6 +1446,11 @@ api.edge('e0', '#f59e0b');
 
     await openExportMenu(page);
     const previewImage = await expectExportPreview(page);
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('Export Key');
     const previewSvgText = await previewImage.evaluate(async image =>
       (await fetch(image.src)).text()
     );
@@ -1420,10 +1504,8 @@ api.edge('e0', '#f59e0b');
     await expect(frameCounter).toHaveText(initialFrameCounter);
     await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('radio', { name: 'Current frame' }).check();
-    await expect(
-      page.getByRole('radio', { name: 'Current frame' })
-    ).toBeChecked();
+    await page.getByRole('radio', { name: 'Current' }).check();
+    await expect(page.getByRole('radio', { name: 'Current' })).toBeChecked();
     await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
@@ -1434,10 +1516,8 @@ api.edge('e0', '#f59e0b');
     await closeExportMenu(page);
     await choosePreset(page, 'bfs');
     await openExportMenu(page);
-    await page.getByRole('radio', { name: 'Custom range' }).check();
-    await expect(
-      page.getByRole('radio', { name: 'Custom range' })
-    ).toBeChecked();
+    await page.getByRole('radio', { name: 'Range' }).check();
+    await expect(page.getByRole('radio', { name: 'Range' })).toBeChecked();
     await page.getByLabel('Export start frame').fill('1');
     await page.getByLabel('Export end frame').fill('2');
     await expectDownloadFrom({

@@ -119,6 +119,7 @@ const CanvasStage = ({ canvas, status }) => (
 const ModalStack = ({
   modals,
   sidebar,
+  canvas,
   isImportMenuOpen,
   isExportMenuOpen,
   onCloseImportMenu,
@@ -148,6 +149,10 @@ const ModalStack = ({
       exportFrameRange={sidebar.exportFrameRange}
       onExportFrameRangeChange={sidebar.onExportFrameRangeChange}
       totalFrames={sidebar.totalFrames}
+      currentFrame={sidebar.currentFrame}
+      steps={sidebar.steps}
+      getFrameGraph={sidebar.getFrameGraph}
+      previewCanvas={canvas}
     />
     <ParserModal
       open={modals.parser.open}
@@ -210,6 +215,7 @@ const GraphStudioLayout = ({
   const modalStackProps = {
     modals,
     sidebar,
+    canvas,
     isImportMenuOpen,
     isExportMenuOpen,
     onCloseImportMenu: () => setIsImportMenuOpen(false),

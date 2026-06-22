@@ -380,6 +380,10 @@ const GraphCanvas = ({
   nodeRadius = NODE_RADIUS,
   edgeWidth = 2.2,
   resetViewTrigger = 0,
+  svgElementId = 'graph-studio-canvas-svg',
+  svgTestId = 'graph-canvas-svg',
+  svgResourcePrefix = '',
+  layoutIdPrefix = '',
   onSelectNode,
   onSelectEdge,
   onSelectNodes,
@@ -437,10 +441,10 @@ const GraphCanvas = ({
           selected,
           multiSelected,
           strokeColor,
-          markerId: getArrowMarkerId(strokeColor),
+          markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
         };
       }),
-    [edgeRenderData, selectedNodeIds, selectedObject, theme]
+    [edgeRenderData, selectedNodeIds, selectedObject, svgResourcePrefix, theme]
   );
   const arrowMarkers = useMemo(() => {
     const markers = new Map();
@@ -739,8 +743,8 @@ const GraphCanvas = ({
   return (
     <div className="relative h-full bg-white font-inter text-on-surface dark:bg-gray-900 dark:text-dark-on-surface">
       <svg
-        id="graph-studio-canvas-svg"
-        data-testid="graph-canvas-svg"
+        id={svgElementId}
+        data-testid={svgTestId}
         xmlns="http://www.w3.org/2000/svg"
         ref={svgRef}
         className="h-full w-full"
@@ -762,7 +766,7 @@ const GraphCanvas = ({
       >
         <defs>
           <pattern
-            id="graphstudio-dot-grid"
+            id={`${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-dot-grid`}
             width="28"
             height="28"
             patternUnits="userSpaceOnUse"
@@ -800,7 +804,7 @@ const GraphCanvas = ({
               y="-10000"
               width="20000"
               height="20000"
-              fill="url(#graphstudio-dot-grid)"
+              fill={`url(#${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-dot-grid)`}
             />
           )}
           <g data-export-content="true">
@@ -829,6 +833,7 @@ const GraphCanvas = ({
                     markerId={markerId}
                     labelPosition={labelPosition}
                     strokeWidth={strokeWidth}
+                    layoutIdPrefix={layoutIdPrefix}
                     shouldAnimate={
                       endpointMoved || diff.changedEdges.has(String(edge.id))
                     }
@@ -860,6 +865,7 @@ const GraphCanvas = ({
                     multiSelected={multiSelected}
                     drawAnchor={String(drawFrom) === String(node.id)}
                     shouldAnimate={diff.changedNodes.has(String(node.id))}
+                    layoutIdPrefix={layoutIdPrefix}
                     mode={mode}
                     onPointerDown={event =>
                       handleNodePointerDown(event, node.id)

@@ -9,6 +9,7 @@ const GraphEdge = ({
   selected,
   multiSelected,
   shouldAnimate,
+  layoutIdPrefix = '',
   markerId,
   labelPosition,
   onPointerDown,
@@ -39,7 +40,7 @@ const GraphEdge = ({
         }
         strokeLinecap="round"
         markerEnd={edge.directed ? `url(#${markerId})` : undefined}
-        layoutId={`edge-${edge.id}`}
+        layoutId={`${layoutIdPrefix}edge-${edge.id}`}
         initial={false}
         animate={{ d: pathD }}
         transition={

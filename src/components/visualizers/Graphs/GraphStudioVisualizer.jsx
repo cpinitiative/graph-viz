@@ -327,6 +327,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onApplyPreset: applyPreset,
       currentFrame,
       totalFrames: frameCount,
+      steps,
+      getFrameGraph,
       onPlay: togglePlayback,
       isPlaying,
       onCenterView: centerViewOnContent,
