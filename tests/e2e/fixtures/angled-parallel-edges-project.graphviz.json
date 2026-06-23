@@ -1,0 +1,245 @@
+{
+  "format": "graph-viz-project",
+  "version": 1,
+  "exportedAt": "2026-06-22T00:00:00.000Z",
+  "graph": {
+    "nodes": [
+      { "id": "steep-a", "label": "SA", "x": 360, "y": 240, "visible": true },
+      { "id": "steep-b", "label": "SB", "x": 520, "y": 500, "visible": true },
+      { "id": "shallow-a", "label": "HA", "x": 650, "y": 260, "visible": true },
+      { "id": "shallow-b", "label": "HB", "x": 980, "y": 380, "visible": true },
+      {
+        "id": "vertical-a",
+        "label": "VA",
+        "x": 760,
+        "y": 470,
+        "visible": true
+      },
+      {
+        "id": "vertical-b",
+        "label": "VB",
+        "x": 800,
+        "y": 650,
+        "visible": true
+      },
+      { "id": "bridge-a", "label": "BA", "x": 610, "y": 650, "visible": true },
+      { "id": "bridge-b", "label": "BB", "x": 1010, "y": 560, "visible": true }
+    ],
+    "edges": [
+      {
+        "id": "steep-f1",
+        "from": "steep-a",
+        "to": "steep-b",
+        "directed": true,
+        "label": "S1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-f2",
+        "from": "steep-a",
+        "to": "steep-b",
+        "directed": true,
+        "label": "S2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-f3",
+        "from": "steep-a",
+        "to": "steep-b",
+        "directed": true,
+        "label": "S3",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-f4",
+        "from": "steep-a",
+        "to": "steep-b",
+        "directed": true,
+        "label": "S4",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-f5",
+        "from": "steep-a",
+        "to": "steep-b",
+        "directed": true,
+        "label": "S5",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-r1",
+        "from": "steep-b",
+        "to": "steep-a",
+        "directed": true,
+        "label": "SR1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "steep-r2",
+        "from": "steep-b",
+        "to": "steep-a",
+        "directed": true,
+        "label": "SR2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "shallow-f1",
+        "from": "shallow-a",
+        "to": "shallow-b",
+        "directed": true,
+        "label": "H1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "shallow-f2",
+        "from": "shallow-a",
+        "to": "shallow-b",
+        "directed": true,
+        "label": "H2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "shallow-f3",
+        "from": "shallow-a",
+        "to": "shallow-b",
+        "directed": true,
+        "label": "H3",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "shallow-f4",
+        "from": "shallow-a",
+        "to": "shallow-b",
+        "directed": true,
+        "label": "H4",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-f1",
+        "from": "vertical-a",
+        "to": "vertical-b",
+        "directed": true,
+        "label": "V1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-f2",
+        "from": "vertical-a",
+        "to": "vertical-b",
+        "directed": true,
+        "label": "V2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-f3",
+        "from": "vertical-a",
+        "to": "vertical-b",
+        "directed": true,
+        "label": "V3",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-r1",
+        "from": "vertical-b",
+        "to": "vertical-a",
+        "directed": true,
+        "label": "VR1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-r2",
+        "from": "vertical-b",
+        "to": "vertical-a",
+        "directed": true,
+        "label": "VR2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "vertical-r3",
+        "from": "vertical-b",
+        "to": "vertical-a",
+        "directed": true,
+        "label": "VR3",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "single-1",
+        "from": "steep-b",
+        "to": "bridge-a",
+        "directed": true,
+        "label": "C1",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "single-2",
+        "from": "bridge-a",
+        "to": "vertical-b",
+        "directed": false,
+        "label": "C2",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "single-3",
+        "from": "shallow-b",
+        "to": "bridge-b",
+        "directed": true,
+        "label": "C3",
+        "color": "#64748b",
+        "visible": true
+      },
+      {
+        "id": "single-4",
+        "from": "bridge-b",
+        "to": "vertical-b",
+        "directed": true,
+        "label": "C4",
+        "color": "#64748b",
+        "visible": true
+      }
+    ]
+  },
+  "timeline": {
+    "steps": [
+      {
+        "id": "step-0",
+        "description": "Angled parallel edge stress case",
+        "durationMs": 600,
+        "nodeOverrides": {},
+        "edgeOverrides": {}
+      }
+    ],
+    "currentFrame": 0
+  },
+  "settings": {
+    "edgeRouting": "straight",
+    "snapEnabled": true,
+    "showGrid": false,
+    "lockCanvas": true,
+    "viewState": null,
+    "globalSettings": {
+      "forceStrength": 1,
+      "edgeCurvature": 46,
+      "nodeSize": 22,
+      "edgeWidth": 2.2
+    }
+  }
+}

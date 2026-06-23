@@ -1349,6 +1349,196 @@ api.edge('loop', '#3b82f6');
     expect(errors).toEqual([]);
   });
 
+  test('separates parallel and opposite-direction edges across routing modes and SVG export', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await openImportMenu(page);
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('parallel-edges-project.graphviz.json'));
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
+
+    const edgePaths = graphCanvas(page).locator('[data-edge-path-id]');
+    const edgeLabels = graphCanvas(page).locator('[data-edge-label-id]');
+    await expect(edgePaths).toHaveCount(7);
+    await expect(edgeLabels).toHaveCount(7);
+    await expectDirectedEdgesAnchored(page);
+
+    const getPathMap = () =>
+      edgePaths.evaluateAll(paths =>
+        Object.fromEntries(
+          paths.map(path => [
+            path.getAttribute('data-edge-path-id'),
+            path.getAttribute('d'),
+          ])
+        )
+      );
+    const getLabelPositions = () =>
+      edgeLabels.evaluateAll(labels =>
+        labels.map(label => {
+          const text = label.querySelector('[data-edge-label-text="true"]');
+          return `${text?.getAttribute('x')},${text?.getAttribute('y')}`;
+        })
+      );
+
+    const straightPaths = await getPathMap();
+    expect(new Set(Object.values(straightPaths)).size).toBe(7);
+    expect(straightPaths['forward-1']).not.toBe(straightPaths['forward-2']);
+    expect(straightPaths['forward-2']).not.toBe(straightPaths['forward-3']);
+    expect(straightPaths['reverse-1']).not.toBe(straightPaths['reverse-2']);
+    expect(straightPaths['forward-3']).not.toBe(straightPaths['reverse-1']);
+    expect(new Set(await getLabelPositions()).size).toBe(7);
+
+    for (const edgeId of ['forward-3', 'reverse-1']) {
+      await graphCanvas(page)
+        .locator(`[data-edge-hit-target-id="${edgeId}"]`)
+        .dispatchEvent('click');
+      await expect(page.getByText('Edge Inspector')).toBeVisible();
+      await expect(
+        graphCanvas(page).locator(`[data-edge-path-id="${edgeId}"]`)
+      ).toHaveAttribute('marker-end', /^url\(#graphstudio-arrow-[^)]+\)$/);
+    }
+
+    await page.getByText('Frame 2').click();
+    await expect.poll(getPathMap).toEqual(straightPaths);
+
+    await page.getByLabel('Edge routing').selectOption('bezier');
+    const curvedPaths = await getPathMap();
+    expect(new Set(Object.values(curvedPaths)).size).toBe(7);
+    expect(curvedPaths).not.toEqual(straightPaths);
+    expect(new Set(await getLabelPositions()).size).toBe(7);
+    await expectDirectedEdgesAnchored(page);
+
+    await openExportMenu(page);
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const exportedSvg = await fs.readFile(svgPath, 'utf8');
+    const exportedEdgeTags =
+      exportedSvg.match(/<path\b[^>]*data-edge-path-id="[^"]+"[^>]*>/g) ?? [];
+    const exportedPathData = exportedEdgeTags
+      .map(tag => tag.match(/\bd="([^"]+)"/)?.[1])
+      .filter(Boolean);
+    expect(exportedEdgeTags).toHaveLength(7);
+    expect(new Set(exportedPathData).size).toBe(7);
+    expect(
+      exportedEdgeTags.every(tag => tag.includes('marker-end="url(#'))
+    ).toBe(true);
+    expect(exportedSvg).toContain('data-edge-label-id="forward-1"');
+    expect(exportedSvg).toContain('data-edge-label-id="reverse-1"');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps angled and irregular parallel-edge fans separated', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await openImportMenu(page);
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(
+        fixturePath('angled-parallel-edges-project.graphviz.json')
+      );
+    await expect(page.getByText('Project imported')).toBeVisible();
+
+    const getPathData = paths =>
+      paths.evaluateAll(items => items.map(path => path.getAttribute('d')));
+    const getEndpoints = paths =>
+      paths.evaluateAll(items =>
+        items.map(path => {
+          const values = (
+            path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? []
+          ).map(Number);
+          return `${values.at(-2)?.toFixed(3)},${values.at(-1)?.toFixed(3)}`;
+        })
+      );
+    const pairCases = [
+      { prefix: 'steep-', count: 7 },
+      { prefix: 'shallow-', count: 4 },
+      { prefix: 'vertical-', count: 6 },
+    ];
+    const singlePaths = graphCanvas(page).locator(
+      '[data-edge-path-id^="single-"]'
+    );
+    const singleLabels = graphCanvas(page).locator(
+      '[data-edge-label-id^="single-"]'
+    );
+
+    const straightPathData = {};
+    for (const { prefix, count } of pairCases) {
+      const paths = graphCanvas(page).locator(
+        `[data-edge-path-id^="${prefix}"]`
+      );
+      const labels = graphCanvas(page).locator(
+        `[data-edge-label-id^="${prefix}"]`
+      );
+      await expect(paths).toHaveCount(count);
+      await expect(labels).toHaveCount(count);
+      const pathData = await getPathData(paths);
+      expect(new Set(pathData).size).toBe(count);
+      straightPathData[prefix] = pathData;
+    }
+    await expect(singlePaths).toHaveCount(4);
+    await expect(singleLabels).toHaveCount(4);
+    const straightSinglePathData = await getPathData(singlePaths);
+    expect(straightSinglePathData.every(path => path.includes(' L '))).toBe(
+      true
+    );
+    expect(straightSinglePathData.every(path => !path.includes(' C '))).toBe(
+      true
+    );
+    expect(new Set(straightSinglePathData).size).toBe(4);
+
+    for (const { prefix, count } of [
+      { prefix: 'steep-f', count: 5 },
+      { prefix: 'steep-r', count: 2 },
+      { prefix: 'shallow-f', count: 4 },
+      { prefix: 'vertical-f', count: 3 },
+      { prefix: 'vertical-r', count: 3 },
+    ]) {
+      const endpoints = await getEndpoints(
+        graphCanvas(page).locator(`[data-edge-path-id^="${prefix}"]`)
+      );
+      expect(new Set(endpoints).size).toBe(count);
+    }
+    await expectDirectedEdgesAnchored(page);
+
+    await page.getByLabel('Edge routing').selectOption('bezier');
+    for (const { prefix, count } of pairCases) {
+      const paths = graphCanvas(page).locator(
+        `[data-edge-path-id^="${prefix}"]`
+      );
+      await expect
+        .poll(async () => JSON.stringify(await getPathData(paths)))
+        .not.toBe(JSON.stringify(straightPathData[prefix]));
+      expect(new Set(await getPathData(paths)).size).toBe(count);
+    }
+    await expect
+      .poll(async () => JSON.stringify(await getPathData(singlePaths)))
+      .not.toBe(JSON.stringify(straightSinglePathData));
+    const curvedSinglePathData = await getPathData(singlePaths);
+    expect(curvedSinglePathData.every(path => path.includes(' C '))).toBe(true);
+    expect(new Set(curvedSinglePathData).size).toBe(4);
+    await expectDirectedEdgesAnchored(page);
+
+    expect(errors).toEqual([]);
+  });
+
   test('keeps directed arrowheads bound to effective edge stroke colors', async ({
     page,
   }) => {

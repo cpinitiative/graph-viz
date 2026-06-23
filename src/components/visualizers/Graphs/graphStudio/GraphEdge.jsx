@@ -17,8 +17,9 @@ const GraphEdge = ({
   strokeWidth,
 }) => {
   return (
-    <g style={{ cursor: 'pointer' }}>
+    <g data-edge-id={edge.id} style={{ cursor: 'pointer' }}>
       <path
+        data-edge-hit-target-id={edge.id}
         d={pathD}
         fill="none"
         stroke="rgba(0,0,0,0)"
@@ -28,6 +29,7 @@ const GraphEdge = ({
         onClick={onClick}
       />
       <motion.path
+        data-edge-path-id={edge.id}
         d={pathD}
         fill="none"
         stroke={strokeColor}
