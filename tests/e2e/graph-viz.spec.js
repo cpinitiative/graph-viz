@@ -670,9 +670,21 @@ while (true) {}
     await expect(page.getByText(/^Frame Description/)).toBeVisible();
     const descriptionBox = await descriptionRow.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
+    const canvasLayoutBox = await graphCanvas(page).boundingBox();
+    const visibleFrameBox = await cards.first().boundingBox();
     expect(descriptionBox).not.toBeNull();
     expect(timelineBox).not.toBeNull();
+    expect(canvasLayoutBox).not.toBeNull();
+    expect(visibleFrameBox).not.toBeNull();
     expect(descriptionBox.y + descriptionBox.height).toBeLessThanOrEqual(
+      timelineBox.y + timelineBox.height
+    );
+    expect(canvasLayoutBox.y + canvasLayoutBox.height).toBeLessThanOrEqual(
+      timelineBox.y
+    );
+    expect(canvasLayoutBox.height).toBeGreaterThan(timelineBox.height);
+    expect(visibleFrameBox.y).toBeGreaterThanOrEqual(timelineBox.y);
+    expect(visibleFrameBox.y + visibleFrameBox.height).toBeLessThanOrEqual(
       timelineBox.y + timelineBox.height
     );
 
