@@ -595,13 +595,18 @@ while (true) {}
     const durationInput = page.getByTestId('frame-duration-input');
     const initialFrameCount = await cards.count();
 
-    await cards.nth(1).click();
-    await expect(cards.nth(1)).toHaveAttribute('data-current', 'true');
-    await expect(frameCounter).toHaveText(`2 / ${initialFrameCount}`);
+    await cards.last().click();
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount} / ${initialFrameCount}`
+    );
 
     await page.getByRole('button', { name: '+ Keyframe' }).click();
     await expect(cards).toHaveCount(initialFrameCount + 1);
-    await expect(cards.nth(2)).toHaveAttribute('data-current', 'true');
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount + 1} / ${initialFrameCount + 1}`
+    );
     await expect(frameDescription).toHaveValue('');
     await expect(durationInput).toHaveValue('600');
 
@@ -611,26 +616,45 @@ while (true) {}
     await durationInput.type('1200');
     await durationInput.press('Tab');
     await expect(durationInput).toHaveValue('1200');
-    await expect(cards.nth(2).getByText('1200 ms')).toBeVisible();
+    await expect(cards.last().getByText('1200 ms')).toBeVisible();
 
     await frameDescription.fill('Next BFS state');
-    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
     await expect(cards).toHaveCount(initialFrameCount + 2);
-    await expect(cards.nth(3)).toHaveAttribute('data-current', 'true');
-    await expect(frameDescription).toHaveValue('Next BFS state');
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount + 2} / ${initialFrameCount + 2}`
+    );
+    await expect(frameDescription).toHaveValue('');
+    await expect(durationInput).toHaveValue('1200');
+    await expect(
+      cards.nth(initialFrameCount).getByText('Next BFS state')
+    ).toBeVisible();
+
+    await frameDescription.fill('Second BFS state');
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(cards).toHaveCount(initialFrameCount + 3);
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameDescription).toHaveValue('Second BFS state');
     await expect(durationInput).toHaveValue('1200');
 
-    await cards.nth(3).focus();
-    await cards.nth(3).press('ArrowLeft');
-    await expect(cards.nth(2)).toHaveAttribute('data-current', 'true');
+    await cards.last().focus();
+    await cards.last().press('ArrowLeft');
+    await expect(cards.nth(initialFrameCount + 1)).toHaveAttribute(
+      'data-current',
+      'true'
+    );
 
     await timelinePanel.focus();
     await timelinePanel.press('ArrowRight');
-    await expect(cards.nth(3)).toHaveAttribute('data-current', 'true');
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
 
     await graphCanvas(page).focus();
     await graphCanvas(page).press('ArrowLeft');
-    await expect(cards.nth(2)).toHaveAttribute('data-current', 'true');
+    await expect(cards.nth(initialFrameCount + 1)).toHaveAttribute(
+      'data-current',
+      'true'
+    );
 
     const frameBeforeInputArrows = await frameCounter.textContent();
     await frameDescription.focus();
@@ -659,7 +683,7 @@ while (true) {}
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
       .poll(async () => frameCounter.textContent(), { timeout: 3000 })
-      .not.toBe(`1 / ${initialFrameCount + 2}`);
+      .not.toBe(`1 / ${initialFrameCount + 3}`);
     await page.getByRole('button', { name: 'Pause timeline' }).click();
 
     await openExportMenu(page);
@@ -670,17 +694,22 @@ while (true) {}
       filenamePattern: /\.graphviz\.json$/,
     });
     const project = await readJsonDownload(download);
-    const sourceStep = project.timeline.steps[1];
-    const addedStep = project.timeline.steps[2];
-    const duplicatedStep = project.timeline.steps[3];
+    const sourceStep = project.timeline.steps[initialFrameCount - 1];
+    const addedStep = project.timeline.steps[initialFrameCount];
+    const secondAddedStep = project.timeline.steps[initialFrameCount + 1];
+    const duplicatedStep = project.timeline.steps[initialFrameCount + 2];
 
     expect(addedStep.nodeOverrides).toEqual(sourceStep.nodeOverrides);
     expect(addedStep.edgeOverrides).toEqual(sourceStep.edgeOverrides);
     expect(addedStep.description).toBe('Next BFS state');
     expect(addedStep.durationMs).toBe(1200);
-    expect(duplicatedStep.id).not.toBe(addedStep.id);
+    expect(secondAddedStep.nodeOverrides).toEqual(addedStep.nodeOverrides);
+    expect(secondAddedStep.edgeOverrides).toEqual(addedStep.edgeOverrides);
+    expect(secondAddedStep.description).toBe('Second BFS state');
+    expect(secondAddedStep.durationMs).toBe(1200);
+    expect(duplicatedStep.id).not.toBe(secondAddedStep.id);
     expect({ ...duplicatedStep, id: undefined }).toEqual({
-      ...addedStep,
+      ...secondAddedStep,
       id: undefined,
     });
     await closeExportMenu(page);

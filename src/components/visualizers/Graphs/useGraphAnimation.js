@@ -222,8 +222,8 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
     []
   );
   const setFrame = useCallback(
-    nextFrame => {
-      setCurrentFrame(clampFrame(nextFrame, frameCount));
+    (nextFrame, nextFrameCount = frameCount) => {
+      setCurrentFrame(clampFrame(nextFrame, nextFrameCount));
     },
     [frameCount]
   );

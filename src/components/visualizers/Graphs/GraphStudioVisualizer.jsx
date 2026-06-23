@@ -438,11 +438,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'description', value),
       onAddStep: () => {
         addStep(currentFrame);
-        setCurrentFrame(currentFrame + 1);
+        setCurrentFrame(currentFrame + 1, frameCount + 1);
       },
       onDuplicateStep: () => {
         duplicateStep(currentFrame);
-        setCurrentFrame(currentFrame + 1);
+        setCurrentFrame(currentFrame + 1, frameCount + 1);
       },
       onDeleteStep: () => {
         if (steps.length <= 1) return;
