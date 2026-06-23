@@ -147,6 +147,12 @@ const readPngDimensions = async download => {
   };
 };
 
+const readJsonDownload = async download => {
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  return JSON.parse(await fs.readFile(path, 'utf8'));
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   const modal = page.getByTestId('custom-legend-modal');
@@ -569,6 +575,160 @@ while (true) {}
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('supports coherent keyframe creation, timing, and keyboard navigation', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const cards = page.getByTestId('timeline-frame-card');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    const timelinePanel = page.getByTestId('timeline-panel');
+    const frameDescription = page.getByLabel('Frame Description');
+    const durationInput = page.getByTestId('frame-duration-input');
+    const initialFrameCount = await cards.count();
+
+    await cards.last().click();
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount} / ${initialFrameCount}`
+    );
+
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(cards).toHaveCount(initialFrameCount + 1);
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount + 1} / ${initialFrameCount + 1}`
+    );
+    await expect(frameDescription).toHaveValue('');
+    await expect(durationInput).toHaveValue('600');
+
+    await durationInput.click({ clickCount: 3 });
+    await durationInput.press('Backspace');
+    await expect(durationInput).toHaveValue('');
+    await durationInput.type('1200');
+    await durationInput.press('Tab');
+    await expect(durationInput).toHaveValue('1200');
+    await expect(cards.last().getByText('1200 ms')).toBeVisible();
+
+    await frameDescription.fill('Next BFS state');
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(cards).toHaveCount(initialFrameCount + 2);
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount + 2} / ${initialFrameCount + 2}`
+    );
+    await expect(frameDescription).toHaveValue('');
+    await expect(durationInput).toHaveValue('1200');
+    await expect(
+      cards.nth(initialFrameCount).getByText('Next BFS state')
+    ).toBeVisible();
+
+    await frameDescription.fill('Second BFS state');
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(cards).toHaveCount(initialFrameCount + 3);
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect(frameDescription).toHaveValue('Second BFS state');
+    await expect(durationInput).toHaveValue('1200');
+
+    await cards.last().focus();
+    await cards.last().press('ArrowLeft');
+    await expect(cards.nth(initialFrameCount + 1)).toHaveAttribute(
+      'data-current',
+      'true'
+    );
+
+    await timelinePanel.focus();
+    await timelinePanel.press('ArrowRight');
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+
+    await graphCanvas(page).focus();
+    await graphCanvas(page).press('ArrowLeft');
+    await expect(cards.nth(initialFrameCount + 1)).toHaveAttribute(
+      'data-current',
+      'true'
+    );
+
+    const frameBeforeInputArrows = await frameCounter.textContent();
+    await frameDescription.focus();
+    await frameDescription.press('ArrowRight');
+    await frameDescription.press('ArrowLeft');
+    await expect(frameCounter).toHaveText(frameBeforeInputArrows);
+    await durationInput.focus();
+    await durationInput.press('ArrowRight');
+    await durationInput.press('ArrowLeft');
+    await expect(frameCounter).toHaveText(frameBeforeInputArrows);
+
+    const descriptionRow = page.getByTestId('frame-description-row');
+    await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('selected-frame-summary')).toHaveText(
+      `Frame ${initialFrameCount + 2} / ${initialFrameCount + 3}`
+    );
+    const descriptionBox = await descriptionRow.boundingBox();
+    const timelineBox = await timelinePanel.boundingBox();
+    const canvasLayoutBox = await graphCanvas(page).boundingBox();
+    const visibleFrameBox = await cards.first().boundingBox();
+    expect(descriptionBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(canvasLayoutBox).not.toBeNull();
+    expect(visibleFrameBox).not.toBeNull();
+    expect(descriptionBox.y + descriptionBox.height).toBeLessThanOrEqual(
+      timelineBox.y + timelineBox.height
+    );
+    expect(canvasLayoutBox.y + canvasLayoutBox.height).toBeLessThanOrEqual(
+      timelineBox.y
+    );
+    expect(canvasLayoutBox.height).toBeGreaterThan(timelineBox.height);
+    expect(descriptionBox.height).toBeLessThan(timelineBox.height / 2);
+    expect(visibleFrameBox.y).toBeGreaterThanOrEqual(timelineBox.y);
+    expect(visibleFrameBox.y + visibleFrameBox.height).toBeLessThanOrEqual(
+      timelineBox.y + timelineBox.height
+    );
+
+    await cards.first().click();
+    await graphCanvas(page).focus();
+    await graphCanvas(page).press('ArrowLeft');
+    await expect(cards.first()).toHaveAttribute('data-current', 'true');
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect
+      .poll(async () => frameCounter.textContent(), { timeout: 3000 })
+      .not.toBe(`1 / ${initialFrameCount + 3}`);
+    await page.getByRole('button', { name: 'Pause timeline' }).click();
+
+    await openExportMenu(page);
+    await expectExportPreview(page);
+    const download = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const project = await readJsonDownload(download);
+    const sourceStep = project.timeline.steps[initialFrameCount - 1];
+    const addedStep = project.timeline.steps[initialFrameCount];
+    const secondAddedStep = project.timeline.steps[initialFrameCount + 1];
+    const duplicatedStep = project.timeline.steps[initialFrameCount + 2];
+
+    expect(addedStep.nodeOverrides).toEqual(sourceStep.nodeOverrides);
+    expect(addedStep.edgeOverrides).toEqual(sourceStep.edgeOverrides);
+    expect(addedStep.description).toBe('Next BFS state');
+    expect(addedStep.durationMs).toBe(1200);
+    expect(secondAddedStep.nodeOverrides).toEqual(addedStep.nodeOverrides);
+    expect(secondAddedStep.edgeOverrides).toEqual(addedStep.edgeOverrides);
+    expect(secondAddedStep.description).toBe('Second BFS state');
+    expect(secondAddedStep.durationMs).toBe(1200);
+    expect(duplicatedStep.id).not.toBe(secondAddedStep.id);
+    expect({ ...duplicatedStep, id: undefined }).toEqual({
+      ...secondAddedStep,
+      id: undefined,
+    });
+    await closeExportMenu(page);
 
     expect(errors).toEqual([]);
   });

@@ -39,6 +39,6 @@ test.describe('Graph Viz mobile smoke', () => {
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await page.getByRole('button', { name: '+ Keyframe' }).click();
-    await expect(page.getByText('Frame 2')).toBeVisible();
+    await expect(page.getByText('Frame 2', { exact: true })).toBeVisible();
   });
 });

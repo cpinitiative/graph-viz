@@ -145,8 +145,17 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
   const addStep = useCallback(index => {
     setSteps(prev => {
       const next = prev.length ? [...prev] : [normalizeAnimationStep({}, 0)];
-      const insertAt = Math.max(0, Math.min(Number(index) + 1, next.length));
-      next.splice(insertAt, 0, normalizeAnimationStep({}, insertAt));
+      const frameIndex = clampFrame(index, next.length);
+      const insertAt = frameIndex + 1;
+      const carriedStep = normalizeAnimationStep(
+        {
+          ...cloneStep(next[frameIndex]),
+          id: createStepId(),
+          description: '',
+        },
+        insertAt
+      );
+      next.splice(insertAt, 0, carriedStep);
       return next;
     });
   }, []);
@@ -213,8 +222,8 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
     []
   );
   const setFrame = useCallback(
-    nextFrame => {
-      setCurrentFrame(clampFrame(nextFrame, frameCount));
+    (nextFrame, nextFrameCount = frameCount) => {
+      setCurrentFrame(clampFrame(nextFrame, nextFrameCount));
     },
     [frameCount]
   );
