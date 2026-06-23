@@ -667,7 +667,10 @@ while (true) {}
     await expect(frameCounter).toHaveText(frameBeforeInputArrows);
 
     const descriptionRow = page.getByTestId('frame-description-row');
-    await expect(page.getByText(/^Frame Description/)).toBeVisible();
+    await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('selected-frame-summary')).toHaveText(
+      `Frame ${initialFrameCount + 2} / ${initialFrameCount + 3}`
+    );
     const descriptionBox = await descriptionRow.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
     const canvasLayoutBox = await graphCanvas(page).boundingBox();
@@ -683,6 +686,7 @@ while (true) {}
       timelineBox.y
     );
     expect(canvasLayoutBox.height).toBeGreaterThan(timelineBox.height);
+    expect(descriptionBox.height).toBeLessThan(timelineBox.height / 2);
     expect(visibleFrameBox.y).toBeGreaterThanOrEqual(timelineBox.y);
     expect(visibleFrameBox.y + visibleFrameBox.height).toBeLessThanOrEqual(
       timelineBox.y + timelineBox.height

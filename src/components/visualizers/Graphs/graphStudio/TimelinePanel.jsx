@@ -210,7 +210,7 @@ const TimelinePanel = ({
         </div>
       </div>
 
-      <div className="min-h-[70px] flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1.5 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
+      <div className="min-h-[50px] flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
         <div
           aria-label="Timeline frames"
           className="flex h-full min-w-max items-center gap-2"
@@ -221,7 +221,7 @@ const TimelinePanel = ({
               key={`${step.id ?? 'step'}-${index}`}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`flex min-h-[64px] min-w-[120px] cursor-pointer flex-col rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[132px] ${
+              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
                 index === currentFrame
                   ? 'border-l-4 border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#F59E0B]'
                   : 'border-[#D7DEE8] hover:border-[#94A3B8] dark:border-[#334155] dark:hover:border-[#64748B]'
@@ -239,7 +239,7 @@ const TimelinePanel = ({
               role="option"
               tabIndex="0"
             >
-              <div className="px-2 py-1.5">
+              <div className="px-2 py-1">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
                   <div
                     className={`text-xs font-bold ${
@@ -255,7 +255,7 @@ const TimelinePanel = ({
                   </div>
                 </div>
                 <div
-                  className="leading-3.5 max-w-[100px] truncate text-[10px] text-[#475569] dark:text-[#CBD5E1] md:max-w-[112px]"
+                  className="leading-3.5 max-w-[96px] truncate text-[10px] text-[#475569] dark:text-[#CBD5E1] md:max-w-[108px]"
                   title={step.description || 'No description'}
                 >
                   {step.description || (
@@ -263,44 +263,25 @@ const TimelinePanel = ({
                   )}
                 </div>
               </div>
-              <div
-                className="mt-auto border-t border-[#E2E8F0] bg-[#F8F9FA] px-2 py-0.5 dark:border-[#475569] dark:bg-[#111827]"
-                onClick={event => event.stopPropagation()}
-              >
-                <input
-                  aria-label={`Frame ${index + 1} duration`}
-                  className="h-1.5 w-full cursor-pointer appearance-none bg-[#CBD5E1] px-0 py-1 accent-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:bg-[#475569] dark:accent-[#60A5FA] dark:focus:ring-[#60A5FA]"
-                  type="range"
-                  min={MIN_DURATION_MS}
-                  max={MAX_DURATION_MS}
-                  step="20"
-                  value={step.durationMs ?? 600}
-                  onChange={event =>
-                    onStepDurationChange(index, Number(event.target.value))
-                  }
-                />
-              </div>
             </div>
           ))}
         </div>
       </div>
 
       <div
-        className="shrink-0 border-t border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]"
+        className="shrink-0 border-t border-[#D7DEE8] bg-[#F8F9FA] px-2 py-1 dark:border-[#334155] dark:bg-[#111827]"
         data-testid="frame-description-row"
       >
-        <div className="grid grid-cols-[minmax(0,1fr)_7rem] items-end gap-2 md:grid-cols-[7.5rem_minmax(0,1fr)_7rem]">
-          <div className="col-span-2 flex items-baseline gap-1.5 md:col-span-1 md:block">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-[#0F2747] dark:text-[#F8FAFC]">
-              Selected Keyframe
-            </div>
-            <div className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-              Frame {currentFrame + 1} of {Math.max(1, steps.length)}
-            </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div
+            className="w-full shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#0F2747] dark:text-[#F8FAFC] md:w-auto"
+            data-testid="selected-frame-summary"
+          >
+            Frame {currentFrame + 1} / {Math.max(1, steps.length)}
           </div>
-          <label className="min-w-0">
-            <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
-              Frame Description
+          <label className="flex min-w-[170px] flex-1 items-center gap-1.5 md:min-w-[220px]">
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
+              Description
             </span>
             <input
               aria-label="Frame Description"
@@ -312,8 +293,8 @@ const TimelinePanel = ({
               placeholder="Enter a description for this frame..."
             />
           </label>
-          <label className="w-28 shrink-0">
-            <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
+          <label className="flex w-36 shrink-0 items-center gap-1.5 md:w-44">
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
               Duration (ms)
             </span>
             <DurationInput
