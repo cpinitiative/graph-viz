@@ -8,6 +8,10 @@ import {
 const MIN_ZOOM_FLOOR = 0.1;
 const MAX_ZOOM = 2.6;
 const EPSILON = 0.001;
+const STRAIGHT_PARALLEL_SPACING = 24;
+const CURVED_PARALLEL_SPACING = 20;
+const MAX_STRAIGHT_FAN_SHIFT = 60;
+const MAX_CURVED_FAN_SHIFT = 48;
 
 export const computeMinZoom = (viewportW, viewportH) => {
   if (!viewportW || !viewportH) return MIN_ZOOM_FLOOR;
@@ -275,6 +279,104 @@ export const chooseBestLabelPosition = ({
   return best;
 };
 
+const getStableSide = value => {
+  const seed = String(value)
+    .split('')
+    .reduce((sum, part) => sum + part.charCodeAt(0), 0);
+  return seed % 2 === 0 ? 1 : -1;
+};
+
+const getParallelSpacing = ({ count, preferredSpacing, maxFanShift }) => {
+  const maxOffset = (Math.max(1, count) - 1) / 2;
+  if (maxOffset <= 0) return 0;
+  return Math.min(preferredSpacing, maxFanShift / maxOffset);
+};
+
+const insetParallelSegment = ({ from, to, directed, nodeRadius, shift }) => {
+  const segment = insetSegment(from, to, directed, nodeRadius);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+  const ux = dx / length;
+  const uy = dy / length;
+  const maxLateralInset = nodeRadius * 0.52;
+  const lateralInset = Math.max(
+    -maxLateralInset,
+    Math.min(maxLateralInset, shift * 0.14)
+  );
+  const startRadius = nodeRadius * 0.94;
+  const endRadius = directed ? nodeRadius : nodeRadius * 0.94;
+  const startRadialInset = Math.sqrt(
+    Math.max(0, startRadius * startRadius - lateralInset * lateralInset)
+  );
+  const endRadialInset = Math.sqrt(
+    Math.max(0, endRadius * endRadius - lateralInset * lateralInset)
+  );
+
+  return {
+    ...segment,
+    x1: from.x + ux * startRadialInset + segment.nx * lateralInset,
+    y1: from.y + uy * startRadialInset + segment.ny * lateralInset,
+    x2: to.x - ux * endRadialInset + segment.nx * lateralInset,
+    y2: to.y - uy * endRadialInset + segment.ny * lateralInset,
+  };
+};
+
+const getLabelTValues = (edgeIndex, edgeCount) => {
+  const preferredT =
+    edgeCount > 1 ? 0.32 + (edgeIndex / (edgeCount - 1)) * 0.36 : 0.5;
+  const candidates = [
+    preferredT,
+    0.5,
+    preferredT - 0.1,
+    preferredT + 0.1,
+    0.38,
+    0.62,
+    0.28,
+    0.72,
+  ];
+  return Array.from(
+    new Set(
+      candidates.map(value => Math.max(0.28, Math.min(0.72, value)).toFixed(3))
+    ),
+    Number
+  );
+};
+
+const buildCurvedSegment = ({
+  segment,
+  shift,
+  edgeIndex = 0,
+  edgeCount = 1,
+}) => {
+  const c1x =
+    segment.x1 + (segment.x2 - segment.x1) * 0.25 + segment.nx * shift;
+  const c1y =
+    segment.y1 + (segment.y2 - segment.y1) * 0.25 + segment.ny * shift;
+  const c2x =
+    segment.x1 + (segment.x2 - segment.x1) * 0.75 + segment.nx * shift;
+  const c2y =
+    segment.y1 + (segment.y2 - segment.y1) * 0.75 + segment.ny * shift;
+  const points = [
+    { x: segment.x1, y: segment.y1 },
+    { x: c1x, y: c1y },
+    { x: c2x, y: c2y },
+    { x: segment.x2, y: segment.y2 },
+  ];
+  const preferredSide = shift >= 0 ? 1 : -1;
+  return {
+    d: `M ${segment.x1} ${segment.y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${segment.x2} ${segment.y2}`,
+    labelOptions: getLabelTValues(edgeIndex, edgeCount).flatMap(t => {
+      const point = cubicBezierPoint(...points, t);
+      const tangent = cubicBezierTangent(...points, t);
+      return [
+        offsetFromTangent(point, tangent, 14, preferredSide),
+        offsetFromTangent(point, tangent, 14, -preferredSide),
+      ];
+    }),
+  };
+};
+
 export const buildEdgePath = ({
   edge,
   from,
@@ -285,6 +387,12 @@ export const buildEdgePath = ({
   nodeRadius,
   edgeIndex = 0,
   edgeCount = 1,
+  parallelOffset = 0,
+  directionOffset = 0,
+  directionCount = 1,
+  pairDirectionMultiplier = 1,
+  pairKey = '',
+  hasOppositeDirections = false,
 }) => {
   if (String(from.id) === String(to.id)) {
     const loopRadius = nodeRadius * 1.5 + edgeIndex * 15;
@@ -296,66 +404,81 @@ export const buildEdgePath = ({
     return { d, labelOptions: [{ x: from.x, y: from.y - loopRadius * 2.2 }] };
   }
   const segment = insetSegment(from, to, edge.directed, nodeRadius);
-  let multiShift = 0;
   if (edgeCount > 1) {
-    const centerIndex = (edgeCount - 1) / 2;
-    const offset = edgeIndex - centerIndex;
-    const directionMultiplier = String(from.id) < String(to.id) ? 1 : -1;
-    multiShift = offset * 25 * directionMultiplier;
+    if (routing === EDGE_ROUTING.bezier) {
+      const curvedOffset = hasOppositeDirections
+        ? directionOffset *
+          getParallelSpacing({
+            count: directionCount,
+            preferredSpacing: CURVED_PARALLEL_SPACING,
+            maxFanShift: MAX_CURVED_FAN_SHIFT,
+          })
+        : parallelOffset *
+          pairDirectionMultiplier *
+          getParallelSpacing({
+            count: edgeCount,
+            preferredSpacing: CURVED_PARALLEL_SPACING,
+            maxFanShift: MAX_CURVED_FAN_SHIFT,
+          });
+      const pairSide = getStableSide(pairKey || edge.id);
+      const baseSide =
+        hasOppositeDirections && edge.directed
+          ? 1
+          : pairSide * pairDirectionMultiplier;
+      const baseShift = Math.max(18, edgeCurvature) * baseSide;
+      const shift =
+        getAvoidanceShift(segment, edge, nodes, baseShift, nodeRadius) +
+        curvedOffset;
+      return buildCurvedSegment({
+        segment: insetParallelSegment({
+          from,
+          to,
+          directed: edge.directed,
+          nodeRadius,
+          shift,
+        }),
+        shift,
+        edgeIndex,
+        edgeCount,
+      });
+    }
+
+    const straightShift =
+      parallelOffset *
+      pairDirectionMultiplier *
+      getParallelSpacing({
+        count: edgeCount,
+        preferredSpacing: STRAIGHT_PARALLEL_SPACING,
+        maxFanShift: MAX_STRAIGHT_FAN_SHIFT,
+      });
+    if (Math.abs(straightShift) > EPSILON) {
+      return buildCurvedSegment({
+        segment: insetParallelSegment({
+          from,
+          to,
+          directed: edge.directed,
+          nodeRadius,
+          shift: straightShift,
+        }),
+        shift: straightShift,
+        edgeIndex,
+        edgeCount,
+      });
+    }
   }
-  if (routing === EDGE_ROUTING.bezier || edgeCount > 1) {
-    const seed = String(edge.id)
-      .split('')
-      .reduce((sum, part) => sum + part.charCodeAt(0), 0);
-    const side = seed % 2 === 0 ? 1 : -1;
+  if (routing === EDGE_ROUTING.bezier) {
+    const side = getStableSide(edge.id);
     const baseShift = Math.max(18, edgeCurvature) * side;
-    const shift =
-      getAvoidanceShift(segment, edge, nodes, baseShift, nodeRadius) +
-      multiShift;
-    const c1x =
-      segment.x1 + (segment.x2 - segment.x1) * 0.25 + segment.nx * shift;
-    const c1y =
-      segment.y1 + (segment.y2 - segment.y1) * 0.25 + segment.ny * shift;
-    const c2x =
-      segment.x1 + (segment.x2 - segment.x1) * 0.75 + segment.nx * shift;
-    const c2y =
-      segment.y1 + (segment.y2 - segment.y1) * 0.75 + segment.ny * shift;
-    const midpoint = cubicBezierPoint(
-      { x: segment.x1, y: segment.y1 },
-      { x: c1x, y: c1y },
-      { x: c2x, y: c2y },
-      { x: segment.x2, y: segment.y2 },
-      0.5
+    const shift = getAvoidanceShift(
+      segment,
+      edge,
+      nodes,
+      baseShift,
+      nodeRadius
     );
-    const tangent = cubicBezierTangent(
-      { x: segment.x1, y: segment.y1 },
-      { x: c1x, y: c1y },
-      { x: c2x, y: c2y },
-      { x: segment.x2, y: segment.y2 },
-      0.5
-    );
-    const preferredSide = shift >= 0 ? 1 : -1;
-    const labelPrimary = offsetFromTangent(
-      midpoint,
-      tangent,
-      14,
-      preferredSide
-    );
-    const labelSecondary = offsetFromTangent(
-      midpoint,
-      tangent,
-      14,
-      -preferredSide
-    );
-    return {
-      d: `M ${segment.x1} ${segment.y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${segment.x2} ${segment.y2}`,
-      labelOptions: [labelPrimary, labelSecondary],
-    };
+    return buildCurvedSegment({ segment, shift });
   }
-  const seed = String(edge.id)
-    .split('')
-    .reduce((sum, part) => sum + part.charCodeAt(0), 0);
-  const side = seed % 2 === 0 ? 1 : -1;
+  const side = getStableSide(edge.id);
   const straightMidpoint = {
     x: (segment.x1 + segment.x2) / 2,
     y: (segment.y1 + segment.y2) / 2,
