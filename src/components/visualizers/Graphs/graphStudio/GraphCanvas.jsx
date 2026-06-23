@@ -640,6 +640,7 @@ const GraphCanvas = ({
     return () => svg.removeEventListener('wheel', handleWheel);
   }, [lockCanvas, viewState, setViewState]);
   const onPointerDownBackground = event => {
+    svgRef.current?.focus();
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
     const local = {
@@ -770,6 +771,7 @@ const GraphCanvas = ({
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
   const handleNodePointerDown = (event, nodeId) => {
+    svgRef.current?.focus();
     if (mode === 'pan') return;
     if (mode === 'draw' || mode === 'add') {
       event.stopPropagation();
@@ -802,10 +804,13 @@ const GraphCanvas = ({
         xmlns="http://www.w3.org/2000/svg"
         ref={svgRef}
         className="h-full w-full"
+        aria-label="Graph canvas"
+        data-frame-navigation-surface="true"
         data-mode={mode}
         data-view-x={viewState.x}
         data-view-y={viewState.y}
         data-view-zoom={viewState.zoom}
+        tabIndex="0"
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

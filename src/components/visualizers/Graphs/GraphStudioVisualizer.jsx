@@ -275,6 +275,44 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     );
     return () => window.clearTimeout(timeout);
   }, [status]);
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      const tagName = String(target?.tagName ?? '').toLowerCase();
+      const editableAncestor = target?.closest?.('[contenteditable]');
+      if (
+        tagName === 'input' ||
+        tagName === 'textarea' ||
+        tagName === 'select' ||
+        target?.isContentEditable ||
+        (editableAncestor &&
+          editableAncestor.getAttribute('contenteditable') !== 'false')
+      ) {
+        return;
+      }
+      if (!target?.closest?.('[data-frame-navigation-surface="true"]')) {
+        return;
+      }
+
+      event.preventDefault();
+      const frameDelta = event.key === 'ArrowLeft' ? -1 : 1;
+      setCurrentFrame(currentFrame + frameDelta);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentFrame, setCurrentFrame]);
   const previousGraph = useMemo(() => {
     if (currentFrame <= 0) return computedGraph;
     return getFrameGraph(currentFrame - 1);
@@ -411,7 +449,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         removeStep(currentFrame);
         setCurrentFrame(Math.max(0, currentFrame - 1));
       },
-      onMoveStep: moveStep,
+      onMoveStep: (fromIndex, toIndex) => {
+        moveStep(fromIndex, toIndex);
+        setCurrentFrame(toIndex);
+      },
       onPlay: togglePlayback,
       isPlaying,
     },
