@@ -1,4 +1,8 @@
 import { EDGE_ROUTING } from '../constants';
+import {
+  DEFAULT_CAPTION_OVERLAY,
+  normalizeCaptionOverlay,
+} from './captionOverlay';
 import { DEFAULT_CUSTOM_LEGEND, normalizeCustomLegend } from './customLegend';
 
 const PROJECT_FORMAT = 'graph-viz-project';
@@ -14,6 +18,7 @@ const DEFAULT_SETTINGS = {
   edgeRouting: EDGE_ROUTING.straight,
   snapEnabled: true,
   showGrid: false,
+  captionOverlay: DEFAULT_CAPTION_OVERLAY,
   customLegend: DEFAULT_CUSTOM_LEGEND,
   lockCanvas: false,
   viewState: null,
@@ -156,6 +161,7 @@ const sanitizeSettings = settings => {
       DEFAULT_SETTINGS.snapEnabled
     ),
     showGrid: booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid),
+    captionOverlay: normalizeCaptionOverlay(input.captionOverlay),
     customLegend,
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),

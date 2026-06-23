@@ -112,6 +112,8 @@ const TimelinePanel = ({
   onFrameChange,
   onStepDurationChange,
   onDescriptionChange,
+  captionEnabled,
+  onCaptionEnabledChange,
   onAddStep,
   onDuplicateStep,
   onDeleteStep,
@@ -302,6 +304,17 @@ const TimelinePanel = ({
               durationMs={steps[currentFrame]?.durationMs ?? 600}
               onCommit={value => onStepDurationChange(currentFrame, value)}
             />
+          </label>
+          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
+            <input
+              aria-label="Show frame caption"
+              checked={Boolean(captionEnabled)}
+              className="h-3.5 w-3.5 accent-[#B45309]"
+              data-testid="frame-caption-toggle"
+              onChange={event => onCaptionEnabledChange?.(event.target.checked)}
+              type="checkbox"
+            />
+            <span>Show frame caption</span>
           </label>
         </div>
       </div>

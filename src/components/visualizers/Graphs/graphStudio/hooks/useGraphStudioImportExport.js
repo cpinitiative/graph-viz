@@ -5,6 +5,7 @@ import {
   parseEdgeListText,
   runScriptTrace,
 } from '../graphStudioUtils';
+import { normalizeCaptionOverlay } from '../lib/captionOverlay';
 import { normalizeCustomLegend } from '../lib/customLegend';
 import {
   clampExportFrameRange,
@@ -39,6 +40,8 @@ export const useGraphStudioImportExport = ({
   setSnapEnabled,
   showGrid,
   setShowGrid,
+  captionOverlay,
+  setCaptionOverlay,
   customLegend,
   setCustomLegend,
   lockCanvas,
@@ -69,8 +72,6 @@ export const useGraphStudioImportExport = ({
   const [scriptError, setScriptError] = useState('');
   const isScriptRunningRef = useRef(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
-  const [exportVideoLabelPos, setExportVideoLabelPos] =
-    useState('bottom-center');
   const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
   const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.viewport);
   const [exportFrameRangeState, setExportFrameRangeState] = useState(() => ({
@@ -146,6 +147,7 @@ export const useGraphStudioImportExport = ({
         edgeRouting,
         snapEnabled,
         showGrid,
+        captionOverlay: normalizeCaptionOverlay(captionOverlay),
         customLegend: normalizeCustomLegend(customLegend),
         lockCanvas,
         viewState,
@@ -157,6 +159,7 @@ export const useGraphStudioImportExport = ({
   }, [
     baseGraph,
     currentFrame,
+    captionOverlay,
     customLegend,
     edgeRouting,
     globalSettings,
@@ -203,6 +206,7 @@ export const useGraphStudioImportExport = ({
       setEdgeRouting(project.settings.edgeRouting);
       setSnapEnabled(project.settings.snapEnabled);
       setShowGrid(project.settings.showGrid);
+      setCaptionOverlay(project.settings.captionOverlay);
       setCustomLegend(project.settings.customLegend);
       setLockCanvas(project.settings.lockCanvas);
       setGlobalSettings(project.settings.globalSettings);
@@ -227,6 +231,7 @@ export const useGraphStudioImportExport = ({
       setLockCanvas,
       setMode,
       setShowGrid,
+      setCaptionOverlay,
       setCustomLegend,
       setSnapEnabled,
       setStatus,
@@ -287,34 +292,30 @@ export const useGraphStudioImportExport = ({
     }
   }, [importProjectJsonText, projectJsonPasteText, setStatus]);
 
-  const exportVideo = useCallback(
-    async labelPos => {
-      const frameIndexes = getExportFrameIndexes();
-      if (!frameIndexes.length) {
-        setStatus('Export failed: no timeline frames to export');
-        return;
-      }
+  const exportVideo = useCallback(async () => {
+    const frameIndexes = getExportFrameIndexes();
+    if (!frameIndexes.length) {
+      setStatus('Export failed: no timeline frames to export');
+      return;
+    }
 
-      const originalFrame = currentFrame;
-      setStatus('Exporting video...');
-      try {
-        await exportTimelineVideo({
-          steps,
-          setCurrentFrame,
-          labelPos,
-          frameIndexes,
-        });
-        setStatus('Video exported successfully');
-      } catch (error) {
-        console.error(error);
-        setStatus(`Export failed: ${error.message}`);
-      } finally {
-        setCurrentFrame(originalFrame);
-        await waitForFrameRender();
-      }
-    },
-    [currentFrame, getExportFrameIndexes, setCurrentFrame, setStatus, steps]
-  );
+    const originalFrame = currentFrame;
+    setStatus('Exporting video...');
+    try {
+      await exportTimelineVideo({
+        steps,
+        setCurrentFrame,
+        frameIndexes,
+      });
+      setStatus('Video exported successfully');
+    } catch (error) {
+      console.error(error);
+      setStatus(`Export failed: ${error.message}`);
+    } finally {
+      setCurrentFrame(originalFrame);
+      await waitForFrameRender();
+    }
+  }, [currentFrame, getExportFrameIndexes, setCurrentFrame, setStatus, steps]);
 
   const exportSlideshow = useCallback(async () => {
     if (!steps.length) {
@@ -424,8 +425,8 @@ export const useGraphStudioImportExport = ({
 
   const confirmExportVideo = useCallback(() => {
     setIsExportVideoOpen(false);
-    exportVideo(exportVideoLabelPos);
-  }, [exportVideo, exportVideoLabelPos]);
+    exportVideo();
+  }, [exportVideo]);
 
   return {
     isParserOpen,
@@ -447,8 +448,6 @@ export const useGraphStudioImportExport = ({
     scriptError,
     runScript,
     isExportVideoOpen,
-    exportVideoLabelPos,
-    setExportVideoLabelPos,
     exportVideo,
     exportSlideshow,
     exportSvg,

@@ -91,6 +91,7 @@ export const getFitContentViewBox = ({ svgEl, aspectRatio }) => {
   const exportElements = [
     svgEl.querySelector('[data-export-content="true"]'),
     svgEl.querySelector('[data-testid="custom-export-legend"]'),
+    svgEl.querySelector('[data-testid="frame-caption-overlay"]'),
   ].filter(Boolean);
 
   const boundsList = exportElements.flatMap(element => {

@@ -1,22 +1,6 @@
-import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
-const LABEL_POSITIONS = [
-  { value: 'top-left', label: 'Top Left' },
-  { value: 'top-center', label: 'Top Center' },
-  { value: 'top-right', label: 'Top Right' },
-  { value: 'bottom-left', label: 'Bottom Left' },
-  { value: 'bottom-center', label: 'Bottom Center' },
-  { value: 'bottom-right', label: 'Bottom Right' },
-];
-
-const ExportVideoModal = ({
-  open,
-  labelPos,
-  onLabelPosChange,
-  onClose,
-  onExport,
-}) => {
+const ExportVideoModal = ({ open, onClose, onExport }) => {
   if (!open) return null;
 
   return (
@@ -30,24 +14,9 @@ const ExportVideoModal = ({
         </div>
         <div className="p-4">
           <p className="mb-4 text-xs text-on-surface dark:text-dark-on-surface">
-            This will generate a static video of the timeline steps.
+            This will generate a static video of the timeline steps. Enabled
+            frame captions use their canvas position.
           </p>
-          <div className="space-y-2">
-            <label className="block text-xs font-medium text-on-surface dark:text-dark-on-surface">
-              Label Position
-            </label>
-            <NativeSelect
-              value={labelPos}
-              onChange={event => onLabelPosChange(event.target.value)}
-              size="regular"
-            >
-              {LABEL_POSITIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
         </div>
         <div className="flex flex-col justify-end gap-2 border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900 sm:flex-row">
           <button

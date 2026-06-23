@@ -12,6 +12,7 @@ import {
   toWorld,
 } from './graphCanvasUtils';
 import { edgeBetweenSelected } from './graphStudioUtils';
+import { normalizeCaptionOverlay } from './lib/captionOverlay';
 import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 
@@ -41,6 +42,26 @@ const LEGEND_PALETTES = {
     nodeStroke: '#CBD5E1',
   },
 };
+const CAPTION_PALETTES = {
+  light: {
+    background: '#0F2747',
+    border: '#173A68',
+    text: '#FFFFFF',
+  },
+  dark: {
+    background: '#F8F9FA',
+    border: '#94A3B8',
+    text: '#0F172A',
+  },
+};
+const CAPTION_FONT_SIZE = 12;
+const CAPTION_LINE_HEIGHT = 17;
+const CAPTION_HORIZONTAL_PADDING = 14;
+const CAPTION_VERTICAL_PADDING = 10;
+const CAPTION_MIN_WIDTH = 120;
+const CAPTION_MAX_WIDTH = 520;
+const CAPTION_MAX_LINES = 3;
+const CAPTION_CHARACTER_WIDTH = 6.4;
 
 const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
   if (selected || multiSelected) {
@@ -134,8 +155,8 @@ const getLegendOrigin = ({
   const maxY = Math.max(0, canvasSize.height - boxHeight);
   const leftX = Math.min(margin, maxX);
   const topY = Math.min(margin, maxY);
-  const rightX = Math.max(0, maxX - margin);
-  const bottomY = Math.max(0, maxY - margin);
+  const rightX = Math.max(leftX, maxX - margin);
+  const bottomY = Math.max(topY, maxY - margin);
   const resolvedPosition = resolveLegendPosition(position);
 
   if (resolvedPosition === 'custom') {
@@ -410,6 +431,206 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
   );
 };
 
+const truncateCaptionLine = (line, maxCharacters) => {
+  if (line.length <= maxCharacters) return line;
+  return `${line.slice(0, Math.max(1, maxCharacters - 3)).trimEnd()}...`;
+};
+
+const wrapCaptionText = (value, maxCharacters) => {
+  const words = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+  if (!words.length) return [];
+
+  const lines = [];
+  let currentLine = '';
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (candidate.length <= maxCharacters) {
+      currentLine = candidate;
+      continue;
+    }
+    if (currentLine) lines.push(currentLine);
+    currentLine = word;
+  }
+  if (currentLine) lines.push(currentLine);
+
+  if (lines.length <= CAPTION_MAX_LINES) {
+    return lines.map(line => truncateCaptionLine(line, maxCharacters));
+  }
+
+  return [
+    ...lines.slice(0, CAPTION_MAX_LINES - 1),
+    truncateCaptionLine(
+      lines.slice(CAPTION_MAX_LINES - 1).join(' '),
+      maxCharacters
+    ),
+  ];
+};
+
+const FrameCaption = ({
+  captionOverlay,
+  captionText,
+  setCaptionOverlay,
+  canvasSize,
+  svgRef,
+}) => {
+  const { theme } = useTheme();
+  const caption = normalizeCaptionOverlay(captionOverlay);
+  const text = String(captionText ?? '').trim();
+  const dragStateRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  if (
+    !caption.enabled ||
+    !text ||
+    canvasSize.width <= 0 ||
+    canvasSize.height <= 0
+  ) {
+    return null;
+  }
+
+  const palette = CAPTION_PALETTES[theme] ?? CAPTION_PALETTES.light;
+  const margin = Math.min(
+    16,
+    Math.max(
+      4,
+      Math.floor(Math.min(canvasSize.width, canvasSize.height) * 0.04)
+    )
+  );
+  const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
+  const contentMaxWidth = Math.max(
+    1,
+    Math.min(CAPTION_MAX_WIDTH, maxBoxWidth) - CAPTION_HORIZONTAL_PADDING * 2
+  );
+  const maxCharacters = Math.max(
+    8,
+    Math.floor(contentMaxWidth / CAPTION_CHARACTER_WIDTH)
+  );
+  const lines = wrapCaptionText(text, maxCharacters);
+  const estimatedTextWidth =
+    Math.max(...lines.map(line => line.length), 1) * CAPTION_CHARACTER_WIDTH;
+  const boxWidth = Math.min(
+    maxBoxWidth,
+    Math.max(
+      CAPTION_MIN_WIDTH,
+      estimatedTextWidth + CAPTION_HORIZONTAL_PADDING * 2
+    )
+  );
+  const boxHeight =
+    CAPTION_VERTICAL_PADDING * 2 + lines.length * CAPTION_LINE_HEIGHT;
+  const maxX = Math.max(0, canvasSize.width - boxWidth);
+  const maxY = Math.max(0, canvasSize.height - boxHeight);
+  const leftX = Math.min(margin, maxX);
+  const topY = Math.min(margin, maxY);
+  const rightX = Math.max(0, maxX - margin);
+  const bottomY = Math.max(0, maxY - margin);
+  const x = leftX + (rightX - leftX) * caption.position.x;
+  const y = topY + (bottomY - topY) * caption.position.y;
+
+  const updatePosition = event => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const svgBounds = svgRef.current?.getBoundingClientRect();
+    if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
+    const scaleX = canvasSize.width / svgBounds.width;
+    const scaleY = canvasSize.height / svgBounds.height;
+    const nextX =
+      dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
+    const nextY =
+      dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
+    const normalizedX =
+      rightX > leftX
+        ? Math.max(0, Math.min(1, (nextX - leftX) / (rightX - leftX)))
+        : 0;
+    const normalizedY =
+      bottomY > topY
+        ? Math.max(0, Math.min(1, (nextY - topY) / (bottomY - topY)))
+        : 0;
+    setCaptionOverlay?.(prev => ({
+      ...normalizeCaptionOverlay(prev),
+      position: {
+        x: normalizedX,
+        y: normalizedY,
+      },
+    }));
+  };
+  const finishDragging = event => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragStateRef.current = null;
+    setIsDragging(false);
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  return (
+    <g
+      aria-label="Frame caption"
+      data-caption-position-x={caption.position.x}
+      data-caption-position-y={caption.position.y}
+      data-caption-theme={theme}
+      data-testid="frame-caption-overlay"
+      pointerEvents="all"
+      transform={`translate(${x} ${y})`}
+      onPointerDown={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        dragStateRef.current = {
+          pointerId: event.pointerId,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          originX: x,
+          originY: y,
+        };
+        setIsDragging(true);
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerMove={updatePosition}
+      onPointerUp={finishDragging}
+      onPointerCancel={finishDragging}
+      style={{
+        cursor: isDragging ? 'grabbing' : 'grab',
+        touchAction: 'none',
+      }}
+    >
+      <rect
+        x="0"
+        y="0"
+        width={boxWidth}
+        height={boxHeight}
+        fill={palette.background}
+        fillOpacity="0.94"
+        stroke={palette.border}
+        strokeWidth="1"
+      />
+      <text
+        x={CAPTION_HORIZONTAL_PADDING}
+        y={CAPTION_VERTICAL_PADDING + CAPTION_FONT_SIZE}
+        fill={palette.text}
+        fontFamily="Arial, sans-serif"
+        fontSize={CAPTION_FONT_SIZE}
+        fontWeight="600"
+      >
+        {lines.map((line, index) => (
+          <tspan
+            key={`${line}-${index}`}
+            x={CAPTION_HORIZONTAL_PADDING}
+            dy={index === 0 ? 0 : CAPTION_LINE_HEIGHT}
+          >
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
 const GraphCanvas = ({
   graph,
   diff,
@@ -420,6 +641,9 @@ const GraphCanvas = ({
   viewState,
   setViewState,
   showGrid,
+  captionOverlay,
+  captionText,
+  setCaptionOverlay,
   customLegend,
   setCustomLegend,
   snapEnabled,
@@ -970,6 +1194,13 @@ const GraphCanvas = ({
         <Legend
           customLegend={customLegend}
           setCustomLegend={setCustomLegend}
+          canvasSize={canvasSize}
+          svgRef={svgRef}
+        />
+        <FrameCaption
+          captionOverlay={captionOverlay}
+          captionText={captionText}
+          setCaptionOverlay={setCaptionOverlay}
           canvasSize={canvasSize}
           svgRef={svgRef}
         />

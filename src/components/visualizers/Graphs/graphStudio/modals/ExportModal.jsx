@@ -30,7 +30,7 @@ const primaryActionClass =
 const numberInputClass =
   'h-10 w-full border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-sm font-medium text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:disabled:bg-[#0F172A]';
 
-const ExportPreviewRenderer = ({ graph, viewport, canvas }) => {
+const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
   if (!graph || viewport.width <= 0 || viewport.height <= 0) return null;
 
   return (
@@ -49,6 +49,9 @@ const ExportPreviewRenderer = ({ graph, viewport, canvas }) => {
         viewState={canvas?.viewState ?? { x: 0, y: 0, zoom: 1 }}
         setViewState={noop}
         showGrid={Boolean(canvas?.showGrid)}
+        captionOverlay={canvas?.captionOverlay}
+        captionText={captionText}
+        setCaptionOverlay={noop}
         customLegend={canvas?.customLegend}
         setCustomLegend={noop}
         snapEnabled={false}
@@ -139,6 +142,8 @@ const ExportModal = ({
     () => getFrameGraph?.(previewFrameIndex) ?? null,
     [getFrameGraph, previewFrameIndex]
   );
+  const selectedStep = steps[previewFrameIndex];
+  const previewCaptionText = selectedStep?.description ?? '';
   const previewRenderKey = useMemo(
     () =>
       JSON.stringify({
@@ -146,6 +151,8 @@ const ExportModal = ({
         graph: previewGraph,
         viewState: previewCanvas?.viewState,
         showGrid: Boolean(previewCanvas?.showGrid),
+        captionOverlay: previewCanvas?.captionOverlay,
+        captionText: previewCaptionText,
         customLegend: previewCanvas?.customLegend,
         edgeRouting: previewCanvas?.edgeRouting,
         edgeCurvature: previewCanvas?.edgeCurvature,
@@ -153,6 +160,7 @@ const ExportModal = ({
         edgeWidth: previewCanvas?.edgeWidth,
       }),
     [
+      previewCanvas?.captionOverlay,
       previewCanvas?.customLegend,
       previewCanvas?.edgeCurvature,
       previewCanvas?.edgeRouting,
@@ -161,10 +169,10 @@ const ExportModal = ({
       previewCanvas?.showGrid,
       previewCanvas?.viewState,
       previewFrameIndex,
+      previewCaptionText,
       previewGraph,
     ]
   );
-  const selectedStep = steps[previewFrameIndex];
   const isCustomFrameRange = frameRange.mode === 'range';
 
   useEffect(() => {
@@ -688,6 +696,7 @@ const ExportModal = ({
 
       <ExportPreviewRenderer
         graph={previewGraph}
+        captionText={previewCaptionText}
         viewport={editorViewport}
         canvas={previewCanvas}
       />
