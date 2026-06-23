@@ -121,6 +121,27 @@ const dragLegend = async (page, { dx = -160, dy = -100 } = {}) => {
   };
 };
 
+const dragCaption = async (page, { dx = 160, dy = -100 } = {}) => {
+  const caption = page.getByTestId('frame-caption-overlay');
+  await expect(caption).toBeVisible();
+  const box = await caption.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    box.x + box.width / 2 + dx,
+    box.y + box.height / 2 + dy,
+    { steps: 8 }
+  );
+  await page.mouse.up();
+
+  return {
+    x: Number(await caption.getAttribute('data-caption-position-x')),
+    y: Number(await caption.getAttribute('data-caption-position-y')),
+  };
+};
+
 const setRangeValue = async (page, label, value) => {
   await page.getByLabel(label).evaluate((input, nextValue) => {
     input.value = String(nextValue);
@@ -341,6 +362,10 @@ const pastedProject = {
     edgeRouting: 'straight',
     snapEnabled: true,
     showGrid: false,
+    captionOverlay: {
+      enabled: true,
+      position: { x: 0.2, y: 0.7 },
+    },
     lockCanvas: true,
     viewState: null,
     globalSettings: {
@@ -733,6 +758,101 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('renders, moves, exports, and persists frame captions', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const captionToggle = page.getByLabel('Show frame caption');
+    const caption = page.getByTestId('frame-caption-overlay');
+    const frameDescription = page.getByLabel('Frame Description');
+    const frameCards = page.getByTestId('timeline-frame-card');
+
+    await expect(captionToggle).not.toBeChecked();
+    await expect(caption).toHaveCount(0);
+
+    await captionToggle.check();
+    await expect(caption).toBeVisible();
+    await expect(caption).toContainText('Start BFS at A');
+    await expect(caption).toHaveAttribute('data-caption-theme', 'light');
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(caption).toHaveAttribute('data-caption-theme', 'dark');
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(caption).toHaveAttribute('data-caption-theme', 'light');
+
+    await frameDescription.fill('Explain the active frontier');
+    await expect(caption).toContainText('Explain the active frontier');
+
+    const draggedPosition = await dragCaption(page);
+    expect(draggedPosition.x).toBeGreaterThan(0);
+    expect(draggedPosition.y).toBeLessThan(1);
+
+    await frameCards.nth(1).click();
+    await expect(caption).toContainText('Queue B and C');
+    expect(
+      Number(await caption.getAttribute('data-caption-position-x'))
+    ).toBeCloseTo(draggedPosition.x, 5);
+    expect(
+      Number(await caption.getAttribute('data-caption-position-y'))
+    ).toBeCloseTo(draggedPosition.y, 5);
+
+    const exportMenu = await openExportMenu(page);
+    const previewImage = await expectExportPreview(page);
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('Queue B and C');
+    const previewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(previewSvgText).toContain('data-testid="frame-caption-overlay"');
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const svgText = await fs.readFile(svgPath, 'utf8');
+    expect(svgText).toContain('data-testid="frame-caption-overlay"');
+    expect(svgText).toContain('Queue B and C');
+
+    const projectDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const project = await readJsonDownload(projectDownload);
+    expect(project.settings.captionOverlay.enabled).toBe(true);
+    expect(project.settings.captionOverlay.position.x).toBeCloseTo(
+      draggedPosition.x,
+      5
+    );
+    expect(project.settings.captionOverlay.position.y).toBeCloseTo(
+      draggedPosition.y,
+      5
+    );
+    await closeExportMenu(page);
+
+    await frameDescription.fill('');
+    await expect(caption).toHaveCount(0);
+    await frameDescription.fill('Restored caption');
+    await expect(caption).toContainText('Restored caption');
+    await captionToggle.uncheck();
+    await expect(caption).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
   test('loads Script Mode examples without auto-running them', async ({
     page,
   }) => {
@@ -1003,6 +1123,8 @@ while (true) {}
     await expect(
       page.getByPlaceholder('Enter a description for this frame...')
     ).toHaveValue('Imported fixture frame two');
+    await expect(page.getByLabel('Show frame caption')).not.toBeChecked();
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
@@ -1248,6 +1370,18 @@ while (true) {}
     await expect(
       graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
     ).toBeVisible();
+    await expect(page.getByLabel('Show frame caption')).toBeChecked();
+    await expect(page.getByTestId('frame-caption-overlay')).toContainText(
+      'Pasted JSON import test'
+    );
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+      'data-caption-position-x',
+      '0.2'
+    );
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+      'data-caption-position-y',
+      '0.7'
+    );
 
     expect(errors).toEqual([]);
   });

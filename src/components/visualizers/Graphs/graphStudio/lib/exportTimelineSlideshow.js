@@ -9,18 +9,15 @@ import {
 const SLIDE_WIDTH = 13.333;
 const SLIDE_HEIGHT = 7.5;
 const IMAGE_MARGIN = 0.08;
-const CAPTION_HEIGHT = 0.34;
-const CAPTION_Y = 7.08;
 
 const getDatedFilename = () => {
   const date = new Date().toISOString().slice(0, 10);
   return `graph-viz-slideshow-${date}.pptx`;
 };
 
-const getFittedImageRect = ({ imageWidth, imageHeight, hasCaption }) => {
+const getFittedImageRect = ({ imageWidth, imageHeight }) => {
   const availableWidth = SLIDE_WIDTH - IMAGE_MARGIN * 2;
-  const availableHeight =
-    SLIDE_HEIGHT - IMAGE_MARGIN * 2 - (hasCaption ? CAPTION_HEIGHT : 0);
+  const availableHeight = SLIDE_HEIGHT - IMAGE_MARGIN * 2;
   const imageRatio = imageWidth / imageHeight;
   const availableRatio = availableWidth / availableHeight;
 
@@ -43,23 +40,6 @@ const getFittedImageRect = ({ imageWidth, imageHeight, hasCaption }) => {
     w: width,
     h: height,
   };
-};
-
-const addCaption = ({ slide, text }) => {
-  slide.addText(text, {
-    x: 0.32,
-    y: CAPTION_Y - 0.02,
-    w: SLIDE_WIDTH - 0.64,
-    h: 0.3,
-    fontFace: 'Arial',
-    fontSize: 8,
-    color: '4B5563',
-    fill: { color: 'FFFFFF', transparency: 5 },
-    line: { color: 'FFFFFF', transparency: 100 },
-    margin: 0,
-    breakLine: false,
-    fit: 'shrink',
-  });
 };
 
 /**
@@ -116,7 +96,6 @@ export async function exportTimelineSlideshow({
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      const caption = String(steps[i]?.description ?? '').trim();
       const slide = pptx.addSlide();
       slide.background = { color: 'FFFFFF' };
       slide.addImage({
@@ -124,10 +103,8 @@ export async function exportTimelineSlideshow({
         ...getFittedImageRect({
           imageWidth: canvas.width,
           imageHeight: canvas.height,
-          hasCaption: Boolean(caption),
         }),
       });
-      if (caption) addCaption({ slide, text: caption });
     }
   } finally {
     setCurrentFrame(currentFrame);

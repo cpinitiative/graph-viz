@@ -32,7 +32,6 @@ const withDefaultColorSpace = meta => {
 export async function exportTimelineVideo({
   steps,
   setCurrentFrame,
-  labelPos,
   frameIndexes,
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
 }) {
@@ -96,28 +95,6 @@ export async function exportTimelineVideo({
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      const desc = steps[i].description;
-      if (desc) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = '24px sans-serif';
-        const textMetrics = ctx.measureText(desc);
-        const padding = 10;
-        const textWidth = textMetrics.width;
-        const textHeight = 24;
-        let x;
-        let y;
-        if (labelPos.includes('left')) x = 20;
-        else if (labelPos.includes('right'))
-          x = canvas.width - textWidth - 20 - padding * 2;
-        else x = (canvas.width - textWidth) / 2 - padding;
-        if (labelPos.includes('top')) y = 20;
-        else if (labelPos.includes('bottom'))
-          y = canvas.height - textHeight - 20 - padding * 2;
-        else y = (canvas.height - textHeight) / 2 - padding;
-        ctx.fillRect(x, y, textWidth + padding * 2, textHeight + padding * 2);
-        ctx.fillStyle = '#000000';
-        ctx.fillText(desc, x + padding, y + textHeight + padding - 4);
-      }
       const frame = new VideoFrame(canvas, {
         timestamp: (frameIndex * 1000000) / fps,
       });

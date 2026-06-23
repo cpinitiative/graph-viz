@@ -184,8 +184,6 @@ const ModalStack = ({
     />
     <ExportVideoModal
       open={modals.exportVideo.open}
-      labelPos={modals.exportVideo.labelPos}
-      onLabelPosChange={modals.exportVideo.onLabelPosChange}
       onClose={modals.exportVideo.onClose}
       onExport={modals.exportVideo.onExport}
     />

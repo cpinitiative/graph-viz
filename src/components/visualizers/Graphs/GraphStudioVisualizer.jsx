@@ -19,6 +19,10 @@ import {
 import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
 import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
 import {
+  DEFAULT_CAPTION_OVERLAY,
+  normalizeCaptionOverlay,
+} from './graphStudio/lib/captionOverlay';
+import {
   DEFAULT_CUSTOM_LEGEND,
   normalizeCustomLegend,
 } from './graphStudio/lib/customLegend';
@@ -68,6 +72,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
+  const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const {
@@ -201,8 +206,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     scriptError,
     runScript,
     isExportVideoOpen,
-    exportVideoLabelPos,
-    setExportVideoLabelPos,
     exportText,
     exportProject,
     exportSlideshow,
@@ -231,6 +234,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSnapEnabled,
     showGrid,
     setShowGrid,
+    captionOverlay,
+    setCaptionOverlay,
     customLegend,
     setCustomLegend,
     lockCanvas,
@@ -411,6 +416,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodePointerUp,
       onNodeClickForDraw,
       onCanvasAddNode: addNodeAt,
+      captionOverlay,
+      setCaptionOverlay,
+      captionText: steps[currentFrame]?.description ?? '',
     },
     property: {
       selectedNode,
@@ -436,6 +444,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
         updateStep(index, 'description', value),
+      captionEnabled: normalizeCaptionOverlay(captionOverlay).enabled,
+      onCaptionEnabledChange: enabled =>
+        setCaptionOverlay(prev => ({
+          ...normalizeCaptionOverlay(prev),
+          enabled,
+        })),
       onAddStep: () => {
         addStep(currentFrame);
         setCurrentFrame(currentFrame + 1, frameCount + 1);
@@ -482,8 +496,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       },
       exportVideo: {
         open: isExportVideoOpen,
-        labelPos: exportVideoLabelPos,
-        onLabelPosChange: setExportVideoLabelPos,
         onClose: closeExportVideoModal,
         onExport: confirmExportVideo,
       },
