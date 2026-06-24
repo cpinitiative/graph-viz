@@ -6,6 +6,7 @@ import {
 } from '../lib/exportFrameRange';
 import {
   getGraphSvgElement,
+  IMAGE_FRAMING,
   serializeCurrentFrameSvg,
   waitForFrameRender,
 } from '../lib/timelineFrameCapture';
@@ -20,6 +21,11 @@ const EMPTY_DIFF = {
 const EMPTY_SELECTION = new Set();
 const noop = () => {};
 const PREVIEW_UPDATE_DELAY_MS = 400;
+const IMAGE_FRAMING_LABELS = {
+  [IMAGE_FRAMING.viewport]: 'Viewport',
+  [IMAGE_FRAMING.fit]: 'Fit graph',
+  [IMAGE_FRAMING.slide]: 'Slide 16:9',
+};
 
 const sectionClass =
   'space-y-4 border-b border-[#D7DEE8] bg-[#FFFFFF] p-5 last:border-b-0 dark:border-[#334155] dark:bg-[#111827]';
@@ -385,7 +391,8 @@ const ExportModal = ({
                 </h3>
               </div>
               <div className="border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#475569] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]">
-                {imageFraming === 'fit' ? 'Fit graph' : 'Viewport'}
+                {IMAGE_FRAMING_LABELS[imageFraming] ??
+                  IMAGE_FRAMING_LABELS[IMAGE_FRAMING.viewport]}
               </div>
             </div>
 
@@ -427,8 +434,8 @@ const ExportModal = ({
               )}
             </div>
             <p className="mt-3 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-              PNG/SVG export the current editor frame. Use the main timeline to
-              change it.
+              PNG/SVG use the selected image framing. Slideshow exports render
+              into a 16:9 slide frame.
             </p>
 
             <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
@@ -643,8 +650,9 @@ const ExportModal = ({
                     }
                     size="regular"
                   >
-                    <option value="viewport">Viewport</option>
-                    <option value="fit">Fit graph</option>
+                    <option value={IMAGE_FRAMING.viewport}>Viewport</option>
+                    <option value={IMAGE_FRAMING.fit}>Fit graph</option>
+                    <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
                   </NativeSelect>
                 </label>
               </div>

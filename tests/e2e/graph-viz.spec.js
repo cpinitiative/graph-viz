@@ -174,6 +174,23 @@ const readJsonDownload = async download => {
   return JSON.parse(await fs.readFile(path, 'utf8'));
 };
 
+const getSvgRootAttribute = (svgText, name) => {
+  const match = svgText.match(new RegExp(`\\s${name}="([^"]+)"`));
+  return match?.[1] ?? null;
+};
+
+const expectSlideFramedSvg = svgText => {
+  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
+  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
+  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+  const viewBoxText = getSvgRootAttribute(svgText, 'viewBox');
+  expect(viewBoxText).not.toBeNull();
+  const viewBox = viewBoxText.split(/\s+/).map(Number);
+  expect(viewBox).toHaveLength(4);
+  expect(viewBox.every(Number.isFinite)).toBe(true);
+  expect(viewBox[2] / viewBox[3]).toBeCloseTo(1040 / 585, 3);
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   const modal = page.getByTestId('custom-legend-modal');
@@ -1330,7 +1347,7 @@ while (true) {}
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
-      'PNG/SVG export the current editor frame. Use the main timeline to change it.'
+      'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
     );
 
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
@@ -1341,6 +1358,22 @@ while (true) {}
     await expect
       .poll(() => previewImage.getAttribute('src'))
       .not.toBe(viewportPreviewUrl);
+
+    await exportMenu.getByLabel('Image Framing').selectOption('slide');
+    await expect(exportMenu.getByLabel('Image Framing')).toHaveValue('slide');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'slide');
+    await expectExportPreview(page);
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('data-export-framing="slide"');
+    const slidePreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expectSlideFramedSvg(slidePreviewSvgText);
 
     expect(errors).toEqual([]);
   });
@@ -2097,6 +2130,7 @@ api.edge('e0', '#f59e0b');
     const imageFramingSelect = page.getByTestId('image-framing-select');
     await expect(pngScaleSelect).toHaveValue('2');
     await expect(imageFramingSelect).toHaveValue('viewport');
+    await expect(imageFramingSelect).toContainText('Slide 16:9');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
@@ -2203,6 +2237,39 @@ api.edge('e0', '#f59e0b');
       'transform',
       graphTransformBeforeFitExport
     );
+
+    await imageFramingSelect.selectOption('slide');
+    await expect(imageFramingSelect).toHaveValue('slide');
+    await expect(page.getByTestId('export-preview-panel')).toHaveAttribute(
+      'data-preview-framing',
+      'slide'
+    );
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('data-export-framing="slide"');
+    const slidePreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expectSlideFramedSvg(slidePreviewSvgText);
+    const slideSvgDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const slideSvgPath = await slideSvgDownload.path();
+    expect(slideSvgPath).not.toBeNull();
+    expectSlideFramedSvg(await fs.readFile(slideSvgPath, 'utf8'));
+    const slidePngDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+    expect(await readPngDimensions(slidePngDownload)).toEqual({
+      width: 3120,
+      height: 1755,
+    });
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();

@@ -43,6 +43,11 @@ const getFittedImageRect = ({ imageWidth, imageHeight }) => {
   };
 };
 
+const getSlideshowFramingMode = framingMode =>
+  framingMode === IMAGE_FRAMING.viewport
+    ? IMAGE_FRAMING.viewport
+    : IMAGE_FRAMING.slide;
+
 /**
  * Renders each timeline step as a raster image slide.
  * Depends on GraphCanvas exposing `id="graph-studio-canvas-svg"`.
@@ -82,7 +87,10 @@ export async function exportTimelineSlideshow({
   };
 
   const svgEl = getGraphSvgElement(svgElementId);
-  const { canvas, ctx } = createCaptureCanvas(svgEl);
+  const slideshowFramingMode = getSlideshowFramingMode(framingMode);
+  const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, {
+    framingMode: IMAGE_FRAMING.slide,
+  });
 
   try {
     for (const i of selectedFrameIndexes) {
@@ -93,7 +101,9 @@ export async function exportTimelineSlideshow({
         svgEl,
         width: canvas.width,
         height: canvas.height,
-        framingMode,
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+        framingMode: slideshowFramingMode,
       });
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
