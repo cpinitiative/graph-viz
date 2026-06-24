@@ -1,6 +1,7 @@
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
 const SIZE_CLASSES = {
+  dense: 'h-7 py-1 text-xs',
   compact: 'h-9 py-1.5 text-xs',
   regular: 'h-10 py-2 text-sm',
 };

@@ -315,9 +315,9 @@ const GraphStudioLayout = ({
         </Panel>
         <PanelResizeHandle className="graphstudio-resize-horizontal h-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50" />
         <Panel
-          defaultSize="146px"
-          minSize="140px"
-          maxSize="220px"
+          defaultSize="164px"
+          minSize="160px"
+          maxSize="240px"
           className="min-h-0"
         >
           <TimelinePanel {...timeline} />
