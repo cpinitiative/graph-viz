@@ -635,6 +635,9 @@ while (true) {}
     const timelinePanel = page.getByTestId('timeline-panel');
     const frameDescription = page.getByLabel('Frame Description');
     const durationInput = page.getByTestId('frame-duration-input');
+    const captionToggle = page.getByLabel('Show caption');
+    const captionStyleSelect = page.getByLabel('Caption Style');
+    const captionSizeSelect = page.getByLabel('Caption Size');
     const initialFrameCount = await cards.count();
 
     await cards.last().click();
@@ -717,19 +720,55 @@ while (true) {}
     await expect(frameCounter).toHaveText(frameBeforeInputArrows);
 
     const descriptionRow = page.getByTestId('frame-description-row');
+    const detailControls = page.getByTestId('frame-detail-controls');
     await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Timing & Caption', { exact: true })
+    ).toBeVisible();
+    await expect(frameDescription).toBeVisible();
+    await expect(durationInput).toBeVisible();
+    await expect(captionToggle).toBeVisible();
+    await expect(captionStyleSelect).toBeVisible();
+    await expect(captionSizeSelect).toBeVisible();
     await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
     await expect(frameCounter).toHaveText(
       `${initialFrameCount + 2} / ${initialFrameCount + 3}`
     );
     const descriptionBox = await descriptionRow.boundingBox();
+    const detailControlsBox = await detailControls.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
     const canvasLayoutBox = await graphCanvas(page).boundingBox();
     const visibleFrameBox = await cards.first().boundingBox();
     expect(descriptionBox).not.toBeNull();
+    expect(detailControlsBox).not.toBeNull();
     expect(timelineBox).not.toBeNull();
     expect(canvasLayoutBox).not.toBeNull();
     expect(visibleFrameBox).not.toBeNull();
+
+    const expectBoxInsideTimeline = box => {
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(timelineBox.x - 1);
+      expect(box.y).toBeGreaterThanOrEqual(timelineBox.y - 1);
+      expect(box.x + box.width).toBeLessThanOrEqual(
+        timelineBox.x + timelineBox.width + 1
+      );
+      expect(box.y + box.height).toBeLessThanOrEqual(
+        timelineBox.y + timelineBox.height + 1
+      );
+    };
+
+    expectBoxInsideTimeline(descriptionBox);
+    expectBoxInsideTimeline(detailControlsBox);
+    for (const controlBox of await Promise.all([
+      frameDescription.boundingBox(),
+      durationInput.boundingBox(),
+      captionToggle.boundingBox(),
+      captionStyleSelect.boundingBox(),
+      captionSizeSelect.boundingBox(),
+    ])) {
+      expectBoxInsideTimeline(controlBox);
+    }
+
     expect(descriptionBox.y + descriptionBox.height).toBeLessThanOrEqual(
       timelineBox.y + timelineBox.height
     );

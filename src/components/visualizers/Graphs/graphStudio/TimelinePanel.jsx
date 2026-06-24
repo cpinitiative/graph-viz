@@ -18,6 +18,11 @@ const moveButtonClass =
   'min-h-[30px] min-w-[30px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const playbackButtonClass =
   'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
+const detailLabelClass =
+  'shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]';
+const detailControlLabelClass =
+  'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]';
+
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
     <rect x="6" y="4" width="4" height="16" />
@@ -88,7 +93,7 @@ const DurationInput = ({ durationMs, onCommit }) => {
   return (
     <input
       aria-label="Duration (ms)"
-      className="h-7 w-[68px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-center font-mono text-xs tabular-nums text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+      className="h-8 w-[72px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-center font-mono text-xs tabular-nums text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
       data-testid="frame-duration-input"
       inputMode="numeric"
       onBlur={commit}
@@ -130,7 +135,7 @@ const TimelinePanel = ({
   return (
     <div
       aria-label="Animation timeline"
-      className="flex h-full flex-col bg-[#F8F9FA] text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:bg-[#111827] dark:focus-visible:ring-[#60A5FA]"
+      className="flex h-full min-h-[208px] min-w-0 flex-col bg-[#F8F9FA] text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:bg-[#111827] dark:focus-visible:ring-[#60A5FA]"
       data-frame-navigation-surface="true"
       data-testid="timeline-panel"
       tabIndex="0"
@@ -218,7 +223,7 @@ const TimelinePanel = ({
         </div>
       </div>
 
-      <div className="min-h-[50px] flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
+      <div className="min-h-[58px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
         <div
           aria-label="Timeline frames"
           className="flex h-full min-w-max items-center gap-2"
@@ -277,87 +282,89 @@ const TimelinePanel = ({
       </div>
 
       <div
-        className="shrink-0 border-t border-[#D7DEE8] bg-[#F8F9FA] px-2 py-1 dark:border-[#334155] dark:bg-[#111827]"
+        className="flex-none border-t border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-2 dark:border-[#334155] dark:bg-[#111827]"
         data-testid="frame-description-row"
       >
-        <div className="space-y-1.5">
-          <label className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
-              Description
-            </span>
+        <div className="grid min-w-0 gap-2">
+          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-2">
+            <span className={detailLabelClass}>Description</span>
             <input
               aria-label="Frame Description"
               value={steps[currentFrame]?.description ?? ''}
               onChange={event =>
                 onDescriptionChange(currentFrame, event.target.value)
               }
-              className="h-7 w-full rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+              className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
               placeholder="Enter a description for this frame..."
             />
           </label>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            <label className="flex shrink-0 items-center gap-1.5">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
-                Duration (ms)
-              </span>
-              <DurationInput
-                key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
-                durationMs={steps[currentFrame]?.durationMs ?? 600}
-                onCommit={value => onStepDurationChange(currentFrame, value)}
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
-                <input
-                  aria-label="Show caption"
-                  checked={Boolean(captionEnabled)}
-                  className="h-3.5 w-3.5 accent-[#B45309]"
-                  data-testid="frame-caption-toggle"
-                  onChange={event =>
-                    onCaptionEnabledChange?.(event.target.checked)
-                  }
-                  type="checkbox"
+          <div className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center lg:gap-2">
+            <div className={detailLabelClass}>Timing &amp; Caption</div>
+            <div
+              className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
+              data-testid="frame-detail-controls"
+            >
+              <label className={detailControlLabelClass}>
+                <span>Duration</span>
+                <DurationInput
+                  key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
+                  durationMs={steps[currentFrame]?.durationMs ?? 600}
+                  onCommit={value => onStepDurationChange(currentFrame, value)}
                 />
-                <span>Show caption</span>
               </label>
-              <label className="flex shrink-0 items-center gap-1.5">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
-                  Style
-                </span>
-                <NativeSelect
-                  aria-label="Caption Style"
-                  data-testid="caption-style-select"
-                  onChange={event => onCaptionStyleChange?.(event.target.value)}
-                  size="dense"
-                  value={captionStyle}
-                  wrapperClassName="w-[132px]"
-                >
-                  {CAPTION_STYLE_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              <label className="flex shrink-0 items-center gap-1.5">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]">
-                  Size
-                </span>
-                <NativeSelect
-                  aria-label="Caption Size"
-                  data-testid="caption-size-select"
-                  onChange={event => onCaptionSizeChange?.(event.target.value)}
-                  size="dense"
-                  value={captionSize}
-                  wrapperClassName="w-[124px]"
-                >
-                  {CAPTION_SIZE_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-[#D7DEE8] dark:border-[#334155] lg:border-l lg:pl-3">
+                <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
+                  <input
+                    aria-label="Show caption"
+                    checked={Boolean(captionEnabled)}
+                    className="h-3.5 w-3.5 accent-[#B45309]"
+                    data-testid="frame-caption-toggle"
+                    onChange={event =>
+                      onCaptionEnabledChange?.(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  <span>Show caption</span>
+                </label>
+                <label className={detailControlLabelClass}>
+                  <span>Style</span>
+                  <NativeSelect
+                    aria-label="Caption Style"
+                    data-testid="caption-style-select"
+                    onChange={event =>
+                      onCaptionStyleChange?.(event.target.value)
+                    }
+                    size="dense"
+                    value={captionStyle}
+                    wrapperClassName="w-[132px]"
+                  >
+                    {CAPTION_STYLE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
+                <label className={detailControlLabelClass}>
+                  <span>Size</span>
+                  <NativeSelect
+                    aria-label="Caption Size"
+                    data-testid="caption-size-select"
+                    onChange={event =>
+                      onCaptionSizeChange?.(event.target.value)
+                    }
+                    size="dense"
+                    value={captionSize}
+                    wrapperClassName="w-[124px]"
+                  >
+                    {CAPTION_SIZE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
+              </div>
             </div>
           </div>
         </div>
