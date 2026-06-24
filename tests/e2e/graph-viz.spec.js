@@ -651,6 +651,14 @@ while (true) {}
     );
     await expect(frameDescription).toHaveValue('');
     await expect(durationInput).toHaveValue('600');
+    await expect(durationInput).toHaveAttribute('type', 'text');
+    await expect(durationInput).toHaveAttribute('inputmode', 'numeric');
+
+    await durationInput.click({ clickCount: 3 });
+    await durationInput.type('60');
+    await durationInput.press('Enter');
+    await expect(durationInput).toHaveValue('80');
+    await expect(cards.last().getByText('80 ms')).toBeVisible();
 
     await durationInput.click({ clickCount: 3 });
     await durationInput.press('Backspace');
