@@ -73,6 +73,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
+  const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const {
@@ -444,11 +445,23 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
         updateStep(index, 'description', value),
-      captionEnabled: normalizeCaptionOverlay(captionOverlay).enabled,
+      captionEnabled: normalizedCaptionOverlay.enabled,
+      captionStyle: normalizedCaptionOverlay.style,
+      captionSize: normalizedCaptionOverlay.size,
       onCaptionEnabledChange: enabled =>
         setCaptionOverlay(prev => ({
           ...normalizeCaptionOverlay(prev),
           enabled,
+        })),
+      onCaptionStyleChange: style =>
+        setCaptionOverlay(prev => ({
+          ...normalizeCaptionOverlay(prev),
+          style,
+        })),
+      onCaptionSizeChange: size =>
+        setCaptionOverlay(prev => ({
+          ...normalizeCaptionOverlay(prev),
+          size,
         })),
       onAddStep: () => {
         addStep(currentFrame);

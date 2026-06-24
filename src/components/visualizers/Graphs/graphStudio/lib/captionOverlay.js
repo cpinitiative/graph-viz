@@ -4,7 +4,22 @@ export const DEFAULT_CAPTION_OVERLAY = {
     x: 0,
     y: 1,
   },
+  style: 'subtle',
+  size: 'medium',
 };
+
+export const CAPTION_STYLE_OPTIONS = [
+  { value: 'subtle', label: 'Subtle' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'plain', label: 'Plain' },
+];
+
+export const CAPTION_SIZE_OPTIONS = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+];
 
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
 
@@ -13,6 +28,9 @@ const clampNormalizedCoordinate = (value, fallback) => {
   if (!Number.isFinite(coordinate)) return fallback;
   return Math.max(0, Math.min(1, coordinate));
 };
+
+const normalizePreset = (value, options, fallback) =>
+  options.some(option => option.value === value) ? value : fallback;
 
 export const normalizeCaptionOverlay = value => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -41,5 +59,15 @@ export const normalizeCaptionOverlay = value => {
         DEFAULT_CAPTION_OVERLAY.position.y
       ),
     },
+    style: normalizePreset(
+      value.style,
+      CAPTION_STYLE_OPTIONS,
+      DEFAULT_CAPTION_OVERLAY.style
+    ),
+    size: normalizePreset(
+      value.size,
+      CAPTION_SIZE_OPTIONS,
+      DEFAULT_CAPTION_OVERLAY.size
+    ),
   };
 };

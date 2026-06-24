@@ -6,7 +6,9 @@ export const IMAGE_FRAMING = {
   fit: 'fit',
 };
 
-const FIT_CONTENT_PADDING = 80;
+const FIT_CONTENT_MIN_PADDING = 36;
+const FIT_CONTENT_MAX_PADDING = 56;
+const FIT_CONTENT_PADDING_RATIO = 0.075;
 
 const getDatedFrameFilename = extension => {
   const date = new Date().toISOString().slice(0, 10);
@@ -70,9 +72,22 @@ const combineBounds = boundsList => ({
   maxY: Math.max(...boundsList.map(bounds => bounds.maxY)),
 });
 
-const expandBoundsToAspectRatio = (bounds, aspectRatio) => {
-  let width = bounds.maxX - bounds.minX + FIT_CONTENT_PADDING * 2;
-  let height = bounds.maxY - bounds.minY + FIT_CONTENT_PADDING * 2;
+const getFitContentPadding = svgEl => {
+  const viewport = getViewportSize(svgEl);
+  return Math.round(
+    Math.max(
+      FIT_CONTENT_MIN_PADDING,
+      Math.min(
+        FIT_CONTENT_MAX_PADDING,
+        Math.min(viewport.width, viewport.height) * FIT_CONTENT_PADDING_RATIO
+      )
+    )
+  );
+};
+
+const expandBoundsToAspectRatio = (bounds, aspectRatio, padding) => {
+  let width = bounds.maxX - bounds.minX + padding * 2;
+  let height = bounds.maxY - bounds.minY + padding * 2;
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
 
@@ -107,7 +122,11 @@ export const getFitContentViewBox = ({ svgEl, aspectRatio }) => {
   });
 
   if (!boundsList.length) return null;
-  return expandBoundsToAspectRatio(combineBounds(boundsList), aspectRatio);
+  return expandBoundsToAspectRatio(
+    combineBounds(boundsList),
+    aspectRatio,
+    getFitContentPadding(svgEl)
+  );
 };
 
 const formatViewBox = viewBox =>
@@ -132,22 +151,27 @@ export const serializeSvgElement = ({
           aspectRatio: viewportAspectRatio,
         })
       : null;
+  const finalViewBox = fitViewBox ?? {
+    x: 0,
+    y: 0,
+    width: viewportWidth,
+    height: viewportHeight,
+  };
 
   exportSvg.setAttribute('width', width);
   exportSvg.setAttribute('height', height);
   exportSvg.setAttribute('version', '1.1');
-  exportSvg.setAttribute(
-    'viewBox',
-    formatViewBox(
-      fitViewBox ?? {
-        x: 0,
-        y: 0,
-        width: viewportWidth,
-        height: viewportHeight,
-      }
-    )
-  );
+  exportSvg.setAttribute('viewBox', formatViewBox(finalViewBox));
   exportSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const backgroundRect = Array.from(exportSvg.children).find(
+    child => child.tagName?.toLowerCase() === 'rect'
+  );
+  if (backgroundRect) {
+    backgroundRect.setAttribute('x', String(finalViewBox.x));
+    backgroundRect.setAttribute('y', String(finalViewBox.y));
+    backgroundRect.setAttribute('width', String(finalViewBox.width));
+    backgroundRect.setAttribute('height', String(finalViewBox.height));
+  }
 
   let svgData = new XMLSerializer().serializeToString(exportSvg);
 

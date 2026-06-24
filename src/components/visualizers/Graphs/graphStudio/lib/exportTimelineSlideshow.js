@@ -1,7 +1,8 @@
 import {
-  DEFAULT_SVG_ELEMENT_ID,
   createCaptureCanvas,
+  DEFAULT_SVG_ELEMENT_ID,
   getGraphSvgElement,
+  IMAGE_FRAMING,
   loadSvgImageFromElement,
   waitForFrameRender,
 } from './timelineFrameCapture';
@@ -52,6 +53,7 @@ export async function exportTimelineSlideshow({
   setCurrentFrame,
   frameIndexes,
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
+  framingMode = IMAGE_FRAMING.viewport,
 }) {
   if (!steps?.length) {
     throw new Error('No timeline frames to export');
@@ -91,6 +93,7 @@ export async function exportTimelineSlideshow({
         svgEl,
         width: canvas.width,
         height: canvas.height,
+        framingMode,
       });
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
