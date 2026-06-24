@@ -42,26 +42,75 @@ const LEGEND_PALETTES = {
     nodeStroke: '#CBD5E1',
   },
 };
-const CAPTION_PALETTES = {
+const CAPTION_STYLE_PRESETS = {
+  subtle: {
+    background: '#F8F9FA',
+    border: '#CBD5E1',
+    text: '#0F172A',
+    fillOpacity: 0.97,
+    showBox: true,
+    shadow: true,
+  },
   light: {
+    background: '#FFFFFF',
+    border: '#94A3B8',
+    text: '#0F172A',
+    fillOpacity: 0.98,
+    showBox: true,
+    shadow: true,
+  },
+  dark: {
     background: '#0F2747',
     border: '#173A68',
     text: '#FFFFFF',
+    fillOpacity: 0.97,
+    showBox: true,
+    shadow: true,
   },
-  dark: {
-    background: '#F8F9FA',
-    border: '#94A3B8',
-    text: '#0F172A',
+  plain: {
+    background: '#FFFFFF',
+    border: '#FFFFFF',
+    text: '#FFFFFF',
+    textStroke: '#0F2747',
+    textStrokeWidth: 2.5,
+    fillOpacity: 0,
+    showBox: false,
+    shadow: false,
   },
 };
-const CAPTION_FONT_SIZE = 12;
-const CAPTION_LINE_HEIGHT = 17;
-const CAPTION_HORIZONTAL_PADDING = 14;
-const CAPTION_VERTICAL_PADDING = 10;
-const CAPTION_MIN_WIDTH = 120;
-const CAPTION_MAX_WIDTH = 520;
-const CAPTION_MAX_LINES = 3;
-const CAPTION_CHARACTER_WIDTH = 6.4;
+const CAPTION_SIZE_PRESETS = {
+  small: {
+    fontSize: 11,
+    lineHeight: 15,
+    horizontalPadding: 12,
+    verticalPadding: 8,
+    minWidth: 104,
+    maxWidth: 360,
+    maxWidthRatio: 0.38,
+    characterWidth: 5.8,
+  },
+  medium: {
+    fontSize: 12,
+    lineHeight: 17,
+    horizontalPadding: 14,
+    verticalPadding: 9,
+    minWidth: 120,
+    maxWidth: 440,
+    maxWidthRatio: 0.42,
+    characterWidth: 6.4,
+  },
+  large: {
+    fontSize: 14,
+    lineHeight: 20,
+    horizontalPadding: 16,
+    verticalPadding: 11,
+    minWidth: 144,
+    maxWidth: 500,
+    maxWidthRatio: 0.45,
+    characterWidth: 7.4,
+  },
+};
+const CAPTION_MAX_LINES = 4;
 
 const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
   if (selected || multiSelected) {
@@ -433,10 +482,24 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
 
 const truncateCaptionLine = (line, maxCharacters) => {
   if (line.length <= maxCharacters) return line;
+  if (maxCharacters <= 3) return '.'.repeat(Math.max(1, maxCharacters));
   return `${line.slice(0, Math.max(1, maxCharacters - 3)).trimEnd()}...`;
 };
 
-const wrapCaptionText = (value, maxCharacters) => {
+const splitLongCaptionWord = (word, maxCharacters) => {
+  if (word.length <= maxCharacters) return [word];
+  const chunks = [];
+  for (let index = 0; index < word.length; index += maxCharacters) {
+    chunks.push(word.slice(index, index + maxCharacters));
+  }
+  return chunks;
+};
+
+const wrapCaptionText = (
+  value,
+  maxCharacters,
+  maxLines = CAPTION_MAX_LINES
+) => {
   const words = String(value ?? '')
     .trim()
     .replace(/\s+/g, ' ')
@@ -447,6 +510,15 @@ const wrapCaptionText = (value, maxCharacters) => {
   const lines = [];
   let currentLine = '';
   for (const word of words) {
+    if (word.length > maxCharacters) {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = '';
+      }
+      lines.push(...splitLongCaptionWord(word, maxCharacters));
+      continue;
+    }
+
     const candidate = currentLine ? `${currentLine} ${word}` : word;
     if (candidate.length <= maxCharacters) {
       currentLine = candidate;
@@ -457,16 +529,13 @@ const wrapCaptionText = (value, maxCharacters) => {
   }
   if (currentLine) lines.push(currentLine);
 
-  if (lines.length <= CAPTION_MAX_LINES) {
+  if (lines.length <= maxLines) {
     return lines.map(line => truncateCaptionLine(line, maxCharacters));
   }
 
   return [
-    ...lines.slice(0, CAPTION_MAX_LINES - 1),
-    truncateCaptionLine(
-      lines.slice(CAPTION_MAX_LINES - 1).join(' '),
-      maxCharacters
-    ),
+    ...lines.slice(0, maxLines - 1),
+    truncateCaptionLine(lines.slice(maxLines - 1).join(' '), maxCharacters),
   ];
 };
 
@@ -476,9 +545,14 @@ const FrameCaption = ({
   setCaptionOverlay,
   canvasSize,
   svgRef,
+  shadowFilterId,
 }) => {
   const { theme } = useTheme();
   const caption = normalizeCaptionOverlay(captionOverlay);
+  const stylePreset =
+    CAPTION_STYLE_PRESETS[caption.style] ?? CAPTION_STYLE_PRESETS.subtle;
+  const sizePreset =
+    CAPTION_SIZE_PRESETS[caption.size] ?? CAPTION_SIZE_PRESETS.medium;
   const text = String(captionText ?? '').trim();
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -492,7 +566,6 @@ const FrameCaption = ({
     return null;
   }
 
-  const palette = CAPTION_PALETTES[theme] ?? CAPTION_PALETTES.light;
   const margin = Math.min(
     16,
     Math.max(
@@ -501,26 +574,30 @@ const FrameCaption = ({
     )
   );
   const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
+  const presetMaxWidth = Math.min(
+    sizePreset.maxWidth,
+    canvasSize.width * sizePreset.maxWidthRatio
+  );
   const contentMaxWidth = Math.max(
     1,
-    Math.min(CAPTION_MAX_WIDTH, maxBoxWidth) - CAPTION_HORIZONTAL_PADDING * 2
+    Math.min(presetMaxWidth, maxBoxWidth) - sizePreset.horizontalPadding * 2
   );
   const maxCharacters = Math.max(
     8,
-    Math.floor(contentMaxWidth / CAPTION_CHARACTER_WIDTH)
+    Math.floor(contentMaxWidth / sizePreset.characterWidth)
   );
-  const lines = wrapCaptionText(text, maxCharacters);
+  const lines = wrapCaptionText(text, maxCharacters, CAPTION_MAX_LINES);
   const estimatedTextWidth =
-    Math.max(...lines.map(line => line.length), 1) * CAPTION_CHARACTER_WIDTH;
+    Math.max(...lines.map(line => line.length), 1) * sizePreset.characterWidth;
   const boxWidth = Math.min(
     maxBoxWidth,
     Math.max(
-      CAPTION_MIN_WIDTH,
-      estimatedTextWidth + CAPTION_HORIZONTAL_PADDING * 2
+      sizePreset.minWidth,
+      estimatedTextWidth + sizePreset.horizontalPadding * 2
     )
   );
   const boxHeight =
-    CAPTION_VERTICAL_PADDING * 2 + lines.length * CAPTION_LINE_HEIGHT;
+    sizePreset.verticalPadding * 2 + lines.length * sizePreset.lineHeight;
   const maxX = Math.max(0, canvasSize.width - boxWidth);
   const maxY = Math.max(0, canvasSize.height - boxHeight);
   const leftX = Math.min(margin, maxX);
@@ -572,9 +649,13 @@ const FrameCaption = ({
   return (
     <g
       aria-label="Frame caption"
+      data-caption-overlay="true"
       data-caption-position-x={caption.position.x}
       data-caption-position-y={caption.position.y}
+      data-caption-size={caption.size}
+      data-caption-style={caption.style}
       data-caption-theme={theme}
+      data-caption-line-count={lines.length}
       data-testid="frame-caption-overlay"
       pointerEvents="all"
       transform={`translate(${x} ${y})`}
@@ -604,24 +685,34 @@ const FrameCaption = ({
         y="0"
         width={boxWidth}
         height={boxHeight}
-        fill={palette.background}
-        fillOpacity="0.94"
-        stroke={palette.border}
-        strokeWidth="1"
+        fill={stylePreset.background}
+        fillOpacity={stylePreset.fillOpacity}
+        stroke={stylePreset.showBox ? stylePreset.border : 'none'}
+        strokeWidth={stylePreset.showBox ? 1 : 0}
+        filter={
+          stylePreset.shadow && shadowFilterId
+            ? `url(#${shadowFilterId})`
+            : undefined
+        }
       />
       <text
-        x={CAPTION_HORIZONTAL_PADDING}
-        y={CAPTION_VERTICAL_PADDING + CAPTION_FONT_SIZE}
-        fill={palette.text}
+        x={sizePreset.horizontalPadding}
+        y={sizePreset.verticalPadding + sizePreset.fontSize}
+        fill={stylePreset.text}
         fontFamily="Arial, sans-serif"
-        fontSize={CAPTION_FONT_SIZE}
+        fontSize={sizePreset.fontSize}
         fontWeight="600"
+        letterSpacing="0"
+        paintOrder={stylePreset.textStroke ? 'stroke' : undefined}
+        stroke={stylePreset.textStroke}
+        strokeLinejoin={stylePreset.textStroke ? 'round' : undefined}
+        strokeWidth={stylePreset.textStrokeWidth}
       >
         {lines.map((line, index) => (
           <tspan
             key={`${line}-${index}`}
-            x={CAPTION_HORIZONTAL_PADDING}
-            dy={index === 0 ? 0 : CAPTION_LINE_HEIGHT}
+            x={sizePreset.horizontalPadding}
+            dy={index === 0 ? 0 : sizePreset.lineHeight}
           >
             {line}
           </tspan>
@@ -726,6 +817,7 @@ const GraphCanvas = ({
     });
     return Array.from(markers, ([id, color]) => ({ id, color }));
   }, [edgeVisualData]);
+  const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
@@ -1083,6 +1175,21 @@ const GraphCanvas = ({
               <path d="M0,0 L0,12 L10,6 z" fill={color} />
             </marker>
           ))}
+          <filter
+            id={captionShadowFilterId}
+            x="-12%"
+            y="-12%"
+            width="124%"
+            height="124%"
+          >
+            <feDropShadow
+              dx="0"
+              dy="2"
+              stdDeviation="2"
+              floodColor="#0F172A"
+              floodOpacity="0.08"
+            />
+          </filter>
         </defs>
         <rect
           width="100%"
@@ -1197,12 +1304,14 @@ const GraphCanvas = ({
           canvasSize={canvasSize}
           svgRef={svgRef}
         />
+        {/* Captions render above the legend so nearby overlays remain draggable. */}
         <FrameCaption
           captionOverlay={captionOverlay}
           captionText={captionText}
           setCaptionOverlay={setCaptionOverlay}
           canvasSize={canvasSize}
           svgRef={svgRef}
+          shadowFilterId={captionShadowFilterId}
         />
       </svg>
     </div>

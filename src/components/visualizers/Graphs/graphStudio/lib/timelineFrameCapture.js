@@ -1,12 +1,18 @@
 export const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
 export const DEFAULT_PNG_SCALE = 2;
 export const MAX_PNG_DIMENSION = 4096;
+export const SLIDE_EXPORT_WIDTH = 1040;
+export const SLIDE_EXPORT_HEIGHT = 585;
 export const IMAGE_FRAMING = {
   viewport: 'viewport',
   fit: 'fit',
+  slide: 'slide',
 };
+export const SLIDE_ASPECT_RATIO = SLIDE_EXPORT_WIDTH / SLIDE_EXPORT_HEIGHT;
 
-const FIT_CONTENT_PADDING = 80;
+const FIT_CONTENT_MIN_PADDING = 36;
+const FIT_CONTENT_MAX_PADDING = 56;
+const FIT_CONTENT_PADDING_RATIO = 0.075;
 
 const getDatedFrameFilename = extension => {
   const date = new Date().toISOString().slice(0, 10);
@@ -70,9 +76,22 @@ const combineBounds = boundsList => ({
   maxY: Math.max(...boundsList.map(bounds => bounds.maxY)),
 });
 
-const expandBoundsToAspectRatio = (bounds, aspectRatio) => {
-  let width = bounds.maxX - bounds.minX + FIT_CONTENT_PADDING * 2;
-  let height = bounds.maxY - bounds.minY + FIT_CONTENT_PADDING * 2;
+const getFitContentPadding = svgEl => {
+  const viewport = getViewportSize(svgEl);
+  return Math.round(
+    Math.max(
+      FIT_CONTENT_MIN_PADDING,
+      Math.min(
+        FIT_CONTENT_MAX_PADDING,
+        Math.min(viewport.width, viewport.height) * FIT_CONTENT_PADDING_RATIO
+      )
+    )
+  );
+};
+
+const expandBoundsToAspectRatio = (bounds, aspectRatio, padding) => {
+  let width = bounds.maxX - bounds.minX + padding * 2;
+  let height = bounds.maxY - bounds.minY + padding * 2;
   const centerX = (bounds.minX + bounds.maxX) / 2;
   const centerY = (bounds.minY + bounds.maxY) / 2;
 
@@ -84,6 +103,26 @@ const expandBoundsToAspectRatio = (bounds, aspectRatio) => {
     y: centerY - height / 2,
     width,
     height,
+  };
+};
+
+const expandViewportToAspectRatio = ({ width, height }, aspectRatio) => {
+  let nextWidth = width;
+  let nextHeight = height;
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  if (nextWidth / nextHeight > aspectRatio) {
+    nextHeight = nextWidth / aspectRatio;
+  } else {
+    nextWidth = nextHeight * aspectRatio;
+  }
+
+  return {
+    x: centerX - nextWidth / 2,
+    y: centerY - nextHeight / 2,
+    width: nextWidth,
+    height: nextHeight,
   };
 };
 
@@ -107,7 +146,11 @@ export const getFitContentViewBox = ({ svgEl, aspectRatio }) => {
   });
 
   if (!boundsList.length) return null;
-  return expandBoundsToAspectRatio(combineBounds(boundsList), aspectRatio);
+  return expandBoundsToAspectRatio(
+    combineBounds(boundsList),
+    aspectRatio,
+    getFitContentPadding(svgEl)
+  );
 };
 
 const formatViewBox = viewBox =>
@@ -124,30 +167,44 @@ export const serializeSvgElement = ({
   framingMode = IMAGE_FRAMING.viewport,
 }) => {
   const exportSvg = svgEl.cloneNode(true);
-  const viewportAspectRatio = viewportWidth / viewportHeight;
-  const fitViewBox =
-    framingMode === IMAGE_FRAMING.fit
-      ? getFitContentViewBox({
-          svgEl,
-          aspectRatio: viewportAspectRatio,
-        })
-      : null;
+  const outputAspectRatio = width / height;
+  const isFitFraming =
+    framingMode === IMAGE_FRAMING.fit || framingMode === IMAGE_FRAMING.slide;
+  const fitViewBox = isFitFraming
+    ? getFitContentViewBox({
+        svgEl,
+        aspectRatio: outputAspectRatio,
+      })
+    : null;
+  const finalViewBox =
+    fitViewBox ??
+    expandViewportToAspectRatio(
+      {
+        width: viewportWidth,
+        height: viewportHeight,
+      },
+      outputAspectRatio
+    );
 
   exportSvg.setAttribute('width', width);
   exportSvg.setAttribute('height', height);
   exportSvg.setAttribute('version', '1.1');
+  exportSvg.setAttribute('data-export-framing', framingMode);
   exportSvg.setAttribute(
-    'viewBox',
-    formatViewBox(
-      fitViewBox ?? {
-        x: 0,
-        y: 0,
-        width: viewportWidth,
-        height: viewportHeight,
-      }
-    )
+    'data-export-aspect-ratio',
+    Number(outputAspectRatio.toFixed(6))
   );
+  exportSvg.setAttribute('viewBox', formatViewBox(finalViewBox));
   exportSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const backgroundRect = Array.from(exportSvg.children).find(
+    child => child.tagName?.toLowerCase() === 'rect'
+  );
+  if (backgroundRect) {
+    backgroundRect.setAttribute('x', String(finalViewBox.x));
+    backgroundRect.setAttribute('y', String(finalViewBox.y));
+    backgroundRect.setAttribute('width', String(finalViewBox.width));
+    backgroundRect.setAttribute('height', String(finalViewBox.height));
+  }
 
   let svgData = new XMLSerializer().serializeToString(exportSvg);
 
@@ -175,10 +232,20 @@ export const serializeCurrentFrameSvg = ({
 } = {}) => {
   const svgEl = getGraphSvgElement(svgElementId);
   const viewport = getViewportSize(svgEl);
+  const outputSize =
+    framingMode === IMAGE_FRAMING.slide
+      ? {
+          width: SLIDE_EXPORT_WIDTH,
+          height: SLIDE_EXPORT_HEIGHT,
+        }
+      : {
+          width: Math.round(viewport.width),
+          height: Math.round(viewport.height),
+        };
   return serializeSvgElement({
     svgEl,
-    width: Math.round(viewport.width),
-    height: Math.round(viewport.height),
+    width: outputSize.width,
+    height: outputSize.height,
     viewportWidth: viewport.width,
     viewportHeight: viewport.height,
     framingMode,
@@ -225,22 +292,32 @@ export const loadSvgImageFromElement = async ({
   return loadSvgImage(svgData);
 };
 
-export const createCaptureCanvas = (svgEl, { pngScale } = {}) => {
+export const createCaptureCanvas = (
+  svgEl,
+  { pngScale, framingMode = IMAGE_FRAMING.viewport } = {}
+) => {
   const viewport = getViewportSize(svgEl);
   const canvas = document.createElement('canvas');
+  const baseSize =
+    framingMode === IMAGE_FRAMING.slide
+      ? {
+          width: SLIDE_EXPORT_WIDTH,
+          height: SLIDE_EXPORT_HEIGHT,
+        }
+      : viewport;
   if (pngScale === undefined) {
-    canvas.width = Math.max(2, Math.floor(viewport.width / 2) * 2);
-    canvas.height = Math.max(2, Math.floor(viewport.height / 2) * 2);
+    canvas.width = Math.max(2, Math.floor(baseSize.width / 2) * 2);
+    canvas.height = Math.max(2, Math.floor(baseSize.height / 2) * 2);
   } else {
     const requestedScale = [1, 2, 3].includes(Number(pngScale))
       ? Number(pngScale)
       : DEFAULT_PNG_SCALE;
     const cappedScale = Math.min(
       requestedScale,
-      MAX_PNG_DIMENSION / Math.max(viewport.width, viewport.height)
+      MAX_PNG_DIMENSION / Math.max(baseSize.width, baseSize.height)
     );
-    canvas.width = Math.max(2, Math.round(viewport.width * cappedScale));
-    canvas.height = Math.max(2, Math.round(viewport.height * cappedScale));
+    canvas.width = Math.max(2, Math.round(baseSize.width * cappedScale));
+    canvas.height = Math.max(2, Math.round(baseSize.height * cappedScale));
   }
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas rendering context unavailable');
@@ -270,7 +347,10 @@ export const exportCurrentFramePng = async ({
 } = {}) => {
   await waitForFrameRender();
   const svgEl = getGraphSvgElement(svgElementId);
-  const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, { pngScale });
+  const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, {
+    pngScale,
+    framingMode,
+  });
   const svgData = serializeSvgElement({
     svgEl,
     width: canvas.width,

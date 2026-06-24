@@ -174,6 +174,23 @@ const readJsonDownload = async download => {
   return JSON.parse(await fs.readFile(path, 'utf8'));
 };
 
+const getSvgRootAttribute = (svgText, name) => {
+  const match = svgText.match(new RegExp(`\\s${name}="([^"]+)"`));
+  return match?.[1] ?? null;
+};
+
+const expectSlideFramedSvg = svgText => {
+  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
+  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
+  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+  const viewBoxText = getSvgRootAttribute(svgText, 'viewBox');
+  expect(viewBoxText).not.toBeNull();
+  const viewBox = viewBoxText.split(/\s+/).map(Number);
+  expect(viewBox).toHaveLength(4);
+  expect(viewBox.every(Number.isFinite)).toBe(true);
+  expect(viewBox[2] / viewBox[3]).toBeCloseTo(1040 / 585, 3);
+};
+
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
   const modal = page.getByTestId('custom-legend-modal');
@@ -693,8 +710,9 @@ while (true) {}
 
     const descriptionRow = page.getByTestId('frame-description-row');
     await expect(page.getByText('Description', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('selected-frame-summary')).toHaveText(
-      `Frame ${initialFrameCount + 2} / ${initialFrameCount + 3}`
+    await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
+    await expect(frameCounter).toHaveText(
+      `${initialFrameCount + 2} / ${initialFrameCount + 3}`
     );
     const descriptionBox = await descriptionRow.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
@@ -770,18 +788,69 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
-    const captionToggle = page.getByLabel('Show frame caption');
+    const captionToggle = page.getByLabel('Show caption');
+    const captionStyleSelect = page.getByLabel('Caption Style');
+    const captionSizeSelect = page.getByLabel('Caption Size');
     const caption = page.getByTestId('frame-caption-overlay');
     const frameDescription = page.getByLabel('Frame Description');
     const frameCards = page.getByTestId('timeline-frame-card');
 
     await expect(captionToggle).not.toBeChecked();
+    await expect(captionStyleSelect).toHaveValue('subtle');
+    await expect(captionSizeSelect).toHaveValue('medium');
     await expect(caption).toHaveCount(0);
 
     await captionToggle.check();
     await expect(caption).toBeVisible();
     await expect(caption).toContainText('Start BFS at A');
-    await expect(caption).toHaveAttribute('data-caption-theme', 'light');
+    await expect(caption).toHaveAttribute('data-caption-overlay', 'true');
+    await expect(caption).toHaveAttribute('data-caption-style', 'subtle');
+    await expect(caption).toHaveAttribute('data-caption-size', 'medium');
+
+    for (const style of ['subtle', 'light', 'dark', 'plain']) {
+      await captionStyleSelect.selectOption(style);
+      await expect(caption).toBeVisible();
+      await expect(caption).toHaveAttribute('data-caption-style', style);
+    }
+
+    const expectedFontSizes = {
+      small: '11',
+      medium: '12',
+      large: '14',
+    };
+    for (const size of ['small', 'medium', 'large']) {
+      await captionSizeSelect.selectOption(size);
+      await expect(caption).toBeVisible();
+      await expect(caption).toHaveAttribute('data-caption-size', size);
+      await expect(caption.locator('text')).toHaveAttribute(
+        'font-size',
+        expectedFontSizes[size]
+      );
+    }
+
+    await captionStyleSelect.selectOption('dark');
+    await captionSizeSelect.selectOption('large');
+
+    const longCaption =
+      'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas.';
+    await frameDescription.fill(longCaption);
+    await expect(caption).toContainText('This longer teaching annotation');
+    await expect
+      .poll(() => caption.locator('tspan').count())
+      .toBeGreaterThan(1);
+    expect(
+      await caption.evaluate(element => {
+        const captionBounds = element.getBoundingClientRect();
+        const canvasBounds = element.ownerSVGElement.getBoundingClientRect();
+        return (
+          captionBounds.left >= canvasBounds.left - 1 &&
+          captionBounds.top >= canvasBounds.top - 1 &&
+          captionBounds.right <= canvasBounds.right + 1 &&
+          captionBounds.bottom <= canvasBounds.bottom + 1
+        );
+      })
+    ).toBe(true);
+
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(caption).toHaveAttribute('data-caption-theme', 'dark');
     await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -804,6 +873,10 @@ while (true) {}
     ).toBeCloseTo(draggedPosition.y, 5);
 
     const exportMenu = await openExportMenu(page);
+    await exportMenu.getByLabel('Image Framing').selectOption('fit');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'fit');
     const previewImage = await expectExportPreview(page);
     await expect
       .poll(() =>
@@ -814,6 +887,9 @@ while (true) {}
       (await fetch(image.src)).text()
     );
     expect(previewSvgText).toContain('data-testid="frame-caption-overlay"');
+    expect(previewSvgText).toContain('data-caption-overlay="true"');
+    expect(previewSvgText).toContain('data-caption-style="dark"');
+    expect(previewSvgText).toContain('data-caption-size="large"');
 
     const svgDownload = await expectDownloadFrom({
       page,
@@ -824,6 +900,9 @@ while (true) {}
     expect(svgPath).not.toBeNull();
     const svgText = await fs.readFile(svgPath, 'utf8');
     expect(svgText).toContain('data-testid="frame-caption-overlay"');
+    expect(svgText).toContain('data-caption-overlay="true"');
+    expect(svgText).toContain('data-caption-style="dark"');
+    expect(svgText).toContain('data-caption-size="large"');
     expect(svgText).toContain('Queue B and C');
 
     const projectDownload = await expectDownloadFrom({
@@ -831,8 +910,12 @@ while (true) {}
       locator: exportMenu.getByTestId('project-export-button'),
       filenamePattern: /\.graphviz\.json$/,
     });
+    const projectPath = await projectDownload.path();
+    expect(projectPath).not.toBeNull();
     const project = await readJsonDownload(projectDownload);
     expect(project.settings.captionOverlay.enabled).toBe(true);
+    expect(project.settings.captionOverlay.style).toBe('dark');
+    expect(project.settings.captionOverlay.size).toBe('large');
     expect(project.settings.captionOverlay.position.x).toBeCloseTo(
       draggedPosition.x,
       5
@@ -849,6 +932,22 @@ while (true) {}
     await expect(caption).toContainText('Restored caption');
     await captionToggle.uncheck();
     await expect(caption).toHaveCount(0);
+
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles(projectPath);
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(captionToggle).toBeChecked();
+    await expect(captionStyleSelect).toHaveValue('dark');
+    await expect(captionSizeSelect).toHaveValue('large');
+    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toHaveAttribute('data-caption-style', 'dark');
+    await expect(caption).toHaveAttribute('data-caption-size', 'large');
+    expect(
+      Number(await caption.getAttribute('data-caption-position-x'))
+    ).toBeCloseTo(draggedPosition.x, 5);
+    expect(
+      Number(await caption.getAttribute('data-caption-position-y'))
+    ).toBeCloseTo(draggedPosition.y, 5);
 
     expect(errors).toEqual([]);
   });
@@ -1123,7 +1222,7 @@ while (true) {}
     await expect(
       page.getByPlaceholder('Enter a description for this frame...')
     ).toHaveValue('Imported fixture frame two');
-    await expect(page.getByLabel('Show frame caption')).not.toBeChecked();
+    await expect(page.getByLabel('Show caption')).not.toBeChecked();
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
@@ -1248,7 +1347,7 @@ while (true) {}
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
-      'PNG/SVG export the current editor frame. Use the main timeline to change it.'
+      'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
     );
 
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
@@ -1259,6 +1358,22 @@ while (true) {}
     await expect
       .poll(() => previewImage.getAttribute('src'))
       .not.toBe(viewportPreviewUrl);
+
+    await exportMenu.getByLabel('Image Framing').selectOption('slide');
+    await expect(exportMenu.getByLabel('Image Framing')).toHaveValue('slide');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'slide');
+    await expectExportPreview(page);
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('data-export-framing="slide"');
+    const slidePreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expectSlideFramedSvg(slidePreviewSvgText);
 
     expect(errors).toEqual([]);
   });
@@ -1370,9 +1485,19 @@ while (true) {}
     await expect(
       graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
     ).toBeVisible();
-    await expect(page.getByLabel('Show frame caption')).toBeChecked();
+    await expect(page.getByLabel('Show caption')).toBeChecked();
+    await expect(page.getByLabel('Caption Style')).toHaveValue('subtle');
+    await expect(page.getByLabel('Caption Size')).toHaveValue('medium');
     await expect(page.getByTestId('frame-caption-overlay')).toContainText(
       'Pasted JSON import test'
+    );
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+      'data-caption-style',
+      'subtle'
+    );
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+      'data-caption-size',
+      'medium'
     );
     await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
       'data-caption-position-x',
@@ -2005,6 +2130,7 @@ api.edge('e0', '#f59e0b');
     const imageFramingSelect = page.getByTestId('image-framing-select');
     await expect(pngScaleSelect).toHaveValue('2');
     await expect(imageFramingSelect).toHaveValue('viewport');
+    await expect(imageFramingSelect).toContainText('Slide 16:9');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
@@ -2111,6 +2237,39 @@ api.edge('e0', '#f59e0b');
       'transform',
       graphTransformBeforeFitExport
     );
+
+    await imageFramingSelect.selectOption('slide');
+    await expect(imageFramingSelect).toHaveValue('slide');
+    await expect(page.getByTestId('export-preview-panel')).toHaveAttribute(
+      'data-preview-framing',
+      'slide'
+    );
+    await expect
+      .poll(() =>
+        previewImage.evaluate(async image => (await fetch(image.src)).text())
+      )
+      .toContain('data-export-framing="slide"');
+    const slidePreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expectSlideFramedSvg(slidePreviewSvgText);
+    const slideSvgDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const slideSvgPath = await slideSvgDownload.path();
+    expect(slideSvgPath).not.toBeNull();
+    expectSlideFramedSvg(await fs.readFile(slideSvgPath, 'utf8'));
+    const slidePngDownload = await expectDownloadFrom({
+      page,
+      locator: page.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+    expect(await readPngDimensions(slidePngDownload)).toEqual({
+      width: 3120,
+      height: 1755,
+    });
 
     await page.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();

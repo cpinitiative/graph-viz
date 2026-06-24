@@ -351,6 +351,7 @@ export const useGraphStudioImportExport = ({
         currentFrame,
         setCurrentFrame,
         frameIndexes,
+        framingMode: imageFraming,
       });
       setStatus('Slideshow exported');
     } catch (error) {
@@ -368,6 +369,7 @@ export const useGraphStudioImportExport = ({
     currentFrame,
     drawFrom,
     getExportFrameIndexes,
+    imageFraming,
     mode,
     restoreDrawState,
     selectedNodeIds,
