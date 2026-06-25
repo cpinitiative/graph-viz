@@ -26,7 +26,7 @@ const actionButtonClass =
 const headerActionButtonClass =
   'flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] text-base font-semibold leading-none text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#111827]';
 const deleteButtonClass =
-  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-[#B91C1C] px-3 py-2.5 text-left text-xs font-bold text-[#FFFFFF] transition-colors hover:border-[#991B1B] hover:bg-[#991B1B] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:bg-[#FCA5A5] disabled:text-[#FFFFFF] dark:border-[#DC2626] dark:bg-[#DC2626] dark:hover:border-[#B91C1C] dark:hover:bg-[#B91C1C] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] md:min-h-9 md:py-2';
+  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:border-[#B91C1C] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:border-[#DC2626] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
 const listButtonClass =
   'min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5';
 const toggleRowClass =
@@ -59,7 +59,7 @@ const InfoHelp = ({ label, text }) => {
     <span className="group relative inline-flex items-center">
       <button
         type="button"
-        className="flex h-5 w-5 items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] text-[10px] font-bold leading-none text-[#475569] transition-colors hover:border-[#94A3B8] hover:bg-[#F8F9FA] focus:outline-none focus:ring-2 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]"
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus:ring-[#60A5FA]"
         aria-label={label}
         aria-describedby={tooltipId}
       >
@@ -71,7 +71,7 @@ const InfoHelp = ({ label, text }) => {
       <span
         role="tooltip"
         aria-hidden="true"
-        className="pointer-events-none invisible absolute left-0 top-6 z-30 w-56 border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+        className="pointer-events-none invisible absolute right-0 top-5 z-30 w-44 max-w-[12rem] whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
       >
         {text}
       </span>
@@ -290,7 +290,7 @@ const NodeInspector = ({
         help={
           <InfoHelp
             label="Node property scope help"
-            text="Label applies to all frames. Status/color apply to the current frame."
+            text="Label applies to all frames. Status and color apply to this frame."
           />
         }
       >
@@ -441,11 +441,7 @@ const GlobalSettingsPanel = ({
             help={
               <InfoHelp
                 label="Curve Amount help"
-                text={
-                  curveAmountEnabled
-                    ? 'Controls how strongly curved routed edges bend.'
-                    : 'Only affects Curved edge routing. Switch Edge Routing to Curved to use this.'
-                }
+                text="Only works when Edge Routing is Curved."
               />
             }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}

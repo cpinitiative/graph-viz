@@ -13,7 +13,7 @@ const toolbarButtonClass =
 const addButtonClass =
   'min-h-[30px] rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
 const deleteButtonClass =
-  'min-h-[30px] rounded-sm border border-[#B91C1C] bg-[#B91C1C] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:border-[#991B1B] hover:bg-[#991B1B] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-1 disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:bg-[#FCA5A5] dark:border-[#DC2626] dark:bg-[#DC2626] dark:hover:border-[#B91C1C] dark:hover:bg-[#B91C1C] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827]';
+  'min-h-[30px] rounded-sm border border-[#B91C1C] bg-transparent px-2 py-1 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-1 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C]';
 const moveButtonClass =
   'min-h-[30px] min-w-[30px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const playbackButtonClass =

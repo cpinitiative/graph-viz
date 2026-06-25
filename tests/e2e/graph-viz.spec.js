@@ -535,16 +535,25 @@ test.describe('Graph Studio desktop smoke', () => {
     ).toBeHidden();
 
     const lockView = page.getByRole('checkbox', { name: 'Lock View' });
+    const fitViewButton = page.getByRole('button', { name: 'Fit View' });
+    const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
     await expect(lockView).not.toBeChecked();
+    await expect(fitViewButton).toBeEnabled();
     const zoomBefore = Number(
       await graphCanvas(page).getAttribute('data-view-zoom')
     );
-    await page.getByRole('button', { name: 'Zoom In' }).click();
+    await zoomInButton.click();
     await expect
       .poll(async () =>
         Number(await graphCanvas(page).getAttribute('data-view-zoom'))
       )
       .toBeGreaterThan(zoomBefore);
+    await fitViewButton.click();
+    await expect(graphCanvas(page)).toBeVisible();
+    await lockView.check();
+    await expect(fitViewButton).toBeDisabled();
+    await expect(zoomInButton).toBeDisabled();
+    await lockView.uncheck();
 
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
@@ -1443,11 +1452,7 @@ while (true) {}
     await expect(curveAmountHelp).toBeVisible();
     await curveAmountHelp.focus();
     await expect(
-      page
-        .getByText(
-          'Only affects Curved edge routing. Switch Edge Routing to Curved to use this.'
-        )
-        .last()
+      page.getByText('Only works when Edge Routing is Curved.').last()
     ).toBeVisible();
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
@@ -1460,7 +1465,7 @@ while (true) {}
     await expect(curveAmount).toBeEnabled();
     await curveAmountHelp.focus();
     await expect(
-      page.getByText('Controls how strongly curved routed edges bend.').last()
+      page.getByText('Only works when Edge Routing is Curved.').last()
     ).toBeVisible();
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
