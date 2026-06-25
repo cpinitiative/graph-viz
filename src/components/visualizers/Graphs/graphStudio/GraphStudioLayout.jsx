@@ -286,7 +286,7 @@ const GraphStudioLayout = ({
           <CanvasStage canvas={canvas} status={status} />
         </div>
 
-        <div className="h-52 min-h-[208px] border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
+        <div className="min-h-[260px] flex-none border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
           <TimelinePanel {...timeline} />
         </div>
 
@@ -315,9 +315,9 @@ const GraphStudioLayout = ({
         </Panel>
         <PanelResizeHandle className="graphstudio-resize-horizontal h-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50" />
         <Panel
-          defaultSize="164px"
-          minSize="160px"
-          maxSize="240px"
+          defaultSize="216px"
+          minSize="208px"
+          maxSize="320px"
           className="min-h-0"
         >
           <TimelinePanel {...timeline} />
