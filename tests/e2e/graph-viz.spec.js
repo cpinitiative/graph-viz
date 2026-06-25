@@ -25,6 +25,8 @@ const graphCanvas = page =>
     .getByTestId('graph-canvas-svg')
     .or(page.locator('svg#graph-studio-canvas-svg'));
 
+const propertyPanel = page => page.getByTestId('property-panel');
+
 const choosePreset = async (page, value) => {
   await page.getByLabel('Load graph preset').selectOption(value);
   await expect(graphCanvas(page)).toBeVisible();
@@ -144,7 +146,12 @@ const dragCaption = async (page, { dx = 160, dy = -100 } = {}) => {
 
 const setRangeValue = async (page, label, value) => {
   await page.getByLabel(label).evaluate((input, nextValue) => {
-    input.value = String(nextValue);
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    if (valueSetter) valueSetter.call(input, String(nextValue));
+    else input.value = String(nextValue);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, value);
@@ -1240,6 +1247,120 @@ while (true) {}
       legendPreview.locator('text').filter({ hasText: 'Edges' })
     ).toBeVisible();
     await closeLegendEditor(page);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('clears inspector selections from the header and Escape safely', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+
+    const firstNode = graphCanvas(page)
+      .locator('g[data-export-content="true"] circle')
+      .first();
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await expect(page.getByText('Node Inspector')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Canvas' }).click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(firstNode).toHaveAttribute('r', '22');
+
+    await graphCanvas(page)
+      .locator('[data-edge-hit-target-id]')
+      .first()
+      .click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'edge'
+    );
+    await expect(page.getByText('Edge Inspector')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Canvas' }).click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(firstNode).toHaveAttribute('r', '22');
+
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    const nodeLabelInput = propertyPanel(page).getByLabel('Label', {
+      exact: true,
+    });
+    await nodeLabelInput.fill('Node Alpha');
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await expect(nodeLabelInput).toHaveValue('Node Alpha');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps Curve Amount disabled in Straight routing and active in Curved routing', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const curveAmount = page.getByLabel('Curve Amount');
+    await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
+    await expect(curveAmount).toBeDisabled();
+    await expect(page.getByText('Only affects Curved routing.')).toBeVisible();
+
+    const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
+    await expect(firstEdgePath).toBeVisible();
+    const straightPath = await firstEdgePath.getAttribute('d');
+    expect(straightPath).toContain(' L ');
+    expect(straightPath).not.toContain(' C ');
+
+    await page.getByLabel('Edge routing').selectOption('bezier');
+    await expect(curveAmount).toBeEnabled();
+    await expect(page.getByText('Adjusts curved edge depth.')).toBeVisible();
+    await expect(page.getByText('Only affects Curved routing.')).toHaveCount(0);
+    await expect
+      .poll(() => firstEdgePath.getAttribute('d'))
+      .not.toBe(straightPath);
+
+    const curvedPathBefore = await firstEdgePath.getAttribute('d');
+    expect(curvedPathBefore).toContain(' C ');
+
+    await setRangeValue(page, 'Curve Amount', 100);
+    await expect
+      .poll(() => firstEdgePath.getAttribute('d'))
+      .not.toBe(curvedPathBefore);
+    const curvedPathAfter = await firstEdgePath.getAttribute('d');
+    expect(curvedPathAfter).toContain(' C ');
 
     expect(errors).toEqual([]);
   });

@@ -1,4 +1,5 @@
 import NativeSelect from './NativeSelect';
+import { EDGE_ROUTING } from './constants';
 
 const NODE_STATUS_OPTIONS = [
   ['default', 'Default'],
@@ -21,6 +22,8 @@ const inputClass =
   'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const actionButtonClass =
   'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
+const headerActionButtonClass =
+  'shrink-0 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const deleteButtonClass =
   'mt-1 min-h-[44px] w-full rounded-sm border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEE2E2] dark:border-[#7F1D1D] dark:bg-[#450A0A] dark:text-[#FCA5A5] dark:hover:bg-[#7F1D1D] md:min-h-9 md:py-2';
 const listButtonClass =
@@ -32,14 +35,30 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const PanelShell = ({ title, inspectorType, children }) => (
+const BackToCanvasButton = ({ onClick }) => {
+  if (!onClick) return null;
+
+  return (
+    <button
+      type="button"
+      className={headerActionButtonClass}
+      data-testid="back-to-canvas-button"
+      onClick={onClick}
+    >
+      Back to Canvas
+    </button>
+  );
+};
+
+const PanelShell = ({ title, inspectorType, headerAction, children }) => (
   <div
     className={panelClass}
     data-testid="property-panel"
     data-inspector-type={inspectorType}
   >
-    <div className="border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
+    <div className="flex items-center justify-between gap-3 border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
       <div className={sectionTitleClass}>{title}</div>
+      {headerAction}
     </div>
     {children}
   </div>
@@ -110,7 +129,16 @@ const DeleteButton = ({ children, onClick }) => (
   </button>
 );
 
-const RangeControl = ({ label, value, min, max, step, onChange }) => (
+const RangeControl = ({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  disabled = false,
+  helperText = '',
+}) => (
   <label className="block space-y-1.5">
     <div className="flex justify-between">
       <span className={fieldLabelClass}>{label}</span>
@@ -124,9 +152,14 @@ const RangeControl = ({ label, value, min, max, step, onChange }) => (
       max={max}
       step={step}
       value={value}
+      disabled={disabled}
       onChange={event => onChange(Number(event.target.value))}
-      className="h-2 w-full accent-blue-500"
+      className={joinClasses(
+        'h-2 w-full accent-[#0F2747] dark:accent-[#D6A84B]',
+        disabled && 'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
+      )}
     />
+    {helperText && <p className={helperTextClass}>{helperText}</p>}
   </label>
 );
 
@@ -159,8 +192,13 @@ const MultiSelectionPanel = ({
   selectedCount,
   onApplyToSelection,
   onDeleteSelection,
+  onClearSelection,
 }) => (
-  <PanelShell title="Selection Inspector" inspectorType="selection">
+  <PanelShell
+    title="Selection Inspector"
+    inspectorType="selection"
+    headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+  >
     <Section title="Selected Nodes">
       <p className={bodyTextClass}>{selectedCount} items selected</p>
       <div className="space-y-2">
@@ -185,11 +223,16 @@ const NodeInspector = ({
   onUpdateNode,
   onSelectEdge,
   onDeleteSelection,
+  onClearSelection,
 }) => {
   const nodeColor = selectedNode.color ?? '';
 
   return (
-    <PanelShell title="Node Inspector" inspectorType="node">
+    <PanelShell
+      title="Node Inspector"
+      inspectorType="node"
+      headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+    >
       <Section title="Node Properties">
         <p className={helperTextClass}>
           Label: all frames · Status/color: current frame
@@ -252,11 +295,16 @@ const EdgeInspector = ({
   onUpdateEdge,
   onSelectNode,
   onDeleteSelection,
+  onClearSelection,
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
 
   return (
-    <PanelShell title="Edge Inspector" inspectorType="edge">
+    <PanelShell
+      title="Edge Inspector"
+      inspectorType="edge"
+      headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+    >
       <Section title="Edge Properties">
         <p className={helperTextClass}>
           Weight/direction: all frames · Color: current frame
@@ -302,51 +350,65 @@ const EdgeInspector = ({
   );
 };
 
-const GlobalSettingsPanel = ({ globalSettings, onUpdateGlobal }) => (
-  <PanelShell title="Canvas Inspector" inspectorType="canvas">
-    <Section title="Canvas Settings">
-      <div className="space-y-4">
-        <RangeControl
-          label="Gravity (force)"
-          value={globalSettings.forceStrength}
-          min="0.2"
-          max="2"
-          step="0.1"
-          onChange={forceStrength => onUpdateGlobal({ forceStrength })}
-        />
-        <RangeControl
-          label="Edge curvature"
-          value={globalSettings.edgeCurvature}
-          min="0"
-          max="120"
-          step="5"
-          onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
-        />
-        <RangeControl
-          label="Node size"
-          value={globalSettings.nodeSize ?? 22}
-          min="12"
-          max="44"
-          step="1"
-          onChange={nodeSize => onUpdateGlobal({ nodeSize })}
-        />
-        <RangeControl
-          label="Edge width"
-          value={globalSettings.edgeWidth ?? 2.2}
-          min="1"
-          max="8"
-          step="0.2"
-          onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
-        />
+const GlobalSettingsPanel = ({
+  globalSettings,
+  edgeRouting,
+  onUpdateGlobal,
+}) => {
+  const curveAmountEnabled = edgeRouting === EDGE_ROUTING.bezier;
+
+  return (
+    <PanelShell title="Canvas Inspector" inspectorType="canvas">
+      <Section title="Canvas Settings">
+        <div className="space-y-4">
+          <RangeControl
+            label="Gravity (force)"
+            value={globalSettings.forceStrength}
+            min="0.2"
+            max="2"
+            step="0.1"
+            onChange={forceStrength => onUpdateGlobal({ forceStrength })}
+          />
+          <RangeControl
+            label="Curve Amount"
+            value={globalSettings.edgeCurvature}
+            min="0"
+            max="120"
+            step="5"
+            disabled={!curveAmountEnabled}
+            helperText={
+              curveAmountEnabled
+                ? 'Adjusts curved edge depth.'
+                : 'Only affects Curved routing.'
+            }
+            onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
+          />
+          <RangeControl
+            label="Node size"
+            value={globalSettings.nodeSize ?? 22}
+            min="12"
+            max="44"
+            step="1"
+            onChange={nodeSize => onUpdateGlobal({ nodeSize })}
+          />
+          <RangeControl
+            label="Edge width"
+            value={globalSettings.edgeWidth ?? 2.2}
+            min="1"
+            max="8"
+            step="0.2"
+            onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
+          />
+        </div>
+      </Section>
+      <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
+        <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
+          Select a node or edge to open its inspector.
+        </div>
       </div>
-    </Section>
-    <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
-      <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
-        Select a node or edge to open its inspector.
-      </div>
-    </div>
-  </PanelShell>
-);
+    </PanelShell>
+  );
+};
 
 const PropertyPanel = ({
   selectedNode,
@@ -355,12 +417,14 @@ const PropertyPanel = ({
   connectedNodes,
   multiSelection,
   globalSettings,
+  edgeRouting,
   onUpdateNode,
   onUpdateEdge,
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
   onDeleteSelection,
+  onClearSelection,
   onUpdateGlobal,
 }) => {
   if (multiSelection.length > 1) {
@@ -369,6 +433,7 @@ const PropertyPanel = ({
         selectedCount={multiSelection.length}
         onApplyToSelection={onApplyToSelection}
         onDeleteSelection={onDeleteSelection}
+        onClearSelection={onClearSelection}
       />
     );
   }
@@ -381,6 +446,7 @@ const PropertyPanel = ({
         onUpdateNode={onUpdateNode}
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
+        onClearSelection={onClearSelection}
       />
     );
   }
@@ -393,6 +459,7 @@ const PropertyPanel = ({
         onUpdateEdge={onUpdateEdge}
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
+        onClearSelection={onClearSelection}
       />
     );
   }
@@ -400,6 +467,7 @@ const PropertyPanel = ({
   return (
     <GlobalSettingsPanel
       globalSettings={globalSettings}
+      edgeRouting={edgeRouting}
       onUpdateGlobal={onUpdateGlobal}
     />
   );
