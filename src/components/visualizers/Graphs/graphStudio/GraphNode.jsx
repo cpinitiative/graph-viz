@@ -1,5 +1,20 @@
 import { motion } from 'framer-motion';
+import { useTheme } from '../../../../context/useTheme';
 import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
+
+const EDITOR_RING_COLORS = {
+  light: {
+    selected: '#2563EB',
+    multiSelected: '#64748B',
+    drawAnchor: '#B45309',
+  },
+  dark: {
+    selected: '#60A5FA',
+    multiSelected: '#93C5FD',
+    drawAnchor: '#F59E0B',
+  },
+};
+
 const getNodePalette = node => {
   if (node?.color) {
     return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
@@ -22,7 +37,13 @@ const GraphNode = ({
   mode,
   nodeRadius = NODE_RADIUS,
 }) => {
+  const { theme } = useTheme();
   const palette = getNodePalette(node);
+  const ringColors = EDITOR_RING_COLORS[theme] ?? EDITOR_RING_COLORS.light;
+  const selectionRingColor = selected
+    ? ringColors.selected
+    : ringColors.multiSelected;
+
   return (
     <g
       style={{ cursor: mode === 'draw' ? 'crosshair' : 'grab' }}
@@ -32,16 +53,10 @@ const GraphNode = ({
       <motion.circle
         cx={node.x}
         cy={node.y}
-        r={selected ? nodeRadius + 2 : nodeRadius}
+        r={nodeRadius}
         fill={palette.fill}
-        stroke={
-          drawAnchor
-            ? '#000000'
-            : selected || multiSelected
-              ? '#000000'
-              : palette.stroke
-        }
-        strokeWidth={selected ? 4 : multiSelected ? 3 : 2}
+        stroke={palette.stroke}
+        strokeWidth="2"
         layoutId={`${layoutIdPrefix}node-${node.id}`}
         animate={{ cx: node.x, cy: node.y }}
         transition={
@@ -56,6 +71,43 @@ const GraphNode = ({
               : 'none',
         }}
       />
+      {(selected || multiSelected) && (
+        <motion.circle
+          data-node-selection-ring-id={node.id}
+          cx={node.x}
+          cy={node.y}
+          r={nodeRadius + 6}
+          fill="none"
+          stroke={selectionRingColor}
+          strokeWidth={selected ? 3 : 2}
+          pointerEvents="none"
+          animate={{ cx: node.x, cy: node.y }}
+          transition={
+            shouldAnimate
+              ? { duration: 0.32, ease: 'easeInOut' }
+              : { duration: 0 }
+          }
+        />
+      )}
+      {drawAnchor && (
+        <motion.circle
+          data-node-draw-source-ring-id={node.id}
+          cx={node.x}
+          cy={node.y}
+          r={nodeRadius + 10}
+          fill="none"
+          stroke={ringColors.drawAnchor}
+          strokeWidth="3"
+          strokeDasharray="5 4"
+          pointerEvents="none"
+          animate={{ cx: node.x, cy: node.y }}
+          transition={
+            shouldAnimate
+              ? { duration: 0.32, ease: 'easeInOut' }
+              : { duration: 0 }
+          }
+        />
+      )}
       <text
         x={node.x}
         y={node.y + 4}

@@ -15,8 +15,6 @@ const panelClass =
 const sectionTitleClass =
   'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
-const helperTextClass =
-  'border-l-2 border-[#94A3B8] pl-2 text-[10px] leading-relaxed text-[#64748B] dark:border-[#64748B] dark:text-[#94A3B8]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const inputClass =
@@ -24,7 +22,7 @@ const inputClass =
 const actionButtonClass =
   'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
 const headerActionButtonClass =
-  'flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] text-base font-semibold leading-none text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#111827]';
+  '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#111827]';
 const deleteButtonClass =
   'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:border-[#B91C1C] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:border-[#DC2626] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
 const listButtonClass =
@@ -47,7 +45,21 @@ const ClearSelectionButton = ({ label, onClick }) => {
       data-testid="inspector-clear-selection"
       onClick={onClick}
     >
-      <span aria-hidden="true">×</span>
+      <svg
+        aria-hidden="true"
+        className="block"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
     </button>
   );
 };
@@ -368,9 +380,6 @@ const EdgeInspector = ({
       }
     >
       <Section title="Edge Details">
-        <p className={helperTextClass}>
-          Weight/direction: all frames · Color: current frame
-        </p>
         <div className="space-y-4">
           <Field label="Weight / Label">
             <TextInput

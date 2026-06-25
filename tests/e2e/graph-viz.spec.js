@@ -25,6 +25,11 @@ const graphCanvas = page =>
     .getByTestId('graph-canvas-svg')
     .or(page.locator('svg#graph-studio-canvas-svg'));
 
+const nodeCircleSelector =
+  'g[data-export-content="true"] circle:not([data-node-selection-ring-id]):not([data-node-draw-source-ring-id])';
+
+const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
+
 const propertyPanel = page => page.getByTestId('property-panel');
 
 const choosePreset = async (page, value) => {
@@ -33,11 +38,11 @@ const choosePreset = async (page, value) => {
 };
 
 const getDirectedEdgeEndpointOffsets = async page =>
-  graphCanvas(page).evaluate(svg => {
+  graphCanvas(page).evaluate((svg, selector) => {
     const edgePaths = Array.from(
       svg.querySelectorAll('path[marker-end^="url(#graphstudio-arrow-"]')
     );
-    const nodeCircles = Array.from(svg.querySelectorAll(':scope > g circle'))
+    const nodeCircles = Array.from(svg.querySelectorAll(selector))
       .map(circle => ({
         x: Number(circle.getAttribute('cx')),
         y: Number(circle.getAttribute('cy')),
@@ -68,7 +73,7 @@ const getDirectedEdgeEndpointOffsets = async page =>
         return nearest;
       })
       .filter(Boolean);
-  });
+  }, nodeCircleSelector);
 
 const expectDirectedEdgesAnchored = async page => {
   await expect
@@ -84,7 +89,7 @@ const expectDirectedEdgesAnchored = async page => {
 };
 
 const dragFirstGraphNode = async page => {
-  const node = page.locator('svg#graph-studio-canvas-svg > g circle').first();
+  const node = graphNodeCircles(page).first();
   await expect(node).toBeVisible();
   const box = await node.boundingBox();
   expect(box).not.toBeNull();
@@ -206,29 +211,32 @@ const getPreviewSvgText = async page => {
 };
 
 const getSvgPresentationState = async (page, svgText) =>
-  page.evaluate(text => {
-    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
-    const firstNode = doc.querySelector('g[data-export-content="true"] circle');
-    const firstEdge =
-      doc.querySelector('path[data-edge-path-id="e0"]') ??
-      doc.querySelector('path[data-edge-path-id]');
+  page.evaluate(
+    ({ text, selector }) => {
+      const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+      const firstNode = doc.querySelector(selector);
+      const firstEdge =
+        doc.querySelector('path[data-edge-path-id="e0"]') ??
+        doc.querySelector('path[data-edge-path-id]');
 
-    return {
-      firstNode: firstNode
-        ? {
-            r: Number(firstNode.getAttribute('r')),
-            strokeWidth: Number(firstNode.getAttribute('stroke-width')),
-            stroke: firstNode.getAttribute('stroke'),
-          }
-        : null,
-      firstEdge: firstEdge
-        ? {
-            stroke: firstEdge.getAttribute('stroke'),
-            strokeWidth: Number(firstEdge.getAttribute('stroke-width')),
-          }
-        : null,
-    };
-  }, svgText);
+      return {
+        firstNode: firstNode
+          ? {
+              r: Number(firstNode.getAttribute('r')),
+              strokeWidth: Number(firstNode.getAttribute('stroke-width')),
+              stroke: firstNode.getAttribute('stroke'),
+            }
+          : null,
+        firstEdge: firstEdge
+          ? {
+              stroke: firstEdge.getAttribute('stroke'),
+              strokeWidth: Number(firstEdge.getAttribute('stroke-width')),
+            }
+          : null,
+      };
+    },
+    { text: svgText, selector: nodeCircleSelector }
+  );
 
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
@@ -498,9 +506,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await themeToggle.click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
 
-    const graphNodes = graphCanvas(page).locator(
-      'g[data-export-content="true"] circle'
-    );
+    const graphNodes = graphNodeCircles(page);
     const initialNodeCount = await graphNodes.count();
     await page.getByRole('button', { name: 'Add Node' }).click();
     await expect(page.getByTestId('tool-button-add')).toHaveAttribute(
@@ -750,6 +756,14 @@ while (true) {}
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
     await expect(frameDescription).toHaveValue('Second BFS state');
     await expect(durationInput).toHaveValue('1200');
+
+    await page.getByTitle('Move keyframe left').click();
+    await expect(cards.nth(initialFrameCount + 1)).toHaveAttribute(
+      'data-current',
+      'true'
+    );
+    await page.getByTitle('Move keyframe right').click();
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
 
     await cards.last().focus();
     await cards.last().press('ArrowLeft');
@@ -1316,23 +1330,35 @@ while (true) {}
       'canvas'
     );
 
-    const graphNodes = graphCanvas(page).locator(
-      'g[data-export-content="true"] circle'
-    );
+    const graphNodes = graphNodeCircles(page);
     const firstNode = graphNodes.first();
     const secondNode = graphNodes.nth(1);
+    const selectionRing = graphCanvas(page).locator(
+      '[data-node-selection-ring-id]'
+    );
+    const drawSourceRing = graphCanvas(page).locator(
+      '[data-node-draw-source-ring-id]'
+    );
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'node'
     );
     await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(selectionRing).toBeVisible();
+    await expect(selectionRing).toHaveAttribute('stroke', '#2563EB');
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(selectionRing).toHaveAttribute('stroke', '#60A5FA');
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Clear node selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
     await expect(firstNode).toHaveAttribute('r', '22');
+    await expect(selectionRing).toHaveCount(0);
 
     await graphCanvas(page)
       .locator('[data-edge-hit-target-id]')
@@ -1343,6 +1369,9 @@ while (true) {}
       'edge'
     );
     await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      page.getByText('Weight/direction: all frames · Color: current frame')
+    ).toHaveCount(0);
     await page.getByRole('button', { name: 'Clear edge selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1367,13 +1396,15 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
-    await expect(firstNode).toHaveAttribute('r', '24');
+    await expect(firstNode).toHaveAttribute('r', '22');
+    await expect(selectionRing).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
     await expect(firstNode).toHaveAttribute('r', '22');
+    await expect(selectionRing).toHaveCount(0);
 
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -1395,6 +1426,8 @@ while (true) {}
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
+    await expect(drawSourceRing).toBeVisible();
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '5 4');
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1406,6 +1439,7 @@ while (true) {}
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toHaveCount(0);
+    await expect(drawSourceRing).toHaveCount(0);
 
     expect(errors).toEqual([]);
   });
@@ -1675,16 +1709,17 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
-    const graphNodes = graphCanvas(page).locator(
-      'g[data-export-content="true"] circle'
-    );
+    const graphNodes = graphNodeCircles(page);
     const firstNode = graphNodes.first();
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'node'
     );
-    await expect(firstNode).toHaveAttribute('r', '24');
+    await expect(firstNode).toHaveAttribute('r', '22');
+    await expect(
+      graphCanvas(page).locator('[data-node-selection-ring-id]')
+    ).toBeVisible();
 
     let exportMenu = await openExportMenu(page);
     let previewState = await getSvgPresentationState(
