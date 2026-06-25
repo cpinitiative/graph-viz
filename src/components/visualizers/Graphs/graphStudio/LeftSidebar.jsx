@@ -35,7 +35,7 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const iconButtonClass =
-  'min-w-[44px] rounded-sm p-2 text-[#334155] transition-colors hover:bg-[#E2E8F0] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-w-8 md:p-1.5';
+  'flex min-h-[36px] min-w-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] md:min-h-8 md:min-w-8 md:p-1.5';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -199,18 +199,19 @@ const LeftSidebar = ({
     >
       <SidebarSection>
         <SectionTitle>Tools</SectionTitle>
-        <div className="grid grid-cols-2 gap-1 rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
+        <div className="grid grid-cols-2 gap-2">
           {TOOL_OPTIONS.map(tool => (
             <button
               key={tool.id}
               type="button"
               className={joinClasses(
-                'min-h-[44px] rounded-sm px-2 py-2 text-xs font-semibold transition-colors md:min-h-8 md:py-1.5',
+                actionButtonBaseClass,
                 mode === tool.id
-                  ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#1D4ED8] dark:text-[#FFFFFF]'
-                  : 'text-[#475569] hover:bg-[#FFFFFF] hover:text-[#0F2747] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:hover:text-[#FFFFFF]'
+                  ? 'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] dark:border-[#2563EB] dark:bg-[#2563EB] dark:text-[#FFFFFF]'
+                  : actionButtonDefaultClass
               )}
               aria-pressed={mode === tool.id}
+              data-testid={`tool-button-${tool.id}`}
               onClick={() =>
                 tool.id === 'draw' ? onDrawEdge() : setMode(tool.id)
               }
@@ -266,7 +267,7 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="flex items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
+        <div className="flex items-center justify-between gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
           <IconButton title="Center View" onClick={onCenterView}>
             <CenterViewIcon />
           </IconButton>

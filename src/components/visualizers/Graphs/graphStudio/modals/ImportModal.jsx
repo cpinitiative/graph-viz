@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
+import { isEditableKeyboardTarget } from '../lib/keyboardTargets';
 import ModalCloseButton from './ModalCloseButton';
 
 const sectionClass =
-  'space-y-3 border border-outline-variant/30 bg-white p-4 dark:border-dark-outline-variant/30 dark:bg-gray-900';
+  'space-y-3 border border-[#CBD5E1] bg-[#FFFFFF] p-4 dark:border-[#334155] dark:bg-[#111827]';
 const actionClass =
-  'min-h-[44px] w-full rounded-md bg-surface-container px-4 py-3 text-left text-sm font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-gray-800 dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
+  'min-h-[42px] w-full rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 py-2.5 text-left text-sm font-semibold text-[#1E293B] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
+const secondaryActionClass =
+  'rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-4 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
 
 const ImportModal = ({
   open,
@@ -18,7 +21,9 @@ const ImportModal = ({
   useEffect(() => {
     if (!open) return undefined;
     const handleKeyDown = event => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape' && !isEditableKeyboardTarget(event.target)) {
+        onClose?.();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -33,27 +38,27 @@ const ImportModal = ({
 
   return (
     <div
-      className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/75 p-4"
       data-testid="import-menu-modal"
       onMouseDown={event => {
         if (event.target === event.currentTarget) onClose?.();
       }}
     >
       <div
-        className="mx-4 flex max-h-[90vh] w-full max-w-xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black"
+        className="mx-4 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden border border-[#94A3B8] bg-[#F8F9FA] shadow-2xl dark:border-[#475569] dark:bg-[#0F172A]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="import-menu-title"
       >
-        <div className="flex items-center justify-between border-b border-outline-variant/20 p-5 dark:border-dark-outline-variant/20">
+        <div className="flex items-start justify-between border-b border-[#CBD5E1] bg-[#FFFFFF] px-5 py-4 dark:border-[#334155] dark:bg-[#111827]">
           <div>
             <h2
               id="import-menu-title"
-              className="text-base font-semibold text-on-surface dark:text-dark-on-surface"
+              className="text-lg font-semibold text-[#0F172A] dark:text-[#F8FAFC]"
             >
               Import
             </h2>
-            <p className="mt-1 text-xs text-outline dark:text-dark-outline">
+            <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
               Bring project data or an edge list into the current workspace.
             </p>
           </div>
@@ -63,11 +68,12 @@ const ImportModal = ({
         <div className="space-y-4 overflow-auto p-5">
           <section className={sectionClass}>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
-                Project
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+                Project Data
               </h3>
-              <p className="mt-1 text-xs text-outline dark:text-dark-outline">
-                Load a complete Graph Viz project without changing its schema.
+              <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
+                Load a complete Graph Studio project without changing its
+                schema.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -108,10 +114,10 @@ const ImportModal = ({
 
           <section className={sectionClass}>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-on-surface dark:text-dark-on-surface">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
                 Edge List
               </h3>
-              <p className="mt-1 text-xs text-outline dark:text-dark-outline">
+              <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
                 Paste competitive-programming style node and edge data.
               </p>
             </div>
@@ -125,10 +131,10 @@ const ImportModal = ({
           </section>
         </div>
 
-        <div className="flex justify-end border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900">
+        <div className="flex justify-end border-t border-[#CBD5E1] bg-[#FFFFFF] p-4 dark:border-[#334155] dark:bg-[#111827]">
           <button
             type="button"
-            className="rounded-md bg-surface-container px-4 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-gray-800 dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"
+            className={secondaryActionClass}
             onClick={onClose}
           >
             Cancel

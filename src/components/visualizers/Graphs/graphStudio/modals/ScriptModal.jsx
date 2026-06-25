@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { SCRIPT_EXAMPLES } from '../data/scriptExamples';
+import { isEditableKeyboardTarget } from '../lib/keyboardTargets';
 import NativeSelect from '../NativeSelect';
 import ModalCloseButton from './ModalCloseButton';
 
@@ -11,6 +13,20 @@ const ScriptModal = ({
   defaultScript,
   error,
 }) => {
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleKeyDown = event => {
+      if (event.key !== 'Escape' || isEditableKeyboardTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, open]);
+
   if (!open) return null;
 
   const selectedExample =
@@ -27,10 +43,16 @@ const ScriptModal = ({
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60"
       data-testid="script-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="script-modal-title"
     >
       <div className="mx-4 flex max-h-[90vh] w-full max-w-3xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
         <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
-          <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
+          <h3
+            id="script-modal-title"
+            className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
+          >
             Script Mode (Trace Recorder)
           </h3>
           <ModalCloseButton onClick={onClose} />

@@ -4,6 +4,7 @@ import {
   clampExportFrameRange,
   resolveExportFrameIndexes,
 } from '../lib/exportFrameRange';
+import { isEditableKeyboardTarget } from '../lib/keyboardTargets';
 import {
   getGraphSvgElement,
   IMAGE_FRAMING,
@@ -48,9 +49,9 @@ const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
       <GraphCanvas
         graph={graph}
         diff={EMPTY_DIFF}
-        selectedObject={canvas?.selectedObject ?? null}
-        selectedNodeIds={canvas?.selectedNodeIds ?? EMPTY_SELECTION}
-        drawFrom={canvas?.drawFrom ?? null}
+        selectedObject={null}
+        selectedNodeIds={EMPTY_SELECTION}
+        drawFrom={null}
         mode="select"
         viewState={canvas?.viewState ?? { x: 0, y: 0, zoom: 1 }}
         setViewState={noop}
@@ -79,6 +80,7 @@ const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
         onNodePointerUp={noop}
         onNodeClickForDraw={noop}
         onCanvasAddNode={noop}
+        isExporting
       />
     </div>
   );
@@ -256,7 +258,9 @@ const ExportModal = ({
   useEffect(() => {
     if (!open) return undefined;
     const handleKeyDown = event => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape' && !isEditableKeyboardTarget(event.target)) {
+        onClose?.();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -462,7 +466,7 @@ const ExportModal = ({
                       aria-current={isSelected ? 'true' : undefined}
                       className={`min-h-[74px] w-[170px] flex-none border px-3 py-2.5 text-left transition-colors sm:w-[190px] ${
                         isSelected
-                          ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#D97706] dark:bg-[#451A03] dark:text-[#FED7AA]'
+                          ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#60A5FA] dark:bg-[#172554] dark:text-[#DBEAFE]'
                           : 'border-[#CBD5E1] bg-[#FFFFFF] text-[#334155] hover:border-[#94A3B8] hover:bg-[#F8FAFC] dark:border-[#475569] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#64748B]'
                       }`}
                       data-selected={isSelected ? 'true' : 'false'}

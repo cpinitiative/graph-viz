@@ -9,10 +9,16 @@ const ParserModal = ({ open, text, onTextChange, onClose, onSubmit }) => {
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60"
       data-testid="parser-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="parser-modal-title"
     >
       <div className="mx-4 flex max-h-[90vh] w-full max-w-2xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
         <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
-          <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
+          <h3
+            id="parser-modal-title"
+            className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
+          >
             Text-to-Graph Parser
           </h3>
           <ModalCloseButton onClick={onClose} />

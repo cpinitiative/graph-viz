@@ -5,7 +5,7 @@ const graphCanvas = page =>
     .getByTestId('graph-canvas-svg')
     .or(page.locator('svg#graph-studio-canvas-svg'));
 
-test.describe('Graph Viz mobile smoke', () => {
+test.describe('Graph Studio mobile smoke', () => {
   test('keeps the canvas and timeline usable around mobile overlays', async ({
     page,
   }) => {

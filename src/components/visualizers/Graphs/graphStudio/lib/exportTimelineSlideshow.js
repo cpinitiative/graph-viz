@@ -13,7 +13,7 @@ const IMAGE_MARGIN = 0.08;
 
 const getDatedFilename = () => {
   const date = new Date().toISOString().slice(0, 10);
-  return `graph-viz-slideshow-${date}.pptx`;
+  return `graph-studio-slideshow-${date}.pptx`;
 };
 
 const getFittedImageRect = ({ imageWidth, imageHeight }) => {
@@ -75,10 +75,10 @@ export async function exportTimelineSlideshow({
   const { default: PptxGenJS } = await import('pptxgenjs');
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
-  pptx.author = 'Graph Viz';
+  pptx.author = 'Graph Studio';
   pptx.subject = 'Graph animation slideshow export';
-  pptx.title = 'Graph Viz Slideshow';
-  pptx.company = 'Graph Viz';
+  pptx.title = 'Graph Studio Slideshow';
+  pptx.company = 'Graph Studio';
   pptx.lang = 'en-US';
   pptx.theme = {
     headFontFace: 'Arial',

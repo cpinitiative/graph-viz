@@ -16,7 +16,7 @@ const FIT_CONTENT_PADDING_RATIO = 0.075;
 
 const getDatedFrameFilename = extension => {
   const date = new Date().toISOString().slice(0, 10);
-  return `graph-viz-frame-${date}.${extension}`;
+  return `graph-studio-frame-${date}.${extension}`;
 };
 
 export const downloadBlob = ({ blob, filename }) => {

@@ -281,7 +281,7 @@ export const downloadProjectJson = payload => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `graph-viz-project-${date}.graphviz.json`;
+  link.download = `graph-studio-project-${date}.graphviz.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();

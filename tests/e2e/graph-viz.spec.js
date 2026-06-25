@@ -145,16 +145,18 @@ const dragCaption = async (page, { dx = 160, dy = -100 } = {}) => {
 };
 
 const setRangeValue = async (page, label, value) => {
-  await page.getByLabel(label).evaluate((input, nextValue) => {
-    const valueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      'value'
-    )?.set;
-    if (valueSetter) valueSetter.call(input, String(nextValue));
-    else input.value = String(nextValue);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, value);
+  await page
+    .getByRole('slider', { name: label })
+    .evaluate((input, nextValue) => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      )?.set;
+      if (valueSetter) valueSetter.call(input, String(nextValue));
+      else input.value = String(nextValue);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, value);
 };
 
 const expectDownloadFrom = async ({ page, locator, filenamePattern }) => {
@@ -197,6 +199,36 @@ const expectSlideFramedSvg = svgText => {
   expect(viewBox.every(Number.isFinite)).toBe(true);
   expect(viewBox[2] / viewBox[3]).toBeCloseTo(1040 / 585, 3);
 };
+
+const getPreviewSvgText = async page => {
+  const previewImage = await expectExportPreview(page);
+  return previewImage.evaluate(async image => (await fetch(image.src)).text());
+};
+
+const getSvgPresentationState = async (page, svgText) =>
+  page.evaluate(text => {
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const firstNode = doc.querySelector('g[data-export-content="true"] circle');
+    const firstEdge =
+      doc.querySelector('path[data-edge-path-id="e0"]') ??
+      doc.querySelector('path[data-edge-path-id]');
+
+    return {
+      firstNode: firstNode
+        ? {
+            r: Number(firstNode.getAttribute('r')),
+            strokeWidth: Number(firstNode.getAttribute('stroke-width')),
+            stroke: firstNode.getAttribute('stroke'),
+          }
+        : null,
+      firstEdge: firstEdge
+        ? {
+            stroke: firstEdge.getAttribute('stroke'),
+            strokeWidth: Number(firstEdge.getAttribute('stroke-width')),
+          }
+        : null,
+    };
+  }, svgText);
 
 const expandLegendEditor = async page => {
   const editToggle = page.getByTestId('custom-legend-edit-toggle');
@@ -401,7 +433,7 @@ const pastedProject = {
   },
 };
 
-test.describe('Graph Viz desktop smoke', () => {
+test.describe('Graph Studio desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test('loads the app shell without unexpected browser errors', async ({
@@ -455,6 +487,10 @@ test.describe('Graph Viz desktop smoke', () => {
     });
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByTestId('tool-button-select')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -467,6 +503,10 @@ test.describe('Graph Viz desktop smoke', () => {
     );
     const initialNodeCount = await graphNodes.count();
     await page.getByRole('button', { name: 'Add Node' }).click();
+    await expect(page.getByTestId('tool-button-add')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await expect(
       page.getByText('Click the canvas to add a node.')
     ).toBeVisible();
@@ -478,14 +518,18 @@ test.describe('Graph Viz desktop smoke', () => {
     await expect(page.getByTestId('graph-studio-status')).toHaveCount(0);
     await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByTestId('tool-button-select').click();
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await expect(page.getByTestId('tool-button-draw')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await expect(
       page.getByText('Click a source node, then a target node.')
     ).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByTestId('tool-button-select').click();
     await expect(
       page.getByText('Click a source node, then a target node.')
     ).toBeHidden();
@@ -522,7 +566,7 @@ test.describe('Graph Viz desktop smoke', () => {
         ].join(',')
       )
       .not.toBe(viewBeforePan);
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByTestId('tool-button-select').click();
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
       await page.getByRole('button', { name: layout }).click();
@@ -535,12 +579,12 @@ test.describe('Graph Viz desktop smoke', () => {
 
     await expect(page.getByText('Canvas Inspector')).toBeVisible();
     await graphNodes.first().click();
-    await expect(page.getByText('Node Inspector')).toBeVisible();
+    await expect(page.getByText('Node Properties')).toBeVisible();
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first()
       .click();
-    await expect(page.getByText('Edge Inspector')).toBeVisible();
+    await expect(page.getByText('Edge Properties')).toBeVisible();
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(page.getByText('Canvas Inspector')).toBeVisible();
 
@@ -1251,7 +1295,7 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('clears inspector selections from the header and Escape safely', async ({
+  test('clears inspector selections from compact header controls and Escape safely', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -1263,16 +1307,18 @@ while (true) {}
       'canvas'
     );
 
-    const firstNode = graphCanvas(page)
-      .locator('g[data-export-content="true"] circle')
-      .first();
+    const graphNodes = graphCanvas(page).locator(
+      'g[data-export-content="true"] circle'
+    );
+    const firstNode = graphNodes.first();
+    const secondNode = graphNodes.nth(1);
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'node'
     );
-    await expect(page.getByText('Node Inspector')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to Canvas' }).click();
+    await expect(page.getByText('Node Properties')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear node selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
@@ -1287,8 +1333,21 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
-    await expect(page.getByText('Edge Inspector')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to Canvas' }).click();
+    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear edge selection' }).click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+
+    await firstNode.click();
+    await secondNode.click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'selection'
+    );
+    await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
@@ -1299,6 +1358,7 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
+    await expect(firstNode).toHaveAttribute('r', '24');
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1322,6 +1382,49 @@ while (true) {}
     );
     await expect(nodeLabelInput).toHaveValue('Node Alpha');
 
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(
+      page.getByText('Click a source node, then a target node.')
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('exits Script Mode with Escape only when not editing code', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    await expect(page.getByTestId('script-modal')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('script-modal')).toBeHidden();
+
+    await page.getByRole('button', { name: 'Script Mode' }).click();
+    const scriptEditor = page.getByTestId('script-modal').locator('textarea');
+    await scriptEditor.fill('api.push({ description: "Keep editing" });');
+    await scriptEditor.focus();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('script-modal')).toBeVisible();
+    await expect(scriptEditor).toHaveValue(
+      'api.push({ description: "Keep editing" });'
+    );
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
     expect(errors).toEqual([]);
   });
 
@@ -1333,10 +1436,19 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
-    const curveAmount = page.getByLabel('Curve Amount');
+    const curveAmount = page.getByRole('slider', { name: 'Curve Amount' });
+    const curveAmountHelp = page.getByLabel('Curve Amount help');
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
     await expect(curveAmount).toBeDisabled();
-    await expect(page.getByText('Only affects Curved routing.')).toBeVisible();
+    await expect(curveAmountHelp).toBeVisible();
+    await curveAmountHelp.focus();
+    await expect(
+      page
+        .getByText(
+          'Only affects Curved edge routing. Switch Edge Routing to Curved to use this.'
+        )
+        .last()
+    ).toBeVisible();
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -1346,8 +1458,10 @@ while (true) {}
 
     await page.getByLabel('Edge routing').selectOption('bezier');
     await expect(curveAmount).toBeEnabled();
-    await expect(page.getByText('Adjusts curved edge depth.')).toBeVisible();
-    await expect(page.getByText('Only affects Curved routing.')).toHaveCount(0);
+    await curveAmountHelp.focus();
+    await expect(
+      page.getByText('Controls how strongly curved routed edges bend.').last()
+    ).toBeVisible();
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
       .not.toBe(straightPath);
@@ -1429,6 +1543,8 @@ while (true) {}
     await expect(
       importMenu.getByRole('heading', { name: 'Import' })
     ).toBeVisible();
+    await expect(importMenu.getByText('Graph Studio project')).toBeVisible();
+    await expect(importMenu.getByText('Graph Viz project')).toHaveCount(0);
     await expect(
       importMenu.getByRole('button', { name: 'Upload Project File' })
     ).toBeVisible();
@@ -1546,6 +1662,96 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('renders export preview and SVG without editor selection state', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const graphNodes = graphCanvas(page).locator(
+      'g[data-export-content="true"] circle'
+    );
+    const firstNode = graphNodes.first();
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await expect(firstNode).toHaveAttribute('r', '24');
+
+    let exportMenu = await openExportMenu(page);
+    let previewState = await getSvgPresentationState(
+      page,
+      await getPreviewSvgText(page)
+    );
+    expect(previewState.firstNode).toMatchObject({
+      r: 22,
+      strokeWidth: 2,
+    });
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const exportedState = await getSvgPresentationState(
+      page,
+      await fs.readFile(svgPath, 'utf8')
+    );
+    expect(exportedState.firstNode).toMatchObject({
+      r: 22,
+      strokeWidth: 2,
+    });
+    await closeExportMenu(page);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+
+    await graphCanvas(page).locator('[data-edge-hit-target-id="e0"]').click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'edge'
+    );
+    exportMenu = await openExportMenu(page);
+    previewState = await getSvgPresentationState(
+      page,
+      await getPreviewSvgText(page)
+    );
+    expect(previewState.firstEdge.stroke).toBe('#64748B');
+    expect(previewState.firstEdge.strokeWidth).toBeCloseTo(2.2, 3);
+    await closeExportMenu(page);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'edge'
+    );
+
+    await firstNode.click();
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toBeVisible();
+    exportMenu = await openExportMenu(page);
+    previewState = await getSvgPresentationState(
+      page,
+      await getPreviewSvgText(page)
+    );
+    expect(previewState.firstNode).toMatchObject({
+      r: 22,
+      strokeWidth: 2,
+    });
+    await closeExportMenu(page);
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
   test('reviews only included export frames without changing the editor frame', async ({
     page,
   }) => {
@@ -1654,6 +1860,9 @@ while (true) {}
       graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
     ).toBeVisible();
     await expect(page.getByLabel('Show caption')).toBeChecked();
+    await expect(
+      page.getByRole('checkbox', { name: 'Lock View' })
+    ).toBeChecked();
     await expect(page.getByLabel('Caption Style')).toHaveValue('subtle');
     await expect(page.getByLabel('Caption Size')).toHaveValue('medium');
     await expect(page.getByTestId('frame-caption-overlay')).toContainText(
@@ -1913,7 +2122,7 @@ api.edge('loop', '#3b82f6');
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first();
     await edgeHitTarget.dispatchEvent('click');
-    await expect(page.getByText('Edge Inspector')).toBeVisible();
+    await expect(page.getByText('Edge Properties')).toBeVisible();
 
     await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({
@@ -1986,7 +2195,7 @@ api.edge('loop', '#3b82f6');
       await graphCanvas(page)
         .locator(`[data-edge-hit-target-id="${edgeId}"]`)
         .dispatchEvent('click');
-      await expect(page.getByText('Edge Inspector')).toBeVisible();
+      await expect(page.getByText('Edge Properties')).toBeVisible();
       await expect(
         graphCanvas(page).locator(`[data-edge-path-id="${edgeId}"]`)
       ).toHaveAttribute('marker-end', /^url\(#graphstudio-arrow-[^)]+\)$/);

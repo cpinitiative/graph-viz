@@ -14,10 +14,16 @@ const ProjectJsonPasteModal = ({
     <div
       className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60"
       data-testid="project-json-paste-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-json-paste-title"
     >
       <div className="mx-4 flex max-h-[90vh] w-full max-w-2xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
         <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
-          <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
+          <h3
+            id="project-json-paste-title"
+            className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
+          >
             Import Project JSON
           </h3>
           <ModalCloseButton onClick={onClose} />
