@@ -44,6 +44,22 @@ const PRESET_STATUS_LABELS = {
 const STATUS_AUTO_DISMISS_MS = 4000;
 const ERROR_STATUS_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 
+const isEditableKeyboardTarget = target => {
+  const tagName = String(target?.tagName ?? '').toLowerCase();
+  const editableAncestor = target?.closest?.('[contenteditable]');
+  return (
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target?.isContentEditable ||
+    (editableAncestor &&
+      editableAncestor.getAttribute('contenteditable') !== 'false')
+  );
+};
+
+const hasOpenModal = () =>
+  Boolean(document.querySelector('[aria-modal="true"], [role="dialog"]'));
+
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
     () =>
@@ -295,16 +311,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       }
 
       const target = event.target;
-      const tagName = String(target?.tagName ?? '').toLowerCase();
-      const editableAncestor = target?.closest?.('[contenteditable]');
-      if (
-        tagName === 'input' ||
-        tagName === 'textarea' ||
-        tagName === 'select' ||
-        target?.isContentEditable ||
-        (editableAncestor &&
-          editableAncestor.getAttribute('contenteditable') !== 'false')
-      ) {
+      if (isEditableKeyboardTarget(target)) {
         return;
       }
       if (!target?.closest?.('[data-frame-navigation-surface="true"]')) {
@@ -319,6 +326,26 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [currentFrame, setCurrentFrame]);
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        isEditableKeyboardTarget(event.target) ||
+        hasOpenModal()
+      ) {
+        return;
+      }
+
+      if (!selectedObject && selectedNodeIds.length === 0) return;
+
+      event.preventDefault();
+      clearSelection();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [clearSelection, selectedNodeIds.length, selectedObject]);
   const previousGraph = useMemo(() => {
     if (currentFrame <= 0) return computedGraph;
     return getFrameGraph(currentFrame - 1);
@@ -428,12 +455,14 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       connectedNodes: edgeConnectedNodes,
       multiSelection: selectedNodeIds,
       globalSettings,
+      edgeRouting,
       onUpdateNode: updateSelectedNode,
       onUpdateEdge: updateSelectedEdge,
       onSelectEdge: edgeId => onSelectEdge(edgeId),
       onSelectNode: nodeId => onSelectNode(nodeId, false),
       onApplyToSelection: applyPatchToSelectedNodes,
       onDeleteSelection: deleteSelection,
+      onClearSelection: clearSelection,
       onUpdateGlobal: patch =>
         setGlobalSettings(prev => ({ ...prev, ...patch })),
     },
