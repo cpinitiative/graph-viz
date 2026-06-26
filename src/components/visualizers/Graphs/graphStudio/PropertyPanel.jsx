@@ -19,14 +19,14 @@ const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const inputClass =
   'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const actionButtonClass =
-  'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
+const inspectorButtonFocusClass =
+  'focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:focus-visible:ring-[#60A5FA]';
+const actionButtonClass = `min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2 ${inspectorButtonFocusClass}`;
 const headerActionButtonClass =
   '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
 const deleteButtonClass =
-  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:border-[#B91C1C] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:border-[#DC2626] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
-const listButtonClass =
-  'min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5';
+  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:border-[#B91C1C] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#B91C1C] active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:border-[#F87171] dark:focus-visible:ring-[#F87171] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
+const listButtonClass = `min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5 ${inspectorButtonFocusClass}`;
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -104,7 +104,7 @@ const InfoHelp = ({ label, text }) => {
       <button
         ref={buttonRef}
         type="button"
-        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus:ring-[#60A5FA]"
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
         aria-label={label}
         aria-describedby={tooltipId}
         onBlur={hideTooltip}

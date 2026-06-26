@@ -1483,6 +1483,17 @@ while (true) {}
       'selection'
     );
     await expect(page.getByText('Selection Inspector')).toBeVisible();
+    const colorGreenButton = page.getByRole('button', { name: 'Color green' });
+    await expect(colorGreenButton).toHaveClass(/focus-visible:ring-1/);
+    await expect(colorGreenButton).not.toHaveClass(/focus:ring-2/);
+    await colorGreenButton.click();
+    await expect(colorGreenButton).toBeFocused();
+    expect(
+      await colorGreenButton.evaluate(button => ({
+        focusVisible: button.matches(':focus-visible'),
+        boxShadow: window.getComputedStyle(button).boxShadow,
+      }))
+    ).toEqual({ focusVisible: false, boxShadow: 'none' });
     await page.getByRole('button', { name: 'Clear selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
