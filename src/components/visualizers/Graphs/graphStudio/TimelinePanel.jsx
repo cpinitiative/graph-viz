@@ -13,9 +13,9 @@ const toolbarButtonClass =
 const addButtonClass =
   'min-h-[30px] rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
 const deleteButtonClass =
-  'min-h-[30px] rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-2 py-1 text-xs font-medium text-[#9A3412] hover:bg-[#F1F5F9] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#FDBA74] dark:hover:bg-[#334155]';
+  'min-h-[30px] rounded-sm border border-[#B91C1C] bg-transparent px-2 py-1 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-1 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C]';
 const moveButtonClass =
-  'min-h-[30px] min-w-[30px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
+  'inline-flex min-h-[30px] min-w-[30px] items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
 const playbackButtonClass =
   'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
 const detailLabelClass =
@@ -38,6 +38,7 @@ const PlayIcon = () => (
 
 const ChevronLeftIcon = () => (
   <svg
+    className="block"
     width="14"
     height="14"
     viewBox="0 0 24 24"
@@ -53,6 +54,7 @@ const ChevronLeftIcon = () => (
 
 const ChevronRightIcon = () => (
   <svg
+    className="block"
     width="14"
     height="14"
     viewBox="0 0 24 24"
@@ -236,7 +238,7 @@ const TimelinePanel = ({
               aria-selected={index === currentFrame}
               className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
                 index === currentFrame
-                  ? 'border-l-4 border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#F59E0B]'
+                  ? 'border-l-4 border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
                   : 'border-[#D7DEE8] hover:border-[#94A3B8] dark:border-[#334155] dark:hover:border-[#64748B]'
               }`}
               data-current={index === currentFrame}
@@ -317,7 +319,7 @@ const TimelinePanel = ({
                   <input
                     aria-label="Show caption"
                     checked={Boolean(captionEnabled)}
-                    className="h-3.5 w-3.5 accent-[#B45309]"
+                    className="h-3.5 w-3.5 accent-[#B45309] dark:accent-[#60A5FA]"
                     data-testid="frame-caption-toggle"
                     onChange={event =>
                       onCaptionEnabledChange?.(event.target.checked)

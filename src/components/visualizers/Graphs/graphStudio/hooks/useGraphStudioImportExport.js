@@ -60,6 +60,7 @@ export const useGraphStudioImportExport = ({
   restoreDrawState,
   clearSelection,
   clearDrawState,
+  setIsExporting,
   resetUndoHistory,
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
@@ -106,6 +107,16 @@ export const useGraphStudioImportExport = ({
       }),
     [currentFrame, exportFrameRange, steps.length]
   );
+
+  const enableExportCanvas = useCallback(async () => {
+    setIsExporting?.(true);
+    await waitForFrameRender();
+  }, [setIsExporting]);
+
+  const disableExportCanvas = useCallback(async () => {
+    setIsExporting?.(false);
+    await waitForFrameRender();
+  }, [setIsExporting]);
 
   const applyParserText = useCallback(() => {
     try {
@@ -174,17 +185,21 @@ export const useGraphStudioImportExport = ({
   const exportSvg = useCallback(async () => {
     setStatus('Exporting SVG...');
     try {
+      await enableExportCanvas();
       await exportCurrentFrameSvg({ framingMode: imageFraming });
       setStatus('SVG exported');
     } catch (error) {
       console.error(error);
       setStatus(`SVG export error: ${error.message}`);
+    } finally {
+      await disableExportCanvas();
     }
-  }, [imageFraming, setStatus]);
+  }, [disableExportCanvas, enableExportCanvas, imageFraming, setStatus]);
 
   const exportPng = useCallback(async () => {
     setStatus('Exporting PNG...');
     try {
+      await enableExportCanvas();
       await exportCurrentFramePng({
         pngScale,
         framingMode: imageFraming,
@@ -193,8 +208,16 @@ export const useGraphStudioImportExport = ({
     } catch (error) {
       console.error(error);
       setStatus(`PNG export error: ${error.message}`);
+    } finally {
+      await disableExportCanvas();
     }
-  }, [imageFraming, pngScale, setStatus]);
+  }, [
+    disableExportCanvas,
+    enableExportCanvas,
+    imageFraming,
+    pngScale,
+    setStatus,
+  ]);
 
   const applyProjectPayload = useCallback(
     project => {
@@ -302,6 +325,7 @@ export const useGraphStudioImportExport = ({
     const originalFrame = currentFrame;
     setStatus('Exporting video...');
     try {
+      await enableExportCanvas();
       await exportTimelineVideo({
         steps,
         setCurrentFrame,
@@ -314,8 +338,17 @@ export const useGraphStudioImportExport = ({
     } finally {
       setCurrentFrame(originalFrame);
       await waitForFrameRender();
+      await disableExportCanvas();
     }
-  }, [currentFrame, getExportFrameIndexes, setCurrentFrame, setStatus, steps]);
+  }, [
+    currentFrame,
+    disableExportCanvas,
+    enableExportCanvas,
+    getExportFrameIndexes,
+    setCurrentFrame,
+    setStatus,
+    steps,
+  ]);
 
   const exportSlideshow = useCallback(async () => {
     if (!steps.length) {
@@ -346,6 +379,7 @@ export const useGraphStudioImportExport = ({
 
     setStatus('Exporting slideshow...');
     try {
+      await enableExportCanvas();
       await exportTimelineSlideshow({
         steps,
         currentFrame,
@@ -364,10 +398,13 @@ export const useGraphStudioImportExport = ({
       setSelectedObject(originalSelectedObject);
       setSelectedNodeIds(originalSelectedNodeIds);
       restoreDrawState?.(originalDrawFrom);
+      await disableExportCanvas();
     }
   }, [
     currentFrame,
+    disableExportCanvas,
     drawFrom,
+    enableExportCanvas,
     getExportFrameIndexes,
     imageFraming,
     mode,

@@ -18,6 +18,7 @@ import { getEdgeRenderData } from './lib/edgeRenderData';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
+const EMPTY_SELECTED_NODE_IDS = new Set();
 const SELECTED_EDGE_COLORS = {
   light: '#171717',
   dark: '#F5F5F5',
@@ -757,6 +758,7 @@ const GraphCanvas = ({
   onNodePointerUp,
   onNodeClickForDraw,
   onCanvasAddNode,
+  isExporting = false,
 }) => {
   const { theme } = useTheme();
   const svgRef = useRef(null);
@@ -786,14 +788,22 @@ const GraphCanvas = ({
     edgeCurvature,
     nodeRadius,
   ]);
+  const effectiveSelectedObject = isExporting ? null : selectedObject;
+  const effectiveSelectedNodeIds = isExporting
+    ? EMPTY_SELECTED_NODE_IDS
+    : selectedNodeIds;
+  const effectiveDrawFrom = isExporting ? null : drawFrom;
   const edgeVisualData = useMemo(
     () =>
       edgeRenderData.map(renderData => {
         const { edge } = renderData;
         const selected =
-          selectedObject?.type === 'edge' &&
-          String(selectedObject.id) === String(edge.id);
-        const multiSelected = edgeBetweenSelected(edge, selectedNodeIds);
+          effectiveSelectedObject?.type === 'edge' &&
+          String(effectiveSelectedObject.id) === String(edge.id);
+        const multiSelected = edgeBetweenSelected(
+          edge,
+          effectiveSelectedNodeIds
+        );
         const strokeColor = getEffectiveEdgeColor({
           edge,
           selected,
@@ -808,7 +818,13 @@ const GraphCanvas = ({
           markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
         };
       }),
-    [edgeRenderData, selectedNodeIds, selectedObject, svgResourcePrefix, theme]
+    [
+      edgeRenderData,
+      effectiveSelectedNodeIds,
+      effectiveSelectedObject,
+      svgResourcePrefix,
+      theme,
+    ]
   );
   const arrowMarkers = useMemo(() => {
     const markers = new Map();
@@ -1126,6 +1142,7 @@ const GraphCanvas = ({
         data-view-x={viewState.x}
         data-view-y={viewState.y}
         data-view-zoom={viewState.zoom}
+        data-export-mode={isExporting ? 'true' : 'false'}
         tabIndex="0"
         onPointerDown={onPointerDownBackground}
         onPointerMove={onPointerMove}
@@ -1255,9 +1272,11 @@ const GraphCanvas = ({
               .filter(node => node.visible !== false)
               .map(node => {
                 const selected =
-                  selectedObject?.type === 'node' &&
-                  String(selectedObject.id) === String(node.id);
-                const multiSelected = selectedNodeIds.has(String(node.id));
+                  effectiveSelectedObject?.type === 'node' &&
+                  String(effectiveSelectedObject.id) === String(node.id);
+                const multiSelected = effectiveSelectedNodeIds.has(
+                  String(node.id)
+                );
                 return (
                   <GraphNode
                     key={node.id}
@@ -1265,7 +1284,7 @@ const GraphCanvas = ({
                     nodeRadius={nodeRadius}
                     selected={selected}
                     multiSelected={multiSelected}
-                    drawAnchor={String(drawFrom) === String(node.id)}
+                    drawAnchor={String(effectiveDrawFrom) === String(node.id)}
                     shouldAnimate={diff.changedNodes.has(String(node.id))}
                     layoutIdPrefix={layoutIdPrefix}
                     mode={mode}
@@ -1285,7 +1304,7 @@ const GraphCanvas = ({
                 );
               })}
           </g>
-          {dragRect && (
+          {!isExporting && dragRect && (
             <rect
               x={Math.min(dragRect.startX, dragRect.endX)}
               y={Math.min(dragRect.startY, dragRect.endY)}

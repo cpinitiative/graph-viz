@@ -35,7 +35,9 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const iconButtonClass =
-  'min-w-[44px] rounded-sm p-2 text-[#334155] transition-colors hover:bg-[#E2E8F0] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-w-8 md:p-1.5';
+  'flex min-h-[36px] min-w-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:min-w-8 md:p-1.5';
+const fitViewButtonClass =
+  'flex min-h-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:py-1.5';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -93,24 +95,6 @@ const ToggleRow = ({ label, checked, onChange }) => (
       className={checkboxClass}
     />
   </label>
-);
-
-const CenterViewIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 3h6v6H3z" />
-    <path d="M15 3h6v6h-6z" />
-    <path d="M15 15h6v6h-6z" />
-    <path d="M3 15h6v6H3z" />
-  </svg>
 );
 
 const ZoomOutIcon = () => (
@@ -199,18 +183,19 @@ const LeftSidebar = ({
     >
       <SidebarSection>
         <SectionTitle>Tools</SectionTitle>
-        <div className="grid grid-cols-2 gap-1 rounded-sm border border-[#D7DEE8] bg-[#E9EEF4] p-1 dark:border-[#475569] dark:bg-[#1E293B]">
+        <div className="grid grid-cols-2 gap-2">
           {TOOL_OPTIONS.map(tool => (
             <button
               key={tool.id}
               type="button"
               className={joinClasses(
-                'min-h-[44px] rounded-sm px-2 py-2 text-xs font-semibold transition-colors md:min-h-8 md:py-1.5',
+                actionButtonBaseClass,
                 mode === tool.id
-                  ? 'bg-[#0F2747] text-[#FFFFFF] shadow-sm dark:bg-[#1D4ED8] dark:text-[#FFFFFF]'
-                  : 'text-[#475569] hover:bg-[#FFFFFF] hover:text-[#0F2747] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:hover:text-[#FFFFFF]'
+                  ? 'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] dark:border-[#2563EB] dark:bg-[#2563EB] dark:text-[#FFFFFF]'
+                  : actionButtonDefaultClass
               )}
               aria-pressed={mode === tool.id}
+              data-testid={`tool-button-${tool.id}`}
               onClick={() =>
                 tool.id === 'draw' ? onDrawEdge() : setMode(tool.id)
               }
@@ -266,18 +251,34 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="flex items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
-          <IconButton title="Center View" onClick={onCenterView}>
-            <CenterViewIcon />
-          </IconButton>
+        <div className="flex items-center justify-between gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
+          <button
+            type="button"
+            className={fitViewButtonClass}
+            aria-label="Fit View"
+            title="Fit View"
+            data-testid="fit-view-button"
+            disabled={lockCanvas}
+            onClick={onCenterView}
+          >
+            Fit View
+          </button>
           <div className="flex items-center gap-2">
-            <IconButton title="Zoom Out" onClick={onZoomOut}>
+            <IconButton
+              title="Zoom Out"
+              disabled={lockCanvas}
+              onClick={onZoomOut}
+            >
               <ZoomOutIcon />
             </IconButton>
             <span className="w-10 text-center text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
               {zoomPercent}%
             </span>
-            <IconButton title="Zoom In" onClick={onZoomIn}>
+            <IconButton
+              title="Zoom In"
+              disabled={lockCanvas}
+              onClick={onZoomIn}
+            >
               <ZoomInIcon />
             </IconButton>
           </div>

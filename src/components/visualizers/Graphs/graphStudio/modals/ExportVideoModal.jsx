@@ -4,10 +4,18 @@ const ExportVideoModal = ({ open, onClose, onExport }) => {
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60">
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center bg-surface-container-lowest/80 p-4 backdrop-blur-[20px] dark:bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-video-title"
+    >
       <div className="mx-4 flex w-full max-w-md flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
         <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
-          <h3 className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
+          <h3
+            id="export-video-title"
+            className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
+          >
             Export MP4 Video
           </h3>
           <ModalCloseButton onClick={onClose} />

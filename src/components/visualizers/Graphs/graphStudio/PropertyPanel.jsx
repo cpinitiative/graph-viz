@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
 
@@ -14,8 +15,6 @@ const panelClass =
 const sectionTitleClass =
   'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
-const helperTextClass =
-  'border-l-2 border-[#D6A84B] pl-2 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const inputClass =
@@ -23,9 +22,9 @@ const inputClass =
 const actionButtonClass =
   'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
 const headerActionButtonClass =
-  'shrink-0 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
+  '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#111827]';
 const deleteButtonClass =
-  'mt-1 min-h-[44px] w-full rounded-sm border border-[#FECACA] bg-[#FEF2F2] px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#FCA5A5] hover:bg-[#FEE2E2] dark:border-[#7F1D1D] dark:bg-[#450A0A] dark:text-[#FCA5A5] dark:hover:bg-[#7F1D1D] md:min-h-9 md:py-2';
+  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:border-[#B91C1C] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:border-[#DC2626] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
 const listButtonClass =
   'min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5';
 const toggleRowClass =
@@ -35,18 +34,60 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const BackToCanvasButton = ({ onClick }) => {
+const ClearSelectionButton = ({ label, onClick }) => {
   if (!onClick) return null;
 
   return (
     <button
       type="button"
       className={headerActionButtonClass}
-      data-testid="back-to-canvas-button"
+      aria-label={label}
+      data-testid="inspector-clear-selection"
       onClick={onClick}
     >
-      Back to Canvas
+      <svg
+        aria-hidden="true"
+        className="block"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
     </button>
+  );
+};
+
+const InfoHelp = ({ label, text }) => {
+  const tooltipId = useId();
+
+  return (
+    <span className="group relative inline-flex items-center">
+      <button
+        type="button"
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus:ring-[#60A5FA]"
+        aria-label={label}
+        aria-describedby={tooltipId}
+      >
+        ?
+      </button>
+      <span id={tooltipId} className="sr-only">
+        {text}
+      </span>
+      <span
+        role="tooltip"
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute right-0 top-5 z-30 w-44 max-w-[12rem] whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+      >
+        {text}
+      </span>
+    </span>
   );
 };
 
@@ -64,9 +105,12 @@ const PanelShell = ({ title, inspectorType, headerAction, children }) => (
   </div>
 );
 
-const Section = ({ title, children }) => (
+const Section = ({ title, help, children }) => (
   <section className="space-y-3 border-b border-[#D7DEE8] pb-5 last:border-b-0 dark:border-[#334155]">
-    <div className={sectionTitleClass}>{title}</div>
+    <div className="flex items-center gap-2">
+      <div className={sectionTitleClass}>{title}</div>
+      {help}
+    </div>
     {children}
   </section>
 );
@@ -137,31 +181,41 @@ const RangeControl = ({
   step,
   onChange,
   disabled = false,
-  helperText = '',
-}) => (
-  <label className="block space-y-1.5">
-    <div className="flex justify-between">
-      <span className={fieldLabelClass}>{label}</span>
-      <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
-        {value}
-      </span>
+  help,
+}) => {
+  const labelId = useId();
+
+  return (
+    <div className="block space-y-1.5">
+      <div className="flex justify-between">
+        <span className="flex items-center gap-2">
+          <span id={labelId} className={fieldLabelClass}>
+            {label}
+          </span>
+          {help}
+        </span>
+        <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
+          {value}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        aria-labelledby={labelId}
+        onChange={event => onChange(Number(event.target.value))}
+        className={joinClasses(
+          'h-2 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
+          disabled &&
+            'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
+        )}
+      />
     </div>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      disabled={disabled}
-      onChange={event => onChange(Number(event.target.value))}
-      className={joinClasses(
-        'h-2 w-full accent-[#0F2747] dark:accent-[#D6A84B]',
-        disabled && 'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
-      )}
-    />
-    {helperText && <p className={helperTextClass}>{helperText}</p>}
-  </label>
-);
+  );
+};
 
 const LinkedList = ({ items, emptyLabel, renderItem, onSelect }) => {
   if (!items?.length) {
@@ -197,7 +251,12 @@ const MultiSelectionPanel = ({
   <PanelShell
     title="Selection Inspector"
     inspectorType="selection"
-    headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+    headerAction={
+      <ClearSelectionButton
+        label="Clear selection"
+        onClick={onClearSelection}
+      />
+    }
   >
     <Section title="Selected Nodes">
       <p className={bodyTextClass}>{selectedCount} items selected</p>
@@ -229,14 +288,24 @@ const NodeInspector = ({
 
   return (
     <PanelShell
-      title="Node Inspector"
+      title="Node Properties"
       inspectorType="node"
-      headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+      headerAction={
+        <ClearSelectionButton
+          label="Clear node selection"
+          onClick={onClearSelection}
+        />
+      }
     >
-      <Section title="Node Properties">
-        <p className={helperTextClass}>
-          Label: all frames · Status/color: current frame
-        </p>
+      <Section
+        title="Node Details"
+        help={
+          <InfoHelp
+            label="Node property scope help"
+            text="Label applies to all frames. Status and color apply to this frame."
+          />
+        }
+      >
         <div className="space-y-4">
           <Field label="Label">
             <TextInput
@@ -301,14 +370,16 @@ const EdgeInspector = ({
 
   return (
     <PanelShell
-      title="Edge Inspector"
+      title="Edge Properties"
       inspectorType="edge"
-      headerAction={<BackToCanvasButton onClick={onClearSelection} />}
+      headerAction={
+        <ClearSelectionButton
+          label="Clear edge selection"
+          onClick={onClearSelection}
+        />
+      }
     >
-      <Section title="Edge Properties">
-        <p className={helperTextClass}>
-          Weight/direction: all frames · Color: current frame
-        </p>
+      <Section title="Edge Details">
         <div className="space-y-4">
           <Field label="Weight / Label">
             <TextInput
@@ -376,10 +447,11 @@ const GlobalSettingsPanel = ({
             max="120"
             step="5"
             disabled={!curveAmountEnabled}
-            helperText={
-              curveAmountEnabled
-                ? 'Adjusts curved edge depth.'
-                : 'Only affects Curved routing.'
+            help={
+              <InfoHelp
+                label="Curve Amount help"
+                text="Only works when Edge Routing is Curved."
+              />
             }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
           />

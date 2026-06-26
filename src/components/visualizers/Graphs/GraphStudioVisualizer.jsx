@@ -26,6 +26,10 @@ import {
   DEFAULT_CUSTOM_LEGEND,
   normalizeCustomLegend,
 } from './graphStudio/lib/customLegend';
+import {
+  hasOpenModal,
+  isEditableKeyboardTarget,
+} from './graphStudio/lib/keyboardTargets';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
 
@@ -43,22 +47,6 @@ const PRESET_STATUS_LABELS = {
 
 const STATUS_AUTO_DISMISS_MS = 4000;
 const ERROR_STATUS_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
-
-const isEditableKeyboardTarget = target => {
-  const tagName = String(target?.tagName ?? '').toLowerCase();
-  const editableAncestor = target?.closest?.('[contenteditable]');
-  return (
-    tagName === 'input' ||
-    tagName === 'textarea' ||
-    tagName === 'select' ||
-    target?.isContentEditable ||
-    (editableAncestor &&
-      editableAncestor.getAttribute('contenteditable') !== 'false')
-  );
-};
-
-const hasOpenModal = () =>
-  Boolean(document.querySelector('[aria-modal="true"], [role="dialog"]'));
 
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
@@ -92,6 +80,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const {
     viewState,
     setViewState,
@@ -271,6 +260,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     restoreDrawState,
     clearSelection,
     clearDrawState,
+    setIsExporting,
     resetUndoHistory,
   });
   useEffect(() => {
@@ -337,15 +327,28 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         return;
       }
 
-      if (!selectedObject && selectedNodeIds.length === 0) return;
+      if (
+        !selectedObject &&
+        selectedNodeIds.length === 0 &&
+        (drawFrom === null || drawFrom === undefined)
+      ) {
+        return;
+      }
 
       event.preventDefault();
       clearSelection();
+      clearDrawState();
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [clearSelection, selectedNodeIds.length, selectedObject]);
+  }, [
+    clearDrawState,
+    clearSelection,
+    drawFrom,
+    selectedNodeIds.length,
+    selectedObject,
+  ]);
   const previousGraph = useMemo(() => {
     if (currentFrame <= 0) return computedGraph;
     return getFrameGraph(currentFrame - 1);
@@ -447,6 +450,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       captionOverlay,
       setCaptionOverlay,
       captionText: steps[currentFrame]?.description ?? '',
+      isExporting,
     },
     property: {
       selectedNode,
