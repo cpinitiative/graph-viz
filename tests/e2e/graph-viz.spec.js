@@ -32,6 +32,21 @@ const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
 
+const expectTooltipInsideViewport = async tooltip => {
+  await expect(tooltip).toBeVisible();
+  expect(
+    await tooltip.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return (
+        bounds.left >= 0 &&
+        bounds.top >= 0 &&
+        bounds.right <= window.innerWidth &&
+        bounds.bottom <= window.innerHeight
+      );
+    })
+  ).toBe(true);
+};
+
 const choosePreset = async (page, value) => {
   await page.getByLabel('Load graph preset').selectOption(value);
   await expect(graphCanvas(page)).toBeVisible();
@@ -1347,9 +1362,22 @@ while (true) {}
     await expect(page.getByText('Node Properties')).toBeVisible();
     await expect(selectionRing).toBeVisible();
     await expect(selectionRing).toHaveAttribute('stroke', '#2563EB');
+    await expect(selectionRing).toHaveAttribute('r', '26');
+    await expect(selectionRing).toHaveAttribute('stroke-width', '2.25');
+    const nodeDetailsHelp = page.getByLabel('Node property scope help');
+    await nodeDetailsHelp.focus();
+    await expectTooltipInsideViewport(
+      page
+        .getByRole('tooltip')
+        .filter({
+          hasText:
+            'Label applies to all frames. Status and color apply to this frame.',
+        })
+        .last()
+    );
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(selectionRing).toHaveAttribute('stroke', '#60A5FA');
+    await expect(selectionRing).toHaveAttribute('stroke', '#38BDF8');
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Clear node selection' }).click();
@@ -1372,11 +1400,32 @@ while (true) {}
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
-    await page.getByRole('button', { name: 'Clear edge selection' }).click();
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
+    await expect(page.getByText('Edge Properties')).toHaveCount(0);
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toBeVisible();
+    await expect(drawSourceRing).toBeVisible();
+    await expect(drawSourceRing).toHaveAttribute('stroke', '#D97706');
+    await expect(drawSourceRing).toHaveAttribute('r', '28');
+    await expect(drawSourceRing).toHaveAttribute('stroke-width', '2');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '3 4');
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(drawSourceRing).toHaveCount(0);
+    await page.getByTestId('tool-button-select').click();
 
     await firstNode.click();
     await secondNode.click({ modifiers: ['Shift'] });
@@ -1423,11 +1472,34 @@ while (true) {}
     await expect(nodeLabelInput).toHaveValue('Node Alpha');
 
     await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(selectionRing).toHaveCount(0);
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
-    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '5 4');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '3 4');
+    const edgeCountBeforeSelfLoop = await graphCanvas(page)
+      .locator('[data-edge-path-id]')
+      .count();
+    await firstNode.click();
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      edgeCountBeforeSelfLoop + 1
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id]').last()
+    ).toHaveAttribute('d', / C /);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'edge'
+    );
+    await expect(drawSourceRing).toHaveCount(0);
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await firstNode.click();
+    await expect(drawSourceRing).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1485,9 +1557,12 @@ while (true) {}
     await expect(curveAmount).toBeDisabled();
     await expect(curveAmountHelp).toBeVisible();
     await curveAmountHelp.focus();
-    await expect(
-      page.getByText('Only works when Edge Routing is Curved.').last()
-    ).toBeVisible();
+    await expectTooltipInsideViewport(
+      page
+        .getByRole('tooltip')
+        .filter({ hasText: 'Only works when Edge Routing is Curved.' })
+        .last()
+    );
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -1498,9 +1573,12 @@ while (true) {}
     await page.getByLabel('Edge routing').selectOption('bezier');
     await expect(curveAmount).toBeEnabled();
     await curveAmountHelp.focus();
-    await expect(
-      page.getByText('Only works when Edge Routing is Curved.').last()
-    ).toBeVisible();
+    await expectTooltipInsideViewport(
+      page
+        .getByRole('tooltip')
+        .filter({ hasText: 'Only works when Edge Routing is Curved.' })
+        .last()
+    );
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
       .not.toBe(straightPath);

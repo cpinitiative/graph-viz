@@ -151,10 +151,11 @@ export const useGraphStudioGraphModel = ({
           },
         ],
       }));
+      setSelectedNodeIds([]);
       setSelectedObject({ type: 'edge', id });
       setStatus(`Edge ${from} → ${to} added`);
     },
-    [setBaseGraph, setSelectedObject, setStatus]
+    [setBaseGraph, setSelectedNodeIds, setSelectedObject, setStatus]
   );
 
   const deleteSelection = useCallback(() => {

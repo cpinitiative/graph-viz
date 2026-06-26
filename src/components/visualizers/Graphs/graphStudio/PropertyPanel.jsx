@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useRef, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
 
@@ -31,6 +31,10 @@ const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
+const TOOLTIP_WIDTH = 192;
+const TOOLTIP_ESTIMATED_HEIGHT = 64;
+const TOOLTIP_GUTTER = 12;
+const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -66,27 +70,66 @@ const ClearSelectionButton = ({ label, onClick }) => {
 
 const InfoHelp = ({ label, text }) => {
   const tooltipId = useId();
+  const buttonRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const showTooltip = () => {
+    const bounds = buttonRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const rightOpeningLeft = bounds.left;
+    const leftOpeningLeft = bounds.right - TOOLTIP_WIDTH;
+    const maxLeft = Math.max(
+      TOOLTIP_GUTTER,
+      window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_GUTTER
+    );
+    const left =
+      rightOpeningLeft + TOOLTIP_WIDTH <= window.innerWidth - TOOLTIP_GUTTER
+        ? rightOpeningLeft
+        : Math.min(maxLeft, Math.max(TOOLTIP_GUTTER, leftOpeningLeft));
+    const belowTop = bounds.bottom + TOOLTIP_OFFSET;
+    const aboveTop = bounds.top - TOOLTIP_ESTIMATED_HEIGHT - TOOLTIP_OFFSET;
+    const top =
+      belowTop + TOOLTIP_ESTIMATED_HEIGHT <= window.innerHeight - TOOLTIP_GUTTER
+        ? belowTop
+        : Math.max(TOOLTIP_GUTTER, aboveTop);
+
+    setTooltipPosition({ left, top });
+  };
+
+  const hideTooltip = () => setTooltipPosition(null);
 
   return (
-    <span className="group relative inline-flex items-center">
+    <span className="inline-flex items-center">
       <button
+        ref={buttonRef}
         type="button"
         className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus:ring-[#60A5FA]"
         aria-label={label}
         aria-describedby={tooltipId}
+        onBlur={hideTooltip}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
       >
         ?
       </button>
       <span id={tooltipId} className="sr-only">
         {text}
       </span>
-      <span
-        role="tooltip"
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute right-0 top-5 z-30 w-44 max-w-[12rem] whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
-      >
-        {text}
-      </span>
+      {tooltipPosition && (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-50 w-48 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          data-testid="inspector-info-tooltip"
+          style={{
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+          }}
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 };

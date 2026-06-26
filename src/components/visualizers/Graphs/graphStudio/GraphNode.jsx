@@ -6,12 +6,12 @@ const EDITOR_RING_COLORS = {
   light: {
     selected: '#2563EB',
     multiSelected: '#64748B',
-    drawAnchor: '#B45309',
+    drawAnchor: '#D97706',
   },
   dark: {
-    selected: '#60A5FA',
+    selected: '#38BDF8',
     multiSelected: '#93C5FD',
-    drawAnchor: '#F59E0B',
+    drawAnchor: '#FBBF24',
   },
 };
 
@@ -64,22 +64,17 @@ const GraphNode = ({
             ? { duration: 0.32, ease: 'easeInOut' }
             : { duration: 0 }
         }
-        style={{
-          filter:
-            selected || multiSelected
-              ? 'drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))'
-              : 'none',
-        }}
       />
       {(selected || multiSelected) && (
         <motion.circle
           data-node-selection-ring-id={node.id}
+          data-node-selection-ring-kind={selected ? 'primary' : 'multi'}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 6}
+          r={nodeRadius + 4}
           fill="none"
           stroke={selectionRingColor}
-          strokeWidth={selected ? 3 : 2}
+          strokeWidth={selected ? 2.25 : 1.75}
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={
@@ -94,11 +89,11 @@ const GraphNode = ({
           data-node-draw-source-ring-id={node.id}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 10}
+          r={nodeRadius + 6}
           fill="none"
           stroke={ringColors.drawAnchor}
-          strokeWidth="3"
-          strokeDasharray="5 4"
+          strokeWidth="2"
+          strokeDasharray="3 4"
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={
