@@ -236,10 +236,10 @@ const TimelinePanel = ({
               key={`${step.id ?? 'step'}-${index}`}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
+              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border border-l-4 bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
                 index === currentFrame
-                  ? 'border-l-4 border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
-                  : 'border-[#D7DEE8] hover:border-[#94A3B8] dark:border-[#334155] dark:hover:border-[#64748B]'
+                  ? 'border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
+                  : 'border-[#D7DEE8] border-l-transparent hover:border-[#94A3B8] hover:border-l-[#CBD5E1] dark:border-[#334155] dark:border-l-transparent dark:hover:border-[#64748B] dark:hover:border-l-[#475569]'
               }`}
               data-current={index === currentFrame}
               data-frame-navigation-surface="true"

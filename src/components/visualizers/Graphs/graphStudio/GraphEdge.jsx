@@ -6,6 +6,7 @@ const GraphEdge = ({
   edge,
   pathD,
   strokeColor,
+  selectionUnderlayColor,
   selected,
   multiSelected,
   shouldAnimate,
@@ -28,18 +29,34 @@ const GraphEdge = ({
         onPointerDown={onPointerDown}
         onClick={onClick}
       />
+      {(selected || multiSelected) && (
+        <motion.path
+          data-edge-selection-underlay-id={edge.id}
+          d={pathD}
+          fill="none"
+          stroke={selectionUnderlayColor}
+          strokeWidth={selected ? strokeWidth + 5 : strokeWidth + 3.5}
+          strokeLinecap="round"
+          initial={false}
+          animate={{ d: pathD }}
+          transition={
+            shouldAnimate
+              ? {
+                  duration: Math.max((edge.duration ?? 450) / 1000, 0.1),
+                  ease: 'easeInOut',
+                }
+              : { duration: 0 }
+          }
+          pointerEvents="none"
+          opacity="0.62"
+        />
+      )}
       <motion.path
         data-edge-path-id={edge.id}
         d={pathD}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={
-          selected
-            ? strokeWidth + 1.5
-            : multiSelected
-              ? strokeWidth + 0.5
-              : strokeWidth
-        }
+        strokeWidth={selected ? strokeWidth + 0.4 : strokeWidth}
         strokeLinecap="round"
         markerEnd={edge.directed ? `url(#${markerId})` : undefined}
         layoutId={`${layoutIdPrefix}edge-${edge.id}`}

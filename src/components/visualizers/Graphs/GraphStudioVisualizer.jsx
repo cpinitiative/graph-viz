@@ -88,6 +88,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     lockCanvas,
     setLockCanvas,
     setViewFromNodes,
+    setZoomViewportSize,
     bumpViewReset,
     centerViewOnContent,
     zoomIn,
@@ -364,6 +365,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
     setViewFromNodes(nextGraph.nodes);
+    bumpViewReset();
     setCustomLegend(prev =>
       normalizeCustomLegend({
         ...DEFAULT_CUSTOM_LEGEND,
@@ -447,6 +449,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodePointerUp,
       onNodeClickForDraw,
       onCanvasAddNode: addNodeAt,
+      onViewportSizeChange: setZoomViewportSize,
       captionOverlay,
       setCaptionOverlay,
       captionText: steps[currentFrame]?.description ?? '',

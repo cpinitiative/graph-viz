@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { clamp } from '../graphStudioUtils';
 import { createInitialViewState } from '../lib/viewStateUtils';
 
-const VIEWPORT_CENTER_X = 640;
-const VIEWPORT_CENTER_Y = 380;
+const DEFAULT_VIEWPORT_WIDTH = 1280;
+const DEFAULT_VIEWPORT_HEIGHT = 760;
 
 export const useGraphStudioView = ({ initialNodes = [] }) => {
   const [viewState, setViewState] = useState(() =>
@@ -11,9 +11,22 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
   );
   const [viewResetCounter, setViewResetCounter] = useState(0);
   const [lockCanvas, setLockCanvas] = useState(false);
+  const viewportSizeRef = useRef({
+    width: DEFAULT_VIEWPORT_WIDTH,
+    height: DEFAULT_VIEWPORT_HEIGHT,
+  });
 
   const setViewFromNodes = useCallback(nodes => {
-    setViewState(createInitialViewState(nodes));
+    const { width, height } = viewportSizeRef.current;
+    setViewState(createInitialViewState(nodes, width, height));
+  }, []);
+
+  const setZoomViewportSize = useCallback(size => {
+    const width = Number(size?.width);
+    const height = Number(size?.height);
+    if (width > 0 && height > 0) {
+      viewportSizeRef.current = { width, height };
+    }
   }, []);
 
   const bumpViewReset = useCallback(() => {
@@ -31,13 +44,16 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
       const delta = direction > 0 ? 0.12 : -0.12;
       setViewState(prev => {
         const nextZoom = clamp(prev.zoom + delta, 0.05, 2.6);
-        const worldCenterX = (VIEWPORT_CENTER_X - prev.x) / prev.zoom;
-        const worldCenterY = (VIEWPORT_CENTER_Y - prev.y) / prev.zoom;
+        const { width, height } = viewportSizeRef.current;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const worldCenterX = (centerX - prev.x) / prev.zoom;
+        const worldCenterY = (centerY - prev.y) / prev.zoom;
         return {
           ...prev,
           zoom: nextZoom,
-          x: VIEWPORT_CENTER_X - worldCenterX * nextZoom,
-          y: VIEWPORT_CENTER_Y - worldCenterY * nextZoom,
+          x: centerX - worldCenterX * nextZoom,
+          y: centerY - worldCenterY * nextZoom,
         };
       });
     },
@@ -54,6 +70,7 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     lockCanvas,
     setLockCanvas,
     setViewFromNodes,
+    setZoomViewportSize,
     bumpViewReset,
     centerViewOnContent,
     zoomIn,

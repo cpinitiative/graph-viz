@@ -32,6 +32,21 @@ const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
 
+const getCanvasViewSnapshot = async page => ({
+  x: await graphCanvas(page).getAttribute('data-view-x'),
+  y: await graphCanvas(page).getAttribute('data-view-y'),
+  zoom: await graphCanvas(page).getAttribute('data-view-zoom'),
+});
+
+const getNodePositionSnapshot = async page =>
+  graphCanvas(page).evaluate((svg, selector) => {
+    return Array.from(svg.querySelectorAll(selector)).map(circle => ({
+      id: circle.closest('g')?.textContent?.trim() ?? '',
+      x: Number(circle.getAttribute('cx')),
+      y: Number(circle.getAttribute('cy')),
+    }));
+  }, nodeCircleSelector);
+
 const expectTooltipInsideViewport = async tooltip => {
   await expect(tooltip).toBeVisible();
   expect(
@@ -233,6 +248,9 @@ const getSvgPresentationState = async (page, svgText) =>
       const firstEdge =
         doc.querySelector('path[data-edge-path-id="e0"]') ??
         doc.querySelector('path[data-edge-path-id]');
+      const edgeSelectionUnderlays = doc.querySelectorAll(
+        '[data-edge-selection-underlay-id]'
+      );
 
       return {
         firstNode: firstNode
@@ -248,6 +266,7 @@ const getSvgPresentationState = async (page, svgText) =>
               strokeWidth: Number(firstEdge.getAttribute('stroke-width')),
             }
           : null,
+        edgeSelectionUnderlayCount: edgeSelectionUnderlays.length,
       };
     },
     { text: svgText, selector: nodeCircleSelector }
@@ -546,14 +565,13 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(
-      page.getByText('Click a source node, then a target node.')
-    ).toBeVisible();
+    const drawEdgeHelper = page.getByText(
+      /Click a source node, then a target node\.|Source node .* selected\. Click a target node\./
+    );
+    await expect(drawEdgeHelper).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(
-      page.getByText('Click a source node, then a target node.')
-    ).toBeHidden();
+    await expect(drawEdgeHelper).toBeHidden();
 
     const lockView = page.getByRole('checkbox', { name: 'Lock View' });
     const fitViewButton = page.getByRole('button', { name: 'Fit View' });
@@ -574,6 +592,15 @@ test.describe('Graph Studio desktop smoke', () => {
     await lockView.check();
     await expect(fitViewButton).toBeDisabled();
     await expect(zoomInButton).toBeDisabled();
+    const lockedViewBeforeAdd = await getCanvasViewSnapshot(page);
+    const nodeCountBeforeLockedAdd = await graphNodes.count();
+    await page.getByRole('button', { name: 'Add Node' }).click();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await graphCanvas(page).click({ position: { x: 120, y: 120 } });
+    await expect(graphNodes).toHaveCount(nodeCountBeforeLockedAdd + 1);
+    await expect
+      .poll(() => getCanvasViewSnapshot(page))
+      .toEqual(lockedViewBeforeAdd);
     await lockView.uncheck();
 
     await page.getByRole('button', { name: 'Pan' }).click();
@@ -602,6 +629,23 @@ test.describe('Graph Studio desktop smoke', () => {
       await page.getByRole('button', { name: layout }).click();
       await expect(graphCanvas(page)).toBeVisible();
     }
+
+    await choosePreset(page, 'bfs');
+    await page.getByTestId('tool-button-select').click();
+    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await setRangeValue(page, 'Gravity (force)', 0.2);
+    await page.getByRole('button', { name: 'Force' }).click();
+    const lowForcePositions = await getNodePositionSnapshot(page);
+    await choosePreset(page, 'bfs');
+    await setRangeValue(page, 'Gravity (force)', 2);
+    await page.getByRole('button', { name: 'Force' }).click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .not.toBe(JSON.stringify(lowForcePositions));
 
     for (const preset of ['bfs', 'dfs', 'dijkstra']) {
       await choosePreset(page, preset);
@@ -720,6 +764,21 @@ while (true) {}
     const captionStyleSelect = page.getByLabel('Caption Style');
     const captionSizeSelect = page.getByLabel('Caption Size');
     const initialFrameCount = await cards.count();
+    expect(initialFrameCount).toBeGreaterThan(1);
+
+    await cards.first().click();
+    const frameOneLabel = cards.first().getByText('Frame 1');
+    const selectedFrameOneBox = await frameOneLabel.boundingBox();
+    await cards.nth(1).click();
+    const deselectedFrameOneBox = await frameOneLabel.boundingBox();
+    expect(selectedFrameOneBox).not.toBeNull();
+    expect(deselectedFrameOneBox).not.toBeNull();
+    expect(
+      Math.abs(selectedFrameOneBox.x - deselectedFrameOneBox.x)
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(selectedFrameOneBox.width - deselectedFrameOneBox.width)
+    ).toBeLessThanOrEqual(0.5);
 
     await cards.last().click();
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
@@ -1361,20 +1420,10 @@ while (true) {}
     );
     await expect(page.getByText('Node Properties')).toBeVisible();
     await expect(selectionRing).toBeVisible();
-    await expect(selectionRing).toHaveAttribute('stroke', '#2563EB');
-    await expect(selectionRing).toHaveAttribute('r', '26');
-    await expect(selectionRing).toHaveAttribute('stroke-width', '2.25');
-    const nodeDetailsHelp = page.getByLabel('Node property scope help');
-    await nodeDetailsHelp.focus();
-    await expectTooltipInsideViewport(
-      page
-        .getByRole('tooltip')
-        .filter({
-          hasText:
-            'Label applies to all frames. Status and color apply to this frame.',
-        })
-        .last()
-    );
+    await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
+    await expect(selectionRing).toHaveAttribute('r', '25');
+    await expect(selectionRing).toHaveAttribute('stroke-width', '1.5');
+    await expect(page.getByLabel('Node property scope help')).toHaveCount(0);
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(selectionRing).toHaveAttribute('stroke', '#38BDF8');
@@ -1415,10 +1464,10 @@ while (true) {}
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
-    await expect(drawSourceRing).toHaveAttribute('stroke', '#D97706');
-    await expect(drawSourceRing).toHaveAttribute('r', '28');
-    await expect(drawSourceRing).toHaveAttribute('stroke-width', '2');
-    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '3 4');
+    await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
+    await expect(drawSourceRing).toHaveAttribute('r', '26');
+    await expect(drawSourceRing).toHaveAttribute('stroke-width', '1.5');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1481,7 +1530,7 @@ while (true) {}
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
-    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '3 4');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
     const edgeCountBeforeSelfLoop = await graphCanvas(page)
       .locator('[data-edge-path-id]')
       .count();
@@ -1808,6 +1857,7 @@ while (true) {}
       r: 22,
       strokeWidth: 2,
     });
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
 
     const svgDownload = await expectDownloadFrom({
       page,
@@ -1824,6 +1874,7 @@ while (true) {}
       r: 22,
       strokeWidth: 2,
     });
+    expect(exportedState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1835,6 +1886,12 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
+    ).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="e0"]')
+    ).toHaveAttribute('stroke', '#64748B');
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
       page,
@@ -1842,6 +1899,7 @@ while (true) {}
     );
     expect(previewState.firstEdge.stroke).toBe('#64748B');
     expect(previewState.firstEdge.strokeWidth).toBeCloseTo(2.2, 3);
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1862,6 +1920,7 @@ while (true) {}
       r: 22,
       strokeWidth: 2,
     });
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
@@ -2470,11 +2529,13 @@ api.edge('loop', '#3b82f6');
     await expect(marker).toHaveAttribute('refY', '6');
     await expect(marker).toHaveAttribute('orient', 'auto');
     await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
+    await expect(marker).toHaveAttribute('viewBox', '0 0 12 12');
 
     const markerTriangle = graphCanvas(page).locator(
       'marker#graphstudio-arrow-64748b path'
     );
     await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
+    await expect(markerTriangle).toHaveAttribute('d', 'M1,1.5 L1,10.5 L10,6 z');
 
     const directedEdges = graphCanvas(page).locator(
       'path[marker-end^="url(#graphstudio-arrow-"]'
@@ -2551,14 +2612,36 @@ api.edge('e0', '#f59e0b');
       .locator('xpath=..')
       .locator('path[stroke="rgba(0,0,0,0)"]');
     await firstEdgeHitTarget.dispatchEvent('click');
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#171717');
+    await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-171717)'
+      'url(#graphstudio-arrow-f59e0b)'
     );
     await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-171717 path')
-    ).toHaveAttribute('fill', '#171717');
+      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b path')
+    ).toHaveAttribute('fill', '#f59e0b');
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
+    ).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await setRangeValue(page, 'Edge width', 5);
+    await expect
+      .poll(async () =>
+        Number(
+          await graphCanvas(page)
+            .locator('marker#graphstudio-arrow-f59e0b')
+            .getAttribute('markerWidth')
+        )
+      )
+      .toBeGreaterThan(12);
+    await expect(
+      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b')
+    ).toHaveAttribute('refY', '8.7');
 
     expect(errors).toEqual([]);
   });

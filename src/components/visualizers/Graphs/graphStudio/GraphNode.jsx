@@ -4,14 +4,14 @@ import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
 
 const EDITOR_RING_COLORS = {
   light: {
-    selected: '#2563EB',
+    selected: '#2F6FD6',
     multiSelected: '#64748B',
-    drawAnchor: '#D97706',
+    drawAnchor: '#0F766E',
   },
   dark: {
     selected: '#38BDF8',
     multiSelected: '#93C5FD',
-    drawAnchor: '#FBBF24',
+    drawAnchor: '#5EEAD4',
   },
 };
 
@@ -71,10 +71,10 @@ const GraphNode = ({
           data-node-selection-ring-kind={selected ? 'primary' : 'multi'}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 4}
+          r={nodeRadius + 3}
           fill="none"
           stroke={selectionRingColor}
-          strokeWidth={selected ? 2.25 : 1.75}
+          strokeWidth={selected ? 1.5 : 1.25}
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={
@@ -89,11 +89,11 @@ const GraphNode = ({
           data-node-draw-source-ring-id={node.id}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 6}
+          r={nodeRadius + 4}
           fill="none"
           stroke={ringColors.drawAnchor}
-          strokeWidth="2"
-          strokeDasharray="3 4"
+          strokeWidth="1.5"
+          strokeDasharray="2.5 4"
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={

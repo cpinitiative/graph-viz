@@ -19,9 +19,9 @@ import { getEdgeRenderData } from './lib/edgeRenderData';
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
 const EMPTY_SELECTED_NODE_IDS = new Set();
-const SELECTED_EDGE_COLORS = {
-  light: '#171717',
-  dark: '#F5F5F5',
+const EDGE_SELECTION_UNDERLAY_COLORS = {
+  light: '#93C5FD',
+  dark: '#38BDF8',
 };
 const LEGEND_PALETTES = {
   light: {
@@ -113,11 +113,26 @@ const CAPTION_SIZE_PRESETS = {
 };
 const CAPTION_MAX_LINES = 4;
 
-const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
-  if (selected || multiSelected) {
-    return SELECTED_EDGE_COLORS[theme] ?? SELECTED_EDGE_COLORS.light;
-  }
-  return edge.color ?? DEFAULT_EDGE_COLOR;
+const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
+
+const getArrowMarkerMetrics = edgeWidth => {
+  const scale = Math.max(0.82, Math.min(1.45, edgeWidth / 2.2));
+  const round = value => Number(value.toFixed(2));
+  const markerWidth = round(12 * scale);
+  const markerHeight = round(12 * scale);
+  const refX = round(10 * scale);
+  const refY = round(6 * scale);
+  const baseX = round(1 * scale);
+  const topY = round(1.5 * scale);
+  const bottomY = round(10.5 * scale);
+
+  return {
+    markerWidth,
+    markerHeight,
+    refX,
+    refY,
+    pathD: `M${baseX},${topY} L${baseX},${bottomY} L${refX},${refY} z`,
+  };
 };
 
 const hashMarkerColor = color => {
@@ -758,6 +773,7 @@ const GraphCanvas = ({
   onNodePointerUp,
   onNodeClickForDraw,
   onCanvasAddNode,
+  onViewportSizeChange,
   isExporting = false,
 }) => {
   const { theme } = useTheme();
@@ -766,6 +782,7 @@ const GraphCanvas = ({
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
+  const previousResetTriggerRef = useRef(resetViewTrigger);
   const nodeMap = useMemo(() => {
     const map = new Map();
     graph.nodes.forEach(node => map.set(String(node.id), node));
@@ -804,17 +821,16 @@ const GraphCanvas = ({
           edge,
           effectiveSelectedNodeIds
         );
-        const strokeColor = getEffectiveEdgeColor({
-          edge,
-          selected,
-          multiSelected,
-          theme,
-        });
+        const strokeColor = getEffectiveEdgeColor(edge);
+        const selectionUnderlayColor =
+          EDGE_SELECTION_UNDERLAY_COLORS[theme] ??
+          EDGE_SELECTION_UNDERLAY_COLORS.light;
         return {
           ...renderData,
           selected,
           multiSelected,
           strokeColor,
+          selectionUnderlayColor,
           markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
         };
       }),
@@ -833,17 +849,22 @@ const GraphCanvas = ({
     });
     return Array.from(markers, ([id, color]) => ({ id, color }));
   }, [edgeVisualData]);
+  const arrowMarkerMetrics = useMemo(
+    () => getArrowMarkerMetrics(edgeWidth),
+    [edgeWidth]
+  );
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
     const updateCanvasSize = () => {
       const bounds = el.getBoundingClientRect();
+      const next = {
+        width: Math.max(0, Math.round(bounds.width)),
+        height: Math.max(0, Math.round(bounds.height)),
+      };
+      onViewportSizeChange?.(next);
       setCanvasSize(prev => {
-        const next = {
-          width: Math.max(0, Math.round(bounds.width)),
-          height: Math.max(0, Math.round(bounds.height)),
-        };
         return prev.width === next.width && prev.height === next.height
           ? prev
           : next;
@@ -857,11 +878,14 @@ const GraphCanvas = ({
       ro.disconnect();
       window.removeEventListener('resize', updateCanvasSize);
     };
-  }, []);
+  }, [onViewportSizeChange]);
   useEffect(() => {
-    hasInitializedViewRef.current = false;
+    const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
+    previousResetTriggerRef.current = resetViewTrigger;
+    if (hasInitializedViewRef.current && !resetChanged) return undefined;
+
     const el = svgRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const doInit = () => {
       const bounds = el.getBoundingClientRect();
       if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
@@ -1182,14 +1206,15 @@ const GraphCanvas = ({
               key={id}
               id={id}
               data-edge-color={color}
-              markerWidth="12"
-              markerHeight="12"
-              refX="10"
-              refY="6"
+              markerWidth={arrowMarkerMetrics.markerWidth}
+              markerHeight={arrowMarkerMetrics.markerHeight}
+              refX={arrowMarkerMetrics.refX}
+              refY={arrowMarkerMetrics.refY}
               orient="auto"
               markerUnits="userSpaceOnUse"
+              viewBox={`0 0 ${arrowMarkerMetrics.markerWidth} ${arrowMarkerMetrics.markerHeight}`}
             >
-              <path d="M0,0 L0,12 L10,6 z" fill={color} />
+              <path d={arrowMarkerMetrics.pathD} fill={color} />
             </marker>
           ))}
           <filter
@@ -1235,6 +1260,7 @@ const GraphCanvas = ({
                 selected,
                 multiSelected,
                 strokeColor,
+                selectionUnderlayColor,
                 markerId,
               }) => {
                 const endpointMoved =
@@ -1247,6 +1273,7 @@ const GraphCanvas = ({
                     edge={edge}
                     pathD={pathD}
                     strokeColor={strokeColor}
+                    selectionUnderlayColor={selectionUnderlayColor}
                     selected={selected}
                     multiSelected={multiSelected}
                     markerId={markerId}
