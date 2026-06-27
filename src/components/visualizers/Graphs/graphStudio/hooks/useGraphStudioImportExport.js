@@ -130,12 +130,22 @@ export const useGraphStudioImportExport = ({
           edgeOverrides: {},
         },
       ]);
+      setMode('select');
+      clearSelection?.();
+      clearDrawState?.();
       setIsParserOpen(false);
       setStatus(`Graph parsed: ${meta}`);
     } catch (error) {
       setStatus(`Parse failed: ${error.message}`);
     }
-  }, [parserText, replaceTimeline, setStatus]);
+  }, [
+    clearDrawState,
+    clearSelection,
+    parserText,
+    replaceTimeline,
+    setMode,
+    setStatus,
+  ]);
 
   const exportText = useCallback(async () => {
     const output = exportEdgeListText(baseGraph);

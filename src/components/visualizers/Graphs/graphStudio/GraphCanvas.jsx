@@ -45,12 +45,14 @@ const LEGEND_PALETTES = {
 };
 const CAPTION_STYLE_PRESETS = {
   subtle: {
-    background: '#F8F9FA',
-    border: '#CBD5E1',
+    background: '#FFFFFF',
+    border: '#FFFFFF',
     text: '#0F172A',
-    fillOpacity: 0.97,
-    showBox: true,
-    shadow: true,
+    textStroke: '#FFFFFF',
+    textStrokeWidth: 2,
+    fillOpacity: 0,
+    showBox: false,
+    shadow: false,
   },
   light: {
     background: '#FFFFFF',
@@ -111,7 +113,7 @@ const CAPTION_SIZE_PRESETS = {
     characterWidth: 7.4,
   },
 };
-const CAPTION_MAX_LINES = 4;
+const CAPTION_MAX_LINES = 3;
 
 const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
 
@@ -565,8 +567,16 @@ const FrameCaption = ({
 }) => {
   const { theme } = useTheme();
   const caption = normalizeCaptionOverlay(captionOverlay);
-  const stylePreset =
+  const baseStylePreset =
     CAPTION_STYLE_PRESETS[caption.style] ?? CAPTION_STYLE_PRESETS.subtle;
+  const stylePreset =
+    caption.style === 'subtle' && theme === 'dark'
+      ? {
+          ...baseStylePreset,
+          text: '#F8FAFC',
+          textStroke: '#0F172A',
+        }
+      : baseStylePreset;
   const sizePreset =
     CAPTION_SIZE_PRESETS[caption.size] ?? CAPTION_SIZE_PRESETS.medium;
   const text = String(captionText ?? '').trim();
@@ -603,6 +613,14 @@ const FrameCaption = ({
     Math.floor(contentMaxWidth / sizePreset.characterWidth)
   );
   const lines = wrapCaptionText(text, maxCharacters, CAPTION_MAX_LINES);
+  const unclampedLineCount = wrapCaptionText(
+    text,
+    maxCharacters,
+    Number.MAX_SAFE_INTEGER
+  ).length;
+  const isTruncated =
+    unclampedLineCount > lines.length ||
+    lines.some(line => line.endsWith('...'));
   const estimatedTextWidth =
     Math.max(...lines.map(line => line.length), 1) * sizePreset.characterWidth;
   const boxWidth = Math.min(
@@ -672,6 +690,7 @@ const FrameCaption = ({
       data-caption-style={caption.style}
       data-caption-theme={theme}
       data-caption-line-count={lines.length}
+      data-caption-truncated={isTruncated}
       data-testid="frame-caption-overlay"
       pointerEvents="all"
       transform={`translate(${x} ${y})`}

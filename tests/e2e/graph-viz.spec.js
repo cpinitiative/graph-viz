@@ -704,7 +704,16 @@ test.describe('Graph Studio desktop smoke', () => {
     await frameDescription.fill('Smoke test frame');
     await expect(frameDescription).toHaveValue('Smoke test frame');
 
+    await graphNodes.first().click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
     const importMenu = await openImportMenu(page);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
     await importMenu
       .getByRole('button', { name: 'Paste / Import Edge List' })
       .click();
@@ -712,6 +721,10 @@ test.describe('Graph Studio desktop smoke', () => {
     await page.locator('textarea').last().fill('0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
     await expect(page.getByText('Text-to-Graph Parser')).toBeHidden();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
     await expect(graphCanvas(page)).toBeVisible();
 
     await choosePreset(page, 'bfs');
@@ -768,16 +781,28 @@ while (true) {}
 
     await cards.first().click();
     const frameOneLabel = cards.first().getByText('Frame 1');
-    const selectedFrameOneBox = await frameOneLabel.boundingBox();
+    const selectedFrameOneCardBox = await cards.first().boundingBox();
+    const selectedFrameOneLabelBox = await frameOneLabel.boundingBox();
     await cards.nth(1).click();
-    const deselectedFrameOneBox = await frameOneLabel.boundingBox();
-    expect(selectedFrameOneBox).not.toBeNull();
-    expect(deselectedFrameOneBox).not.toBeNull();
+    const deselectedFrameOneCardBox = await cards.first().boundingBox();
+    const deselectedFrameOneLabelBox = await frameOneLabel.boundingBox();
+    expect(selectedFrameOneCardBox).not.toBeNull();
+    expect(deselectedFrameOneCardBox).not.toBeNull();
+    expect(selectedFrameOneLabelBox).not.toBeNull();
+    expect(deselectedFrameOneLabelBox).not.toBeNull();
     expect(
-      Math.abs(selectedFrameOneBox.x - deselectedFrameOneBox.x)
+      Math.abs(selectedFrameOneCardBox.x - deselectedFrameOneCardBox.x)
     ).toBeLessThanOrEqual(0.5);
     expect(
-      Math.abs(selectedFrameOneBox.width - deselectedFrameOneBox.width)
+      Math.abs(selectedFrameOneCardBox.width - deselectedFrameOneCardBox.width)
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(
+        selectedFrameOneCardBox.height - deselectedFrameOneCardBox.height
+      )
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(selectedFrameOneLabelBox.x - deselectedFrameOneLabelBox.x)
     ).toBeLessThanOrEqual(0.5);
 
     await cards.last().click();
@@ -878,6 +903,16 @@ while (true) {}
     await expect(captionToggle).toBeVisible();
     await expect(captionStyleSelect).toBeVisible();
     await expect(captionSizeSelect).toBeVisible();
+    await expect(durationInput).toHaveClass(/text-center/);
+    await expect(durationInput).toHaveClass(/leading-8/);
+    await expect(captionStyleSelect.locator('xpath=..')).toHaveClass(
+      /w-\[108px\]/
+    );
+    await expect(captionSizeSelect.locator('xpath=..')).toHaveClass(
+      /w-\[100px\]/
+    );
+    expect((await captionStyleSelect.boundingBox())?.width).toBeLessThan(120);
+    expect((await captionSizeSelect.boundingBox())?.width).toBeLessThan(112);
     await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
     await expect(frameCounter).toHaveText(
       `${initialFrameCount + 2} / ${initialFrameCount + 3}`
@@ -934,6 +969,9 @@ while (true) {}
     await graphCanvas(page).focus();
     await graphCanvas(page).press('ArrowLeft');
     await expect(cards.first()).toHaveAttribute('data-current', 'true');
+    await expect(cards.first()).toHaveClass(/focus-visible:ring-1/);
+    await expect(cards.first()).toHaveClass(/focus-visible:ring-inset/);
+    await expect(cards.first()).not.toHaveClass(/focus-visible:ring-2/);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
       .poll(async () => frameCounter.textContent(), { timeout: 3000 })
@@ -1001,6 +1039,40 @@ while (true) {}
     await expect(caption).toHaveAttribute('data-caption-overlay', 'true');
     await expect(caption).toHaveAttribute('data-caption-style', 'subtle');
     await expect(caption).toHaveAttribute('data-caption-size', 'medium');
+    await expect(caption.locator('rect')).toHaveAttribute('fill-opacity', '0');
+    await expect(caption.locator('rect')).toHaveAttribute('stroke', 'none');
+    await expect(caption.locator('text')).toHaveAttribute('stroke', '#FFFFFF');
+
+    const captionBoxBeforeGraphControls = await caption.boundingBox();
+    const captionFontSizeBeforeGraphControls = await caption
+      .locator('text')
+      .getAttribute('font-size');
+    expect(captionBoxBeforeGraphControls).not.toBeNull();
+    await page.getByRole('button', { name: 'Zoom In' }).click();
+    await setRangeValue(page, 'Node size', 36);
+    await setRangeValue(page, 'Edge width', 5);
+    const captionBoxAfterGraphControls = await caption.boundingBox();
+    expect(captionBoxAfterGraphControls).not.toBeNull();
+    expect(captionBoxAfterGraphControls.x).toBeCloseTo(
+      captionBoxBeforeGraphControls.x,
+      0
+    );
+    expect(captionBoxAfterGraphControls.y).toBeCloseTo(
+      captionBoxBeforeGraphControls.y,
+      0
+    );
+    expect(captionBoxAfterGraphControls.width).toBeCloseTo(
+      captionBoxBeforeGraphControls.width,
+      0
+    );
+    expect(captionBoxAfterGraphControls.height).toBeCloseTo(
+      captionBoxBeforeGraphControls.height,
+      0
+    );
+    await expect(caption.locator('text')).toHaveAttribute(
+      'font-size',
+      captionFontSizeBeforeGraphControls
+    );
 
     for (const style of ['subtle', 'light', 'dark', 'plain']) {
       await captionStyleSelect.selectOption(style);
@@ -1027,12 +1099,15 @@ while (true) {}
     await captionSizeSelect.selectOption('large');
 
     const longCaption =
-      'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas.';
+      'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas. It keeps going long enough to prove the caption clamps cleanly instead of turning into a large text block that dominates the graph.';
     await frameDescription.fill(longCaption);
     await expect(caption).toContainText('This longer teaching annotation');
-    await expect
-      .poll(() => caption.locator('tspan').count())
-      .toBeGreaterThan(1);
+    await expect(caption).toHaveAttribute('data-caption-line-count', '3');
+    await expect(caption).toHaveAttribute('data-caption-truncated', 'true');
+    await expect.poll(() => caption.locator('tspan').count()).toBe(3);
+    expect(
+      (await caption.locator('tspan').last().textContent()).trim()
+    ).toMatch(/\.\.\.$/);
     expect(
       await caption.evaluate(element => {
         const captionBounds = element.getBoundingClientRect();
@@ -1524,6 +1599,24 @@ while (true) {}
       exact: true,
     });
     await nodeLabelInput.fill('Node Alpha');
+    await page.getByTestId('frame-duration-input').click({ clickCount: 3 });
+    await page.getByTestId('frame-duration-input').type('720');
+    await page.getByTestId('frame-duration-input').press('Enter');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await page.getByLabel('Show caption').check();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await page.getByLabel('Show caption').uncheck();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await nodeLabelInput.focus();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1572,6 +1665,19 @@ while (true) {}
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toHaveCount(0);
     await expect(drawSourceRing).toHaveCount(0);
+
+    await page.getByTestId('tool-button-select').click();
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await choosePreset(page, 'dfs');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(selectionRing).toHaveCount(0);
 
     expect(errors).toEqual([]);
   });

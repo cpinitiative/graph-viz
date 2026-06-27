@@ -366,6 +366,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     replaceTimeline(nextGraph, nextSteps);
     setViewFromNodes(nextGraph.nodes);
     bumpViewReset();
+    setMode('select');
+    clearSelection();
+    clearDrawState();
     setCustomLegend(prev =>
       normalizeCustomLegend({
         ...DEFAULT_CUSTOM_LEGEND,
