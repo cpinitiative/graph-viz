@@ -71,3 +71,8 @@ export const normalizeCaptionOverlay = value => {
     ),
   };
 };
+
+export const resolveStepCaptionEnabled = (step, captionOverlay) => {
+  if (typeof step?.captionVisible === 'boolean') return step.captionVisible;
+  return normalizeCaptionOverlay(captionOverlay).enabled;
+};

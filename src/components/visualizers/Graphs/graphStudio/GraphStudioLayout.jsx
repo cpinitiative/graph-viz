@@ -181,6 +181,7 @@ const ModalStack = ({
       onSubmit={modals.script.onSubmit}
       defaultScript={DEFAULT_SCRIPT}
       error={modals.script.error}
+      isRunning={modals.script.isRunning}
     />
     <ExportVideoModal
       open={modals.exportVideo.open}

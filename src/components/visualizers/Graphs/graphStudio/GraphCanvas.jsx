@@ -165,47 +165,55 @@ const truncateLegendText = (value, maxLength = 34) => {
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
+const LEGEND_KIND_GROUPS = [
+  ['node', 'Nodes'],
+  ['edge', 'Edges'],
+];
+
 const buildLegendRows = (
   entries,
   { groupMaxLength = 28, entryMaxLength = 34 } = {}
 ) => {
-  const groupedEntries = new Map();
-  entries.forEach((entry, index) => {
-    const group = String(entry.group ?? '').trim();
-    const groupKey = group.toLowerCase();
-    if (!groupedEntries.has(groupKey)) {
-      groupedEntries.set(groupKey, {
-        label: group,
+  const groupedEntries = new Map(
+    LEGEND_KIND_GROUPS.map(([kind, label]) => [
+      kind,
+      {
+        label,
         entries: [],
-      });
-    }
-    groupedEntries.get(groupKey).entries.push({ entry, index });
+      },
+    ])
+  );
+  entries.forEach((entry, index) => {
+    const kind = entry.kind === 'edge' ? 'edge' : 'node';
+    groupedEntries.get(kind).entries.push({ entry, index });
   });
 
   const rows = [];
-  Array.from(groupedEntries.values()).forEach((group, groupIndex) => {
-    if (group.label) {
-      rows.push({
-        type: 'group',
-        key: `group-${groupIndex}-${group.label}`,
-        label: truncateLegendText(group.label, groupMaxLength),
-        separated: groupIndex > 0,
-      });
-    }
-    group.entries.forEach(({ entry, index }) => {
-      rows.push({
-        type: 'entry',
-        key: `entry-${index}-${entry.label}`,
-        entry,
-        label: truncateLegendText(entry.label, entryMaxLength),
+  Array.from(groupedEntries.values())
+    .filter(group => group.entries.length > 0)
+    .forEach((group, groupIndex) => {
+      if (group.label) {
+        rows.push({
+          type: 'group',
+          key: `group-${groupIndex}-${group.label}`,
+          label: truncateLegendText(group.label, groupMaxLength),
+          separated: groupIndex > 0,
+        });
+      }
+      group.entries.forEach(({ entry, index }) => {
+        rows.push({
+          type: 'entry',
+          key: `entry-${index}-${entry.label}`,
+          entry,
+          label: truncateLegendText(entry.label, entryMaxLength),
+        });
       });
     });
-  });
   return rows;
 };
 
 const getLegendRowHeight = row =>
-  row.type === 'group' ? (row.separated ? 24 : 18) : 22;
+  row.type === 'group' ? (row.separated ? 22 : 16) : 22;
 
 const resolveLegendPosition = position =>
   position === 'auto' ? 'bottom-right' : position;
@@ -243,9 +251,9 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
   if (entry.kind === 'edge') {
     return (
       <line
-        x1="0"
+        x1="2"
         y1="0"
-        x2="18"
+        x2="22"
         y2="0"
         stroke={entry.color}
         strokeWidth="3"
@@ -256,7 +264,7 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
 
   return (
     <circle
-      cx="7"
+      cx="12"
       cy="0"
       r="6"
       fill={entry.color}
@@ -299,10 +307,10 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
   const boxWidth = Math.min(
     maxBoxWidth,
     300,
-    Math.max(168, 48 + maxTextLength * 7)
+    Math.max(176, 56 + maxTextLength * 7)
   );
   const titleMaxLength = Math.max(4, Math.floor((boxWidth - 24) / 7));
-  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 48) / 7));
+  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 44) / 7));
   const fittedTitle = truncateLegendText(title, titleMaxLength);
   const fittedEntries = legend.entries.map(entry => ({
     ...entry,
@@ -410,6 +418,8 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
       style={{
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       <rect
@@ -481,7 +491,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
           <g key={row.key} transform={`translate(12 ${rowY + 3})`}>
             <LegendSwatch entry={row.entry} nodeStroke={palette.nodeStroke} />
             <text
-              x="22"
+              x="32"
               y="4"
               fill={palette.text}
               fontFamily="Arial, sans-serif"
@@ -713,6 +723,8 @@ const FrameCaption = ({
       style={{
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       <rect

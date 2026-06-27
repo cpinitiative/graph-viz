@@ -97,7 +97,7 @@ const sanitizeOverrideMap = (value, validIds, label) => {
 const sanitizeStep = (step, index, nodeIds, edgeIds) => {
   if (!isRecord(step))
     throw new Error(`Timeline step ${index + 1} must be an object`);
-  return {
+  const sanitized = {
     ...cloneJson(step),
     id: String(step.id ?? `step-${index}`),
     description: String(step.description ?? `Step ${index + 1}`),
@@ -115,6 +115,10 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
       `Timeline step ${index + 1} edgeOverrides`
     ),
   };
+  if (typeof step.captionVisible !== 'boolean') {
+    delete sanitized.captionVisible;
+  }
+  return sanitized;
 };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));

@@ -21,6 +21,7 @@ import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
 import {
   DEFAULT_CAPTION_OVERLAY,
   normalizeCaptionOverlay,
+  resolveStepCaptionEnabled,
 } from './graphStudio/lib/captionOverlay';
 import {
   DEFAULT_CUSTOM_LEGEND,
@@ -78,6 +79,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [showGrid, setShowGrid] = useState(false);
   const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
   const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
+  const currentCaptionOverlay = {
+    ...normalizedCaptionOverlay,
+    enabled: resolveStepCaptionEnabled(
+      steps[currentFrame],
+      normalizedCaptionOverlay
+    ),
+  };
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -211,6 +219,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     scriptText,
     setScriptText,
     scriptError,
+    isScriptRunning,
     runScript,
     isExportVideoOpen,
     exportText,
@@ -453,7 +462,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodeClickForDraw,
       onCanvasAddNode: addNodeAt,
       onViewportSizeChange: setZoomViewportSize,
-      captionOverlay,
+      captionOverlay: currentCaptionOverlay,
+      baseCaptionOverlay: normalizedCaptionOverlay,
       setCaptionOverlay,
       captionText: steps[currentFrame]?.description ?? '',
       isExporting,
@@ -484,14 +494,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
         updateStep(index, 'description', value),
-      captionEnabled: normalizedCaptionOverlay.enabled,
+      captionEnabled: currentCaptionOverlay.enabled,
       captionStyle: normalizedCaptionOverlay.style,
       captionSize: normalizedCaptionOverlay.size,
       onCaptionEnabledChange: enabled =>
-        setCaptionOverlay(prev => ({
-          ...normalizeCaptionOverlay(prev),
-          enabled,
-        })),
+        updateStep(currentFrame, 'captionVisible', enabled),
       onCaptionStyleChange: style =>
         setCaptionOverlay(prev => ({
           ...normalizeCaptionOverlay(prev),
@@ -545,6 +552,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         onClose: () => setIsScriptOpen(false),
         onSubmit: runScript,
         error: scriptError,
+        isRunning: isScriptRunning,
       },
       exportVideo: {
         open: isExportVideoOpen,

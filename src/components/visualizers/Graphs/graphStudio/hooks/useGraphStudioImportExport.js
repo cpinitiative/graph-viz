@@ -72,6 +72,7 @@ export const useGraphStudioImportExport = ({
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
   const [scriptError, setScriptError] = useState('');
   const isScriptRunningRef = useRef(false);
+  const [isScriptRunning, setIsScriptRunning] = useState(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
   const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.viewport);
@@ -444,6 +445,7 @@ export const useGraphStudioImportExport = ({
   const runScript = useCallback(async () => {
     if (isScriptRunningRef.current) return;
     isScriptRunningRef.current = true;
+    setIsScriptRunning(true);
     setScriptError('');
     setStatus('Running script...');
     try {
@@ -452,17 +454,29 @@ export const useGraphStudioImportExport = ({
         graph: baseGraph,
       });
       replaceTimeline(baseGraph, traceSteps);
+      setMode('select');
+      clearSelection?.();
+      clearDrawState?.();
       setIsScriptOpen(false);
       setScriptError('');
       setStatus(`Script generated ${traceSteps.length} frames`);
     } catch (error) {
       const message = `Script error: ${error.message}`;
-      setScriptError(message);
+      setScriptError(previous => (previous === message ? previous : message));
       setStatus(message);
     } finally {
       isScriptRunningRef.current = false;
+      setIsScriptRunning(false);
     }
-  }, [baseGraph, replaceTimeline, scriptText, setStatus]);
+  }, [
+    baseGraph,
+    clearDrawState,
+    clearSelection,
+    replaceTimeline,
+    scriptText,
+    setMode,
+    setStatus,
+  ]);
 
   const openExportVideoModal = useCallback(() => {
     setIsExportVideoOpen(true);
@@ -495,6 +509,7 @@ export const useGraphStudioImportExport = ({
     scriptText,
     setScriptText: updateScriptText,
     scriptError,
+    isScriptRunning,
     runScript,
     isExportVideoOpen,
     exportVideo,

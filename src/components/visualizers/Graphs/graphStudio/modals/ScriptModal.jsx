@@ -12,6 +12,7 @@ const ScriptModal = ({
   onSubmit,
   defaultScript,
   error,
+  isRunning = false,
 }) => {
   useEffect(() => {
     if (!open) return undefined;
@@ -93,14 +94,20 @@ const ScriptModal = ({
               </p>
             )}
           </div>
-          {error && (
+          <div className="mb-3 min-h-[44px]" data-testid="script-output-area">
             <div
-              className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-950 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
-              role="alert"
+              className={`rounded-md border px-3 py-2 text-xs leading-relaxed transition-colors ${
+                error
+                  ? 'border-red-300 bg-red-50 text-red-950 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100'
+                  : 'border-transparent bg-transparent text-transparent'
+              }`}
+              role={error ? 'alert' : undefined}
+              aria-live="polite"
+              data-testid="script-error-banner"
             >
-              {error}
+              {error || 'No script errors'}
             </div>
-          )}
+          </div>
           <textarea
             value={text}
             onChange={event => onTextChange(event.target.value)}
@@ -118,10 +125,12 @@ const ScriptModal = ({
           </button>
           <button
             type="button"
-            className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-on-primary transition-colors hover:bg-blue-500 dark:bg-dark-primary dark:text-dark-on-primary dark:hover:bg-blue-600"
+            className="rounded-md bg-primary px-4 py-2 text-xs font-medium text-on-primary transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-dark-primary dark:text-dark-on-primary dark:hover:bg-blue-600"
+            disabled={isRunning}
+            aria-busy={isRunning}
             onClick={onSubmit}
           >
-            Generate timeline
+            {isRunning ? 'Generating...' : 'Generate timeline'}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import GraphCanvas from '../GraphCanvas';
+import { resolveStepCaptionEnabled } from '../lib/captionOverlay';
 import {
   clampExportFrameRange,
   resolveExportFrameIndexes,
@@ -152,6 +153,15 @@ const ExportModal = ({
   );
   const selectedStep = steps[previewFrameIndex];
   const previewCaptionText = selectedStep?.description ?? '';
+  const baseCaptionOverlay =
+    previewCanvas?.baseCaptionOverlay ?? previewCanvas?.captionOverlay;
+  const previewCaptionOverlay = useMemo(
+    () => ({
+      ...(baseCaptionOverlay ?? {}),
+      enabled: resolveStepCaptionEnabled(selectedStep, baseCaptionOverlay),
+    }),
+    [baseCaptionOverlay, selectedStep]
+  );
   const previewRenderKey = useMemo(
     () =>
       JSON.stringify({
@@ -159,7 +169,7 @@ const ExportModal = ({
         graph: previewGraph,
         viewState: previewCanvas?.viewState,
         showGrid: Boolean(previewCanvas?.showGrid),
-        captionOverlay: previewCanvas?.captionOverlay,
+        captionOverlay: previewCaptionOverlay,
         captionText: previewCaptionText,
         customLegend: previewCanvas?.customLegend,
         edgeRouting: previewCanvas?.edgeRouting,
@@ -168,7 +178,6 @@ const ExportModal = ({
         edgeWidth: previewCanvas?.edgeWidth,
       }),
     [
-      previewCanvas?.captionOverlay,
       previewCanvas?.customLegend,
       previewCanvas?.edgeCurvature,
       previewCanvas?.edgeRouting,
@@ -177,6 +186,7 @@ const ExportModal = ({
       previewCanvas?.showGrid,
       previewCanvas?.viewState,
       previewFrameIndex,
+      previewCaptionOverlay,
       previewCaptionText,
       previewGraph,
     ]
@@ -710,7 +720,10 @@ const ExportModal = ({
         graph={previewGraph}
         captionText={previewCaptionText}
         viewport={editorViewport}
-        canvas={previewCanvas}
+        canvas={{
+          ...previewCanvas,
+          captionOverlay: previewCaptionOverlay,
+        }}
       />
     </div>
   );

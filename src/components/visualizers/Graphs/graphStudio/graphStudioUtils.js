@@ -66,6 +66,9 @@ const normalizeStep = (step, index) => ({
   id: String(step?.id ?? `step-${index}`),
   description: String(step?.description ?? `Step ${index + 1}`),
   durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
+  ...(typeof step?.captionVisible === 'boolean'
+    ? { captionVisible: step.captionVisible }
+    : {}),
   nodeOverrides:
     step?.nodeOverrides && typeof step.nodeOverrides === 'object'
       ? JSON.parse(JSON.stringify(step.nodeOverrides))

@@ -740,16 +740,40 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
-    await page.locator('[data-testid="script-modal"] textarea').fill(`
+    const scriptModal = page.getByTestId('script-modal');
+    const scriptEditor = scriptModal.locator('textarea');
+    const scriptOutputArea = page.getByTestId('script-output-area');
+    const outputBoxBeforeError = await scriptOutputArea.boundingBox();
+    await scriptEditor.fill('wow');
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(scriptModal.getByRole('alert')).toContainText(
+      'Script error: wow is not defined'
+    );
+    await expect(scriptEditor).toHaveValue('wow');
+    await expect(scriptModal.getByRole('alert')).toHaveCount(1);
+    const outputBoxAfterError = await scriptOutputArea.boundingBox();
+    expect(outputBoxBeforeError).not.toBeNull();
+    expect(outputBoxAfterError).not.toBeNull();
+    expect(outputBoxAfterError.y).toBeCloseTo(outputBoxBeforeError.y, 0);
+    expect(outputBoxAfterError.height).toBeCloseTo(
+      outputBoxBeforeError.height,
+      0
+    );
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(scriptModal.getByRole('alert')).toHaveCount(1);
+    await expect(scriptEditor).toHaveValue('wow');
+
+    await scriptEditor.fill(`
 while (true) {}
 `);
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(
-      page
-        .getByTestId('script-modal')
-        .getByText(
-          'Script error: Script timed out. Check for infinite loops or expensive work.'
-        )
+      page.getByRole('button', { name: 'Generating...' })
+    ).toBeDisabled();
+    await expect(
+      scriptModal.getByText(
+        'Script error: Script timed out. Check for infinite loops or expensive work.'
+      )
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -1043,6 +1067,30 @@ while (true) {}
     await expect(caption.locator('rect')).toHaveAttribute('stroke', 'none');
     await expect(caption.locator('text')).toHaveAttribute('stroke', '#FFFFFF');
 
+    await frameCards.nth(1).click();
+    await expect(captionToggle).not.toBeChecked();
+    await expect(caption).toHaveCount(0);
+    await captionToggle.check();
+    await expect(caption).toContainText('Queue B and C');
+    await frameCards.first().click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Start BFS at A');
+    await captionToggle.uncheck();
+    await expect(caption).toHaveCount(0);
+    await frameCards.nth(1).click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Queue B and C');
+
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(captionToggle).toBeChecked();
+    await frameDescription.fill('Inherited caption visibility');
+    await expect(caption).toContainText('Inherited caption visibility');
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Inherited caption visibility');
+    await frameCards.nth(1).click();
+    await expect(caption).toContainText('Queue B and C');
+
     const captionBoxBeforeGraphControls = await caption.boundingBox();
     const captionFontSizeBeforeGraphControls = await caption
       .locator('text')
@@ -1097,6 +1145,8 @@ while (true) {}
 
     await captionStyleSelect.selectOption('dark');
     await captionSizeSelect.selectOption('large');
+    await frameCards.nth(3).click();
+    await expect(caption).toContainText('Inherited caption visibility');
 
     const longCaption =
       'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas. It keeps going long enough to prove the caption clamps cleanly instead of turning into a large text block that dominates the graph.';
@@ -1132,6 +1182,12 @@ while (true) {}
     const draggedPosition = await dragCaption(page);
     expect(draggedPosition.x).toBeGreaterThan(0);
     expect(draggedPosition.y).toBeLessThan(1);
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      ''
+    );
+    expect(
+      await caption.evaluate(element => getComputedStyle(element).userSelect)
+    ).toBe('none');
 
     await frameCards.nth(1).click();
     await expect(caption).toContainText('Queue B and C');
@@ -1183,9 +1239,13 @@ while (true) {}
     const projectPath = await projectDownload.path();
     expect(projectPath).not.toBeNull();
     const project = await readJsonDownload(projectDownload);
-    expect(project.settings.captionOverlay.enabled).toBe(true);
+    expect(project.settings.captionOverlay.enabled).toBe(false);
     expect(project.settings.captionOverlay.style).toBe('dark');
     expect(project.settings.captionOverlay.size).toBe('large');
+    expect(project.timeline.steps[0].captionVisible).toBe(false);
+    expect(project.timeline.steps[1].captionVisible).toBe(true);
+    expect(project.timeline.steps[2].captionVisible).toBe(true);
+    expect(project.timeline.steps[3].captionVisible).toBe(true);
     expect(project.settings.captionOverlay.position.x).toBeCloseTo(
       draggedPosition.x,
       5
@@ -1237,22 +1297,40 @@ while (true) {}
     const editor = page.locator('[data-testid="script-modal"] textarea');
 
     await expect(exampleSelect).toBeVisible();
-    await exampleSelect.selectOption('bfs');
-    await expect(editor).toHaveValue(/Breadth-first search/);
+    const scriptExamples = [
+      ['bfs', /Breadth-first search/],
+      ['dfs', /Depth-first search/],
+      ['topological-sort', /Topological sort/],
+      ['dijkstra', /Dijkstra relaxation/],
+      ['kruskal', /Kruskal/],
+      ['edge-coloring', /edge coloring/i],
+    ];
+
+    await exampleSelect.selectOption(scriptExamples[0][0]);
+    await expect(editor).toHaveValue(scriptExamples[0][1]);
     await expect(editor).toHaveValue(/Start BFS/);
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Generate timeline' }).click();
-    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
-    await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
-    await expect(graphCanvas(page)).toBeVisible();
+    for (const [exampleId, expectedText] of scriptExamples) {
+      await exampleSelect.selectOption(exampleId);
+      await expect(editor).toHaveValue(expectedText);
+      await page.getByRole('button', { name: 'Generate timeline' }).click();
+      await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+      await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
+      await expect(graphCanvas(page)).toBeVisible();
+      await expect
+        .poll(() => page.getByTestId('timeline-frame-card').count())
+        .toBeGreaterThan(1);
+      await page.getByTestId('timeline-frame-card').nth(1).click();
+      await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Script Mode' }).click();
-    await exampleSelect.selectOption('dfs');
-    await expect(editor).toHaveValue(/Depth-first search/);
-    await expect(editor).not.toHaveValue(/Breadth-first search/);
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+      if (exampleId !== scriptExamples[scriptExamples.length - 1][0]) {
+        await page.getByRole('button', { name: 'Script Mode' }).click();
+        await expect(
+          page.getByText('Script Mode (Trace Recorder)')
+        ).toBeVisible();
+      }
+    }
 
     expect(errors).toEqual([]);
   });
@@ -1400,6 +1478,12 @@ while (true) {}
     await expect(
       legendPreview.locator('line[stroke="#F59E0B"]').first()
     ).toHaveAttribute('y1', '0');
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Default node' })
+    ).toHaveAttribute('x', '32');
+    await expect(
+      legendPreview.locator('line[stroke="#F59E0B"]').first()
+    ).toHaveAttribute('x1', '2');
 
     await closeLegendEditor(page);
     await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -1416,14 +1500,27 @@ while (true) {}
     await expandLegendEditor(page);
 
     await legendTitle.fill('Traversal Key');
-    await page.getByTestId('custom-legend-add-entry').click();
+    const addEntryButton = page.getByTestId('custom-legend-add-entry');
+    const addEntryBoxBefore = await addEntryButton.boundingBox();
+    await addEntryButton.click();
+    const addEntryBoxAfter = await addEntryButton.boundingBox();
+    expect(addEntryBoxBefore).not.toBeNull();
+    expect(addEntryBoxAfter).not.toBeNull();
+    expect(addEntryBoxAfter.y).toBeCloseTo(addEntryBoxBefore.y, 0);
+    await expect(page.getByTestId('custom-legend-entry-label-0')).toBeFocused();
+    await expect(
+      page.getByRole('button', { name: 'Delete legend entry 1' })
+    ).toBeVisible();
+    await expect(page.getByTestId('custom-legend-remove-entry-0')).toHaveText(
+      'Delete'
+    );
     await expect(legendPreview.getByText('Nodes', { exact: true })).toHaveCount(
       1
     );
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier edge');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier edge');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
     await legendPlacement.selectOption('top-left');
 
     await expect(legendPreview).toHaveAttribute(
@@ -1440,6 +1537,17 @@ while (true) {}
     await expect(
       legendPreview.locator('line[stroke="#f59e0b"]')
     ).toHaveAttribute('stroke', '#f59e0b');
+    const legendTextOrder = await legendPreview
+      .locator('text')
+      .evaluateAll(nodes => nodes.map(node => node.textContent));
+    expect(legendTextOrder.indexOf('Nodes')).toBeGreaterThan(-1);
+    expect(legendTextOrder.indexOf('Edges')).toBeGreaterThan(-1);
+    expect(legendTextOrder.indexOf('Nodes')).toBeLessThan(
+      legendTextOrder.indexOf('Edges')
+    );
+    expect(legendTextOrder.indexOf('Frontier edge')).toBeGreaterThan(
+      legendTextOrder.indexOf('Edges')
+    );
     await expect(graphCanvas(page)).toBeVisible();
 
     await page.getByTestId('custom-legend-reset').click();
@@ -2264,10 +2372,10 @@ while (true) {}
 
     await legendTitle.fill('Traversal Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
     ).toBeVisible();
@@ -2280,6 +2388,14 @@ while (true) {}
 
     await closeLegendEditor(page);
     const draggedPosition = await dragLegend(page);
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      ''
+    );
+    expect(
+      await legendPreview.evaluate(
+        element => getComputedStyle(element).userSelect
+      )
+    ).toBe('none');
     expect(draggedPosition.x).toBeGreaterThanOrEqual(0);
     expect(draggedPosition.x).toBeLessThanOrEqual(1);
     expect(draggedPosition.y).toBeGreaterThanOrEqual(0);
@@ -2337,16 +2453,16 @@ while (true) {}
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Traversal Key');
     await expect(legendPosition).toHaveValue('custom');
-    await expect(page.getByTestId('custom-legend-entry-group-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-group-0')).toHaveValue(
       'Edges'
     );
-    await expect(page.getByTestId('custom-legend-entry-label-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-label-0')).toHaveValue(
       'Frontier'
     );
-    await expect(page.getByTestId('custom-legend-entry-kind-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-kind-0')).toHaveValue(
       'edge'
     );
-    await expect(page.getByTestId('custom-legend-entry-color-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-color-0')).toHaveValue(
       '#f59e0b'
     );
     await expect(legendPreview).toBeVisible();
@@ -2881,10 +2997,10 @@ api.edge('e0', '#f59e0b');
     await expandLegendEditor(page);
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Critical path');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
     await closeLegendEditor(page);
     await dragLegend(page, { dx: -180, dy: -120 });

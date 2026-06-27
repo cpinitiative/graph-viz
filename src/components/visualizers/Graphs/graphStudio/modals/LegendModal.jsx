@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   CUSTOM_LEGEND_FALLBACK_COLOR,
   CUSTOM_LEGEND_KINDS,
@@ -16,10 +16,14 @@ const CUSTOM_LEGEND_KIND_LABELS = {
 
 const inputClass =
   'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-sm text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
+const entryInputClass =
+  'h-8 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-xs text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase text-outline dark:text-dark-outline';
 const dataButtonClass =
   'rounded bg-surface-container px-3 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
+const dangerButtonClass =
+  'min-h-8 rounded-sm border border-[#B91C1C] bg-transparent px-2 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#B91C1C] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:ring-[#F87171]';
 
 const LegendModal = ({
   open,
@@ -27,6 +31,8 @@ const LegendModal = ({
   setCustomLegend,
   onClose,
 }) => {
+  const pendingNewEntryFocusRef = useRef(false);
+
   useEffect(() => {
     if (!open) return undefined;
 
@@ -37,6 +43,17 @@ const LegendModal = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose, open]);
+
+  useEffect(() => {
+    if (!open || !pendingNewEntryFocusRef.current) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      pendingNewEntryFocusRef.current = false;
+      document
+        .querySelector('[data-testid="custom-legend-entry-label-0"]')
+        ?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [customLegend, open]);
 
   if (!open) return null;
 
@@ -76,6 +93,7 @@ const LegendModal = ({
   };
 
   const addLegendEntry = () => {
+    pendingNewEntryFocusRef.current = true;
     setCustomLegend?.(prev => {
       const current = {
         ...DEFAULT_CUSTOM_LEGEND,
@@ -84,13 +102,13 @@ const LegendModal = ({
       return {
         ...current,
         entries: [
-          ...(Array.isArray(current.entries) ? current.entries : []),
           {
             group: 'Nodes',
             kind: 'node',
             label: 'New entry',
             color: CUSTOM_LEGEND_FALLBACK_COLOR,
           },
+          ...(Array.isArray(current.entries) ? current.entries : []),
         ],
       };
     });
@@ -124,15 +142,17 @@ const LegendModal = ({
       aria-modal="true"
       aria-labelledby="custom-legend-modal-title"
     >
-      <div className="mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
-        <div className="flex items-center justify-between border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
-          <h3
-            id="custom-legend-modal-title"
-            className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
-          >
-            Edit Legend
-          </h3>
-          <ModalCloseButton onClick={onClose} />
+      <div className="mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-md bg-surface-container-low shadow-ambient-lg dark:bg-black">
+        <div className="shrink-0 border-b border-outline-variant/20 p-4 dark:border-dark-outline-variant/20">
+          <div className="flex items-center justify-between">
+            <h3
+              id="custom-legend-modal-title"
+              className="text-sm font-semibold text-on-surface dark:text-dark-on-surface"
+            >
+              Edit Legend
+            </h3>
+            <ModalCloseButton onClick={onClose} />
+          </div>
         </div>
 
         <div
@@ -195,7 +215,7 @@ const LegendModal = ({
           )}
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-y border-outline-variant/20 bg-surface-container-low py-2 dark:border-dark-outline-variant/20 dark:bg-black">
               <div className={fieldLabelClass}>Entries</div>
               <button
                 type="button"
@@ -211,9 +231,9 @@ const LegendModal = ({
               {legendEntries.map((entry, index) => (
                 <div
                   key={`custom-legend-entry-${index}`}
-                  className="grid gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest px-3 pb-3 pt-2 dark:border-dark-outline-variant/20 dark:bg-dark-surface"
+                  className="grid gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest p-2 dark:border-dark-outline-variant/20 dark:bg-dark-surface"
                 >
-                  <div className="grid gap-2 md:grid-cols-[minmax(120px,0.8fr)_minmax(180px,1fr)_120px_80px_44px] md:items-end">
+                  <div className="grid gap-2 md:grid-cols-[minmax(108px,0.75fr)_minmax(160px,1fr)_104px_64px_72px] md:items-end">
                     <label
                       className="space-y-1"
                       htmlFor={`custom-legend-entry-group-${index}`}
@@ -230,7 +250,7 @@ const LegendModal = ({
                             group: event.target.value,
                           })
                         }
-                        className={inputClass}
+                        className={entryInputClass}
                       />
                     </label>
                     <label
@@ -249,7 +269,7 @@ const LegendModal = ({
                             label: event.target.value,
                           })
                         }
-                        className={inputClass}
+                        className={entryInputClass}
                       />
                     </label>
                     <label
@@ -267,7 +287,7 @@ const LegendModal = ({
                             kind: event.target.value,
                           })
                         }
-                        size="regular"
+                        size="dense"
                       >
                         {CUSTOM_LEGEND_KINDS.map(kind => (
                           <option key={kind} value={kind}>
@@ -292,18 +312,18 @@ const LegendModal = ({
                             color: event.target.value,
                           })
                         }
-                        className="h-10 w-full rounded border border-outline-variant/30 bg-white p-1 dark:border-dark-outline-variant/30 dark:bg-gray-800"
+                        className="h-8 w-full rounded border border-outline-variant/30 bg-white p-1 dark:border-dark-outline-variant/30 dark:bg-gray-800"
                       />
                     </label>
                     <button
                       type="button"
-                      title={`Remove Legend Entry ${index + 1}`}
-                      aria-label={`Remove Legend Entry ${index + 1}`}
+                      title={`Delete legend entry ${index + 1}`}
+                      aria-label={`Delete legend entry ${index + 1}`}
                       data-testid={`custom-legend-remove-entry-${index}`}
                       onClick={() => removeLegendEntry(index)}
-                      className="min-h-10 rounded bg-surface-container px-3 text-xs font-semibold text-on-surface hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high"
+                      className={dangerButtonClass}
                     >
-                      X
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -312,7 +332,7 @@ const LegendModal = ({
           </div>
         </div>
 
-        <div className="flex flex-col justify-end gap-2 border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900 sm:flex-row">
+        <div className="flex shrink-0 flex-col justify-end gap-2 border-t border-outline-variant/20 bg-white/50 p-4 dark:border-dark-outline-variant/20 dark:bg-gray-900 sm:flex-row">
           <button
             type="button"
             className={dataButtonClass}
