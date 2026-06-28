@@ -11,7 +11,6 @@ import {
   getRectSelection,
   toWorld,
 } from './graphCanvasUtils';
-import { edgeBetweenSelected } from './graphStudioUtils';
 import { normalizeCaptionOverlay } from './lib/captionOverlay';
 import { normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
@@ -848,10 +847,6 @@ const GraphCanvas = ({
         const selected =
           effectiveSelectedObject?.type === 'edge' &&
           String(effectiveSelectedObject.id) === String(edge.id);
-        const multiSelected = edgeBetweenSelected(
-          edge,
-          effectiveSelectedNodeIds
-        );
         const strokeColor = getEffectiveEdgeColor(edge);
         const selectionUnderlayColor =
           EDGE_SELECTION_UNDERLAY_COLORS[theme] ??
@@ -859,19 +854,13 @@ const GraphCanvas = ({
         return {
           ...renderData,
           selected,
-          multiSelected,
+          multiSelected: false,
           strokeColor,
           selectionUnderlayColor,
           markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
         };
       }),
-    [
-      edgeRenderData,
-      effectiveSelectedNodeIds,
-      effectiveSelectedObject,
-      svgResourcePrefix,
-      theme,
-    ]
+    [edgeRenderData, effectiveSelectedObject, svgResourcePrefix, theme]
   );
   const arrowMarkers = useMemo(() => {
     const markers = new Map();
@@ -980,11 +969,8 @@ const GraphCanvas = ({
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
     setViewState(prev => {
-      const clamped = clampViewStateToPlayspace(
-        prev,
-        bounds.width,
-        bounds.height
-      );
+      const zoom = clampZoom(prev.zoom, bounds.width, bounds.height);
+      const clamped = zoom === prev.zoom ? prev : { ...prev, zoom };
       const unchanged =
         Math.abs(clamped.x - prev.x) < EPSILON &&
         Math.abs(clamped.y - prev.y) < EPSILON &&
@@ -1203,16 +1189,6 @@ const GraphCanvas = ({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
-        onDoubleClick={event => {
-          const bounds = svgRef.current?.getBoundingClientRect();
-          if (!bounds) return;
-          const local = {
-            x: event.clientX - bounds.left,
-            y: event.clientY - bounds.top,
-          };
-          const world = toWorld(local, viewState);
-          if (mode === 'select') onCanvasAddNode(world);
-        }}
         style={{
           touchAction: 'none',
           cursor:

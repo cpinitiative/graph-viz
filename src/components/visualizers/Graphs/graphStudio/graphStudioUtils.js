@@ -62,22 +62,26 @@ export const normalizeBaseGraph = (payload = DEFAULT_GRAPH) => {
     .filter(Boolean);
   return { nodes, edges };
 };
-const normalizeStep = (step, index) => ({
-  id: String(step?.id ?? `step-${index}`),
-  description: String(step?.description ?? `Step ${index + 1}`),
-  durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
-  ...(typeof step?.captionVisible === 'boolean'
-    ? { captionVisible: step.captionVisible }
-    : {}),
-  nodeOverrides:
-    step?.nodeOverrides && typeof step.nodeOverrides === 'object'
-      ? JSON.parse(JSON.stringify(step.nodeOverrides))
-      : {},
-  edgeOverrides:
-    step?.edgeOverrides && typeof step.edgeOverrides === 'object'
-      ? JSON.parse(JSON.stringify(step.edgeOverrides))
-      : {},
-});
+const normalizeStep = (step, index) => {
+  const captionVisible =
+    typeof step?.captionVisible === 'boolean'
+      ? step.captionVisible
+      : step?.showCaption;
+  return {
+    id: String(step?.id ?? `step-${index}`),
+    description: String(step?.description ?? `Step ${index + 1}`),
+    durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
+    ...(typeof captionVisible === 'boolean' ? { captionVisible } : {}),
+    nodeOverrides:
+      step?.nodeOverrides && typeof step.nodeOverrides === 'object'
+        ? JSON.parse(JSON.stringify(step.nodeOverrides))
+        : {},
+    edgeOverrides:
+      step?.edgeOverrides && typeof step.edgeOverrides === 'object'
+        ? JSON.parse(JSON.stringify(step.edgeOverrides))
+        : {},
+  };
+};
 export const normalizeTimelinePayload = payload => {
   if (payload?.baseGraph && Array.isArray(payload?.steps)) {
     return {

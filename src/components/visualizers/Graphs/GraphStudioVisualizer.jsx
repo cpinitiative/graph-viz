@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE_ROUTING } from './graphStudio/constants';
 import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
 import GraphStudioLayout from './graphStudio/GraphStudioLayout';
@@ -201,6 +201,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedNodeIds,
     clearSelection,
   });
+  const previousFrameRef = useRef(currentFrame);
+  useEffect(() => {
+    if (previousFrameRef.current === currentFrame) return;
+    previousFrameRef.current = currentFrame;
+    clearDrawState();
+  }, [clearDrawState, currentFrame]);
   const {
     isParserOpen,
     setIsParserOpen,

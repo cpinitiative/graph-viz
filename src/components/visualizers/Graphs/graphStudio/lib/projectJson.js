@@ -97,6 +97,10 @@ const sanitizeOverrideMap = (value, validIds, label) => {
 const sanitizeStep = (step, index, nodeIds, edgeIds) => {
   if (!isRecord(step))
     throw new Error(`Timeline step ${index + 1} must be an object`);
+  const captionVisible =
+    typeof step.captionVisible === 'boolean'
+      ? step.captionVisible
+      : step.showCaption;
   const sanitized = {
     ...cloneJson(step),
     id: String(step.id ?? `step-${index}`),
@@ -115,7 +119,10 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
       `Timeline step ${index + 1} edgeOverrides`
     ),
   };
-  if (typeof step.captionVisible !== 'boolean') {
+  delete sanitized.showCaption;
+  if (typeof captionVisible === 'boolean') {
+    sanitized.captionVisible = captionVisible;
+  } else {
     delete sanitized.captionVisible;
   }
   return sanitized;
@@ -198,6 +205,21 @@ const sanitizeSettings = settings => {
   };
 };
 
+const normalizeStepForExport = step => {
+  const cloned = isRecord(step) ? cloneJson(step) : {};
+  const captionVisible =
+    typeof cloned.captionVisible === 'boolean'
+      ? cloned.captionVisible
+      : cloned.showCaption;
+  delete cloned.showCaption;
+  if (typeof captionVisible === 'boolean') {
+    cloned.captionVisible = captionVisible;
+  } else {
+    delete cloned.captionVisible;
+  }
+  return cloned;
+};
+
 export const exportProjectJson = ({
   baseGraph,
   steps,
@@ -212,7 +234,7 @@ export const exportProjectJson = ({
     edges: cloneJson(baseGraph?.edges ?? []),
   },
   timeline: {
-    steps: cloneJson(steps ?? []),
+    steps: (Array.isArray(steps) ? steps : []).map(normalizeStepForExport),
     currentFrame: Number.isInteger(currentFrame) ? currentFrame : 0,
   },
   settings: cloneJson(settings ?? {}),

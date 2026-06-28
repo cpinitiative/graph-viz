@@ -475,6 +475,7 @@ const pastedProject = {
         id: 'step-0',
         description: 'Pasted JSON import test',
         durationMs: 600,
+        showCaption: true,
         nodeOverrides: {},
         edgeOverrides: {},
       },
@@ -485,7 +486,7 @@ const pastedProject = {
     snapEnabled: true,
     showGrid: false,
     captionOverlay: {
-      enabled: true,
+      enabled: false,
       position: { x: 0.2, y: 0.7 },
     },
     lockCanvas: true,
@@ -566,6 +567,15 @@ test.describe('Graph Studio desktop smoke', () => {
 
     const graphNodes = graphNodeCircles(page);
     const initialNodeCount = await graphNodes.count();
+    await graphCanvas(page).dblclick({ position: { x: 24, y: 24 } });
+    await expect(graphNodes).toHaveCount(initialNodeCount);
+    await graphNodes.first().dblclick();
+    await expect(graphNodes).toHaveCount(initialNodeCount);
+    await graphCanvas(page)
+      .locator('[data-edge-hit-target-id]')
+      .first()
+      .dblclick();
+    await expect(graphNodes).toHaveCount(initialNodeCount);
     await page.getByRole('button', { name: 'Add Node' }).click();
     await expect(page.getByTestId('tool-button-add')).toHaveAttribute(
       'aria-pressed',
@@ -1690,6 +1700,9 @@ while (true) {}
       'selection'
     );
     await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id]')
+    ).toHaveCount(0);
     const colorGreenButton = page.getByRole('button', { name: 'Color green' });
     await expect(colorGreenButton).toHaveClass(/focus-visible:ring-1/);
     await expect(colorGreenButton).not.toHaveClass(/focus:ring-2/);
@@ -1785,6 +1798,15 @@ while (true) {}
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await firstNode.click();
     await expect(drawSourceRing).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await graphNodes.first().click();
+    await expect(drawSourceRing).toBeVisible();
+    await page.getByTestId('timeline-frame-card').nth(1).click();
+    await expect(drawSourceRing).toHaveCount(0);
+    await expect(
+      page.getByText('Click a source node, then a target node.')
+    ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1934,6 +1956,30 @@ while (true) {}
         .locator('text')
         .filter({ hasText: 'Nodes' })
     ).toBeVisible();
+    await expect
+      .poll(async () => {
+        const snapshot = await getCanvasViewSnapshot(page);
+        return {
+          x: Number(snapshot.x),
+          y: Number(snapshot.y),
+          zoom: Number(snapshot.zoom),
+        };
+      })
+      .toEqual({ x: 120, y: 80, zoom: 0.9 });
+
+    let exportMenu = await openExportMenu(page);
+    const roundTripDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const roundTripProject = await readJsonDownload(roundTripDownload);
+    expect(roundTripProject.settings.viewState).toEqual({
+      zoom: 0.9,
+      x: 120,
+      y: 80,
+    });
+    await closeExportMenu(page);
 
     await openImportMenu(page);
     await page
@@ -2333,6 +2379,24 @@ while (true) {}
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
 
+    await page.getByTestId('tool-button-select').click();
+    await firstNode.click();
+    await graphNodes.nth(1).click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'selection'
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id]')
+    ).toHaveCount(0);
+    exportMenu = await openExportMenu(page);
+    previewState = await getSvgPresentationState(
+      page,
+      await getPreviewSvgText(page)
+    );
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
+    await closeExportMenu(page);
+
     expect(errors).toEqual([]);
   });
 
@@ -2468,6 +2532,18 @@ while (true) {}
       'data-caption-position-y',
       '0.7'
     );
+
+    const exportMenu = await openExportMenu(page);
+    const projectDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const exportedProject = await readJsonDownload(projectDownload);
+    expect(exportedProject.settings.captionOverlay.enabled).toBe(false);
+    expect(exportedProject.timeline.steps[0].captionVisible).toBe(true);
+    expect(exportedProject.timeline.steps[0]).not.toHaveProperty('showCaption');
+    await closeExportMenu(page);
 
     expect(errors).toEqual([]);
   });
