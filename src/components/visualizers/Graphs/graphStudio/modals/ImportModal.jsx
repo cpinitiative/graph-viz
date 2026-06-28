@@ -118,7 +118,8 @@ const ImportModal = ({
                 Edge List
               </h3>
               <p className="mt-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
-                Paste competitive-programming style node and edge data.
+                Strict 0-based format: first line n m, then exactly m rows of u
+                v or u v weight. Spaces only.
               </p>
             </div>
             <button

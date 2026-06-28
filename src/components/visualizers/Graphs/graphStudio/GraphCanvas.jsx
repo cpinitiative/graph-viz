@@ -1271,6 +1271,7 @@ const GraphCanvas = ({
           className="dark:fill-[#121212]"
         />
         <g
+          data-graph-view-transform="true"
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
         >
           {showGrid && (

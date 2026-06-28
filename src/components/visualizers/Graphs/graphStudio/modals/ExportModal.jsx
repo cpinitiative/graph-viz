@@ -96,7 +96,7 @@ const ExportModal = ({
   onExportPng,
   pngScale = 2,
   onPngScaleChange,
-  imageFraming = 'viewport',
+  imageFraming = IMAGE_FRAMING.fit,
   onImageFramingChange,
   onExportVideo,
   onExportSlideshow,
@@ -664,10 +664,14 @@ const ExportModal = ({
                     }
                     size="regular"
                   >
-                    <option value={IMAGE_FRAMING.viewport}>Viewport</option>
                     <option value={IMAGE_FRAMING.fit}>Fit graph</option>
+                    <option value={IMAGE_FRAMING.viewport}>Viewport</option>
                     <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
                   </NativeSelect>
+                  <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+                    Fit graph is the default. Viewport exports the visible
+                    editor view; Slide 16:9 composes a presentation frame.
+                  </span>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">

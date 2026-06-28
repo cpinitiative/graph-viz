@@ -48,6 +48,8 @@ export const useGraphStudioImportExport = ({
   setLockCanvas,
   viewState,
   setViewState,
+  setViewFromNodes,
+  bumpViewReset,
   globalSettings,
   setGlobalSettings,
   mode,
@@ -65,6 +67,7 @@ export const useGraphStudioImportExport = ({
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
+  const [parserError, setParserError] = useState('');
   const [isProjectJsonPasteOpen, setIsProjectJsonPasteOpen] = useState(false);
   const [projectJsonPasteText, setProjectJsonPasteText] = useState('');
   const [projectJsonPasteError, setProjectJsonPasteError] = useState('');
@@ -75,7 +78,7 @@ export const useGraphStudioImportExport = ({
   const [isScriptRunning, setIsScriptRunning] = useState(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
-  const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.viewport);
+  const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.fit);
   const [exportFrameRangeState, setExportFrameRangeState] = useState(() => ({
     ...DEFAULT_EXPORT_FRAME_RANGE,
     endFrame: Math.max(1, steps.length),
@@ -120,6 +123,7 @@ export const useGraphStudioImportExport = ({
   }, [setIsExporting]);
 
   const applyParserText = useCallback(() => {
+    setParserError('');
     try {
       const { graph, meta } = parseEdgeListText(parserText);
       replaceTimeline(graph, [
@@ -131,22 +135,38 @@ export const useGraphStudioImportExport = ({
           edgeOverrides: {},
         },
       ]);
+      setViewFromNodes?.(graph.nodes);
+      bumpViewReset?.();
       setMode('select');
       clearSelection?.();
       clearDrawState?.();
       setIsParserOpen(false);
       setStatus(`Graph parsed: ${meta}`);
     } catch (error) {
-      setStatus(`Parse failed: ${error.message}`);
+      const message = `Parse failed: ${error.message}`;
+      setParserError(message);
+      setStatus(message);
     }
   }, [
     clearDrawState,
     clearSelection,
+    bumpViewReset,
     parserText,
     replaceTimeline,
+    setViewFromNodes,
     setMode,
     setStatus,
   ]);
+
+  const setParserModalOpen = useCallback(open => {
+    setIsParserOpen(open);
+    if (open) setParserError('');
+  }, []);
+
+  const updateParserText = useCallback(value => {
+    setParserText(value);
+    setParserError('');
+  }, []);
 
   const exportText = useCallback(async () => {
     const output = exportEdgeListText(baseGraph);
@@ -396,7 +416,6 @@ export const useGraphStudioImportExport = ({
         currentFrame,
         setCurrentFrame,
         frameIndexes,
-        framingMode: imageFraming,
       });
       setStatus('Slideshow exported');
     } catch (error) {
@@ -417,7 +436,6 @@ export const useGraphStudioImportExport = ({
     drawFrom,
     enableExportCanvas,
     getExportFrameIndexes,
-    imageFraming,
     mode,
     restoreDrawState,
     selectedNodeIds,
@@ -493,9 +511,10 @@ export const useGraphStudioImportExport = ({
 
   return {
     isParserOpen,
-    setIsParserOpen,
+    setIsParserOpen: setParserModalOpen,
     parserText,
-    setParserText,
+    parserError,
+    setParserText: updateParserText,
     applyParserText,
     isProjectJsonPasteOpen,
     projectJsonPasteText,

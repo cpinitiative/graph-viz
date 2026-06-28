@@ -223,15 +223,29 @@ const getSvgRootAttribute = (svgText, name) => {
   return match?.[1] ?? null;
 };
 
-const expectSlideFramedSvg = svgText => {
-  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
-  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
-  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+const getSvgViewBox = svgText => {
   const viewBoxText = getSvgRootAttribute(svgText, 'viewBox');
   expect(viewBoxText).not.toBeNull();
   const viewBox = viewBoxText.split(/\s+/).map(Number);
   expect(viewBox).toHaveLength(4);
   expect(viewBox.every(Number.isFinite)).toBe(true);
+  return viewBox;
+};
+
+const expectReasonableFittedViewBox = svgText => {
+  const viewBox = getSvgViewBox(svgText);
+  expect(viewBox[2]).toBeGreaterThan(0);
+  expect(viewBox[3]).toBeGreaterThan(0);
+  expect(viewBox[2]).toBeLessThan(1800);
+  expect(viewBox[3]).toBeLessThan(1200);
+  return viewBox;
+};
+
+const expectSlideFramedSvg = svgText => {
+  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
+  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
+  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+  const viewBox = expectReasonableFittedViewBox(svgText);
   expect(viewBox[2] / viewBox[3]).toBeCloseTo(1040 / 585, 3);
 };
 
@@ -292,6 +306,16 @@ const openImportMenu = async page => {
   await page.getByTestId('open-import-menu').click();
   await expect(page.getByTestId('import-menu-modal')).toBeVisible();
   return page.getByTestId('import-menu-modal');
+};
+
+const openEdgeListParser = async page => {
+  const importMenu = await openImportMenu(page);
+  await importMenu
+    .getByRole('button', { name: 'Paste / Import Edge List' })
+    .click();
+  const parserModal = page.getByTestId('parser-modal');
+  await expect(parserModal).toBeVisible();
+  return parserModal;
 };
 
 const openExportMenu = async page => {
@@ -718,7 +742,7 @@ test.describe('Graph Studio desktop smoke', () => {
       .getByRole('button', { name: 'Paste / Import Edge List' })
       .click();
     await expect(page.getByText('Text-to-Graph Parser')).toBeVisible();
-    await page.locator('textarea').last().fill('0 1\n1 2\n2 0');
+    await page.locator('textarea').last().fill('3 3\n0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
     await expect(page.getByText('Text-to-Graph Parser')).toBeHidden();
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -1945,6 +1969,7 @@ while (true) {}
     await expect(
       importMenu.getByRole('button', { name: 'Paste / Import Edge List' })
     ).toBeVisible();
+    await expect(importMenu.getByText(/Strict 0-based format/)).toBeVisible();
     await importMenu.getByRole('button', { name: 'Cancel' }).click();
     await expect(importMenu).toBeHidden();
 
@@ -1962,6 +1987,130 @@ while (true) {}
       await parserModal.getByRole('button', { name: 'Cancel' }).click();
     }
     await closeExportMenu(page);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('validates edge-list imports atomically with strict CP format', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const originalDescription = await page
+      .getByPlaceholder('Enter a description for this frame...')
+      .inputValue();
+    const originalNodeCount = await graphNodeCircles(page).count();
+    const originalEdgeCount = await graphCanvas(page)
+      .locator('[data-edge-path-id]')
+      .count();
+
+    const parserModal = await openEdgeListParser(page);
+    await expect(
+      parserModal.getByText(/Strict 0-based CP format/)
+    ).toBeVisible();
+    const parserEditor = parserModal.locator('textarea');
+    const invalidCases = [
+      {
+        input: 'n m\n0 1\n1 2\n2 3',
+        message: /Header n must be an integer/,
+      },
+      {
+        input: '4 10\n0 1\n1 2\n2 3',
+        message: /Header declares 10 edge rows but found 3/,
+      },
+      {
+        input: '4 2\n0 1\n1 2\n2 3\n3 0',
+        message: /Header declares 2 edge rows but found 4/,
+      },
+      {
+        input: '5 4\n0 1\n1\n2 3\n3 4',
+        message: /Line 3 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0,1\n1-2\n2->3\n3:4',
+        message: /Line 2 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0 1 7 hello\n1 2 weight=3\n2 3 4 5 6\n3 4 banana',
+        message: /Line 2 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0 1\n1 2\n2 99\n-1 3',
+        message: /Line 4 node id 99 is out of range 0\.\.4/,
+      },
+      {
+        input: '5 4',
+        message: /Header declares 4 edge rows but found 0/,
+      },
+    ];
+
+    for (const { input, message } of invalidCases) {
+      await parserEditor.fill(input);
+      await expect(parserModal.getByRole('alert')).toBeHidden();
+      await parserModal.getByRole('button', { name: 'Generate graph' }).click();
+      await expect(parserModal).toBeVisible();
+      await expect(parserModal.getByRole('alert')).toContainText(message);
+      await expect(graphNodeCircles(page)).toHaveCount(originalNodeCount);
+      await expect(
+        graphCanvas(page).locator('[data-edge-path-id]')
+      ).toHaveCount(originalEdgeCount);
+      await expect(
+        page.getByPlaceholder('Enter a description for this frame...')
+      ).toHaveValue(originalDescription);
+    }
+
+    await parserModal.getByRole('button', { name: 'Cancel' }).click();
+    await expect(parserModal).toBeHidden();
+    await expect(graphNodeCircles(page)).toHaveCount(originalNodeCount);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      originalEdgeCount
+    );
+
+    const validParserModal = await openEdgeListParser(page);
+    await validParserModal
+      .locator('textarea')
+      .fill('5 6\n0 1 7\n1 2 -3\n0 1 8\n2 2 4\n3 4\n1 4 0');
+    await validParserModal
+      .getByRole('button', { name: 'Generate graph' })
+      .click();
+    await expect(validParserModal).toBeHidden();
+    const status = page.getByTestId('graph-studio-status');
+    await expect(status).toHaveText('Graph parsed: 5 nodes / 6 edges');
+    await expect(status).toHaveAttribute('data-status-tone', 'success');
+    await expectTooltipInsideViewport(status);
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      6
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e0"]')
+    ).toContainText('7');
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e1"]')
+    ).toContainText('-3');
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e3"]')
+    ).toContainText('4');
+    await expect
+      .poll(() =>
+        graphCanvas(page).evaluate((svg, selector) => {
+          const canvasBounds = svg.getBoundingClientRect();
+          return Array.from(svg.querySelectorAll(selector)).every(circle => {
+            const bounds = circle.getBoundingClientRect();
+            return (
+              bounds.left >= canvasBounds.left - 1 &&
+              bounds.top >= canvasBounds.top - 1 &&
+              bounds.right <= canvasBounds.right + 1 &&
+              bounds.bottom <= canvasBounds.bottom + 1
+            );
+          });
+        }, nodeCircleSelector)
+      )
+      .toBe(true);
 
     expect(errors).toEqual([]);
   });
@@ -2017,14 +2166,43 @@ while (true) {}
 
     const exportMenu = await openExportMenu(page);
     const previewImage = await expectExportPreview(page);
-    const viewportPreviewUrl = await previewImage.getAttribute('src');
-    expect(viewportPreviewUrl).toMatch(/^data:image\/svg\+xml/);
+    const fitPreviewUrl = await previewImage.getAttribute('src');
+    expect(fitPreviewUrl).toMatch(/^data:image\/svg\+xml/);
+    await expect(exportMenu.getByLabel('Image Framing')).toHaveValue('fit');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'fit');
+    const fitPreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(getSvgRootAttribute(fitPreviewSvgText, 'data-export-framing')).toBe(
+      'fit'
+    );
+    expectReasonableFittedViewBox(fitPreviewSvgText);
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
       'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
     );
+    await expect(exportMenu.getByTestId('image-export-controls')).toContainText(
+      'Fit graph is the default. Viewport exports the visible editor view; Slide 16:9 composes a presentation frame.'
+    );
 
+    await exportMenu.getByLabel('Image Framing').selectOption('viewport');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'viewport');
+    await expectExportPreview(page);
+    await expect
+      .poll(() => previewImage.getAttribute('src'))
+      .not.toBe(fitPreviewUrl);
+    const viewportPreviewUrl = await previewImage.getAttribute('src');
+    const viewportPreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(
+      getSvgRootAttribute(viewportPreviewSvgText, 'data-export-framing')
+    ).toBe('viewport');
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
     await expect(
       exportMenu.getByTestId('export-preview-panel')
@@ -2074,10 +2252,12 @@ while (true) {}
     ).toBeVisible();
 
     let exportMenu = await openExportMenu(page);
-    let previewState = await getSvgPresentationState(
-      page,
-      await getPreviewSvgText(page)
+    let previewSvgText = await getPreviewSvgText(page);
+    expect(getSvgRootAttribute(previewSvgText, 'data-export-framing')).toBe(
+      'fit'
     );
+    const previewViewBox = expectReasonableFittedViewBox(previewSvgText);
+    let previewState = await getSvgPresentationState(page, previewSvgText);
     expect(previewState.firstNode).toMatchObject({
       r: 22,
       strokeWidth: 2,
@@ -2091,10 +2271,12 @@ while (true) {}
     });
     const svgPath = await svgDownload.path();
     expect(svgPath).not.toBeNull();
-    const exportedState = await getSvgPresentationState(
-      page,
-      await fs.readFile(svgPath, 'utf8')
+    const exportedSvgText = await fs.readFile(svgPath, 'utf8');
+    expect(getSvgRootAttribute(exportedSvgText, 'data-export-framing')).toBe(
+      'fit'
     );
+    expect(getSvgViewBox(exportedSvgText)).toEqual(previewViewBox);
+    const exportedState = await getSvgPresentationState(page, exportedSvgText);
     expect(exportedState.firstNode).toMatchObject({
       r: 22,
       strokeWidth: 2,
@@ -2940,7 +3122,8 @@ api.edge('e0', '#f59e0b');
     const pngScaleSelect = page.getByTestId('png-scale-select');
     const imageFramingSelect = page.getByTestId('image-framing-select');
     await expect(pngScaleSelect).toHaveValue('2');
-    await expect(imageFramingSelect).toHaveValue('viewport');
+    await expect(imageFramingSelect).toHaveValue('fit');
+    await expect(imageFramingSelect).toContainText('Viewport');
     await expect(imageFramingSelect).toContainText('Slide 16:9');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
@@ -2949,12 +3132,22 @@ api.edge('e0', '#f59e0b');
     ).not.toBeChecked();
     await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
-    await expectDownloadFrom({
+    const defaultTimelineSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
       filenamePattern: /\.svg$/,
     });
     await expect(page.getByText('SVG exported')).toBeVisible();
+    const defaultTimelineSvgPath = await defaultTimelineSvgDownload.path();
+    expect(defaultTimelineSvgPath).not.toBeNull();
+    const defaultTimelineSvgText = await fs.readFile(
+      defaultTimelineSvgPath,
+      'utf8'
+    );
+    expect(
+      getSvgRootAttribute(defaultTimelineSvgText, 'data-export-framing')
+    ).toBe('fit');
+    expectReasonableFittedViewBox(defaultTimelineSvgText);
 
     const twoXDownload = await expectDownloadFrom({
       page,

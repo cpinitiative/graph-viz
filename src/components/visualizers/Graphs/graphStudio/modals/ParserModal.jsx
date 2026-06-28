@@ -2,7 +2,14 @@ import ModalCloseButton from './ModalCloseButton';
 
 const PARSER_PLACEHOLDER = '5 6\n0 1 2\n1 2 4\n2 3 1\n3 4 3\n0 4 8\n1 4 6';
 
-const ParserModal = ({ open, text, onTextChange, onClose, onSubmit }) => {
+const ParserModal = ({
+  open,
+  text,
+  error = '',
+  onTextChange,
+  onClose,
+  onSubmit,
+}) => {
   if (!open) return null;
 
   return (
@@ -25,9 +32,24 @@ const ParserModal = ({ open, text, onTextChange, onClose, onSubmit }) => {
         </div>
         <div className="flex-1 overflow-auto p-4">
           <p className="mb-3 text-xs text-on-surface dark:text-dark-on-surface">
-            Supports competitive programming input: first line `N M`, then `u v
-            w` rows.
+            Strict 0-based CP format: first line `n m`, then exactly `m`
+            space-separated rows of `u v` or `u v weight`. Node IDs must be
+            integers from `0` to `n - 1`; weights must be numeric.
           </p>
+          <div className="mb-3 min-h-[42px]" data-testid="parser-output-area">
+            <div
+              className={`rounded-sm border px-3 py-2 text-xs leading-relaxed ${
+                error
+                  ? 'border-[#FCA5A5] bg-[#FEE2E2] text-[#7F1D1D] dark:border-[#F87171] dark:bg-[#450A0A] dark:text-[#FEE2E2]'
+                  : 'border-transparent bg-transparent text-transparent'
+              }`}
+              role={error ? 'alert' : undefined}
+              aria-live="polite"
+              data-testid="parser-error-banner"
+            >
+              {error || 'No parser errors'}
+            </div>
+          </div>
           <textarea
             value={text}
             onChange={event => onTextChange(event.target.value)}
