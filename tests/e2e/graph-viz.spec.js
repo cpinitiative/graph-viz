@@ -617,24 +617,32 @@ test.describe('Graph Studio desktop smoke', () => {
     const zoomOutButton = page.getByRole('button', { name: 'Zoom Out' });
     const zoomValueInput = page.getByLabel('Zoom percent');
     const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
+    const zoomRow = page.getByTestId('view-canvas-zoom-row');
     await expect(lockView).not.toBeChecked();
     await expect(fitViewButton).toBeEnabled();
     await expect
       .poll(async () => {
+        const rowBox = await zoomRow.boundingBox();
         const boxes = await Promise.all(
           [fitViewButton, zoomOutButton, zoomValueInput, zoomInButton].map(
             locator => locator.boundingBox()
           )
         );
-        if (boxes.some(box => !box)) return false;
+        if (!rowBox || boxes.some(box => !box)) return false;
         const centers = boxes.map(box => box.y + box.height / 2);
         const minCenter = Math.min(...centers);
         const maxCenter = Math.max(...centers);
+        const rowLeftInset = boxes[0].x - rowBox.x;
+        const rowRightInset =
+          rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
         return (
           maxCenter - minCenter <= 3 &&
           boxes[0].width >= 60 &&
           boxes[0].height <= 34 &&
-          boxes[2].width <= 48
+          boxes[2].width <= 48 &&
+          rowLeftInset >= 6 &&
+          rowRightInset >= 6 &&
+          Math.abs(rowLeftInset - rowRightInset) <= 3
         );
       })
       .toBe(true);
@@ -1452,6 +1460,11 @@ while (true) {}
     await expect(edgeLabelFontSizeInput).toBeVisible();
     await expect(firstNodeLabel).toBeVisible();
     await expect(firstEdgeLabel).toBeVisible();
+    await expect(nodeLabelFontSizeInput).toHaveValue('12');
+    await expect(edgeLabelFontSizeInput).toHaveValue('16');
+    await expect(
+      propertyPanel(page).getByText('px', { exact: true })
+    ).toHaveCount(0);
     for (const control of [
       page.getByLabel('Gravity (force) value'),
       page.getByLabel('Curve Amount value'),
@@ -2131,12 +2144,16 @@ while (true) {}
     await expect(curveAmount).toBeDisabled();
     await expect(curveAmountHelp).toBeVisible();
     await curveAmountHelp.focus();
-    await expectTooltipInsideViewport(
-      page
-        .getByRole('tooltip')
-        .filter({ hasText: 'Only affects Curved edge routing' })
-        .last()
-    );
+    const straightRoutingTooltip = page
+      .getByRole('tooltip')
+      .filter({ hasText: 'Only affects Curved edge routing' })
+      .last();
+    await expectTooltipInsideViewport(straightRoutingTooltip);
+    const tooltipBox = await straightRoutingTooltip.boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox.width).toBeGreaterThanOrEqual(240);
+    expect(tooltipBox.width).toBeLessThanOrEqual(250);
+    expect(tooltipBox.height).toBeLessThan(44);
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -2817,12 +2834,8 @@ while (true) {}
     const exportedProject = await readJsonDownload(projectDownload);
     expect(exportedProject.settings.captionOverlay.enabled).toBe(false);
     expect(exportedProject.settings.captionOverlay.fontSize).toBe(12);
-    expect(exportedProject.settings.globalSettings.nodeLabelFontSize).toBe(
-      13.2
-    );
-    expect(exportedProject.settings.globalSettings.edgeLabelFontSize).toBe(
-      15.5
-    );
+    expect(exportedProject.settings.globalSettings.nodeLabelFontSize).toBe(13);
+    expect(exportedProject.settings.globalSettings.edgeLabelFontSize).toBe(16);
     expect(exportedProject.timeline.steps[0].captionVisible).toBe(true);
     expect(exportedProject.timeline.steps[0]).not.toHaveProperty('showCaption');
     await closeExportMenu(page);
@@ -3052,7 +3065,7 @@ while (true) {}
     );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
-    await expect(selfLoopLabelText).toHaveAttribute('font-size', '15.5');
+    await expect(selfLoopLabelText).toHaveAttribute('font-size', '16');
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
 
@@ -3085,7 +3098,7 @@ api.edge('loop', '#3b82f6');
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
-    expect(exportedSvg).toContain('font-size="15.5"');
+    expect(exportedSvg).toContain('font-size="16"');
     expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');

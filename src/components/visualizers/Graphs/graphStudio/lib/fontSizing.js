@@ -14,7 +14,7 @@ export const DEFAULT_EDGE_WIDTH = 2.2;
 export const clampNumber = (value, min, max) =>
   Math.max(min, Math.min(max, value));
 
-const roundPixel = value => Number(value.toFixed(1));
+const roundPixel = value => Math.round(value);
 
 export const getDefaultNodeLabelFontSize = nodeSize => {
   const normalizedNodeSize = Number.isFinite(Number(nodeSize))

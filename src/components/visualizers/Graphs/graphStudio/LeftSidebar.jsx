@@ -122,7 +122,7 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
   return (
     <input
       aria-label="Zoom percent"
-      className="h-8 w-11 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+      className="h-8 w-10 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
       disabled={disabled}
       inputMode="numeric"
       onBlur={commit}
@@ -297,7 +297,10 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="grid grid-cols-[minmax(74px,1fr)_34px_64px_34px] items-center gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 dark:border-[#475569] dark:bg-[#111827]">
+        <div
+          className="grid grid-cols-[minmax(64px,1fr)_32px_54px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1.5 dark:border-[#475569] dark:bg-[#111827]"
+          data-testid="view-canvas-zoom-row"
+        >
           <button
             type="button"
             className={fitViewButtonClass}

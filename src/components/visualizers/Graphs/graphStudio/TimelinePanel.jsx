@@ -142,31 +142,26 @@ const CaptionFontSizeInput = ({ value, onCommit }) => {
   };
 
   return (
-    <span className="flex items-center gap-1.5">
-      <input
-        aria-label="Caption Font Size"
-        className="h-8 w-[58px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-1 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
-        data-testid="caption-font-size-input"
-        inputMode="numeric"
-        onBlur={commit}
-        onChange={event => setDraft(event.target.value)}
-        onFocus={() => setDraft(String(normalizedValue))}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          } else if (event.key === 'Escape') {
-            reset();
-            event.currentTarget.blur();
-          }
-        }}
-        pattern="[0-9]*"
-        type="text"
-        value={draft}
-      />
-      <span className="text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
-        px
-      </span>
-    </span>
+    <input
+      aria-label="Caption Font Size"
+      className="h-8 w-14 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-1 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+      data-testid="caption-font-size-input"
+      inputMode="numeric"
+      onBlur={commit}
+      onChange={event => setDraft(event.target.value)}
+      onFocus={() => setDraft(String(normalizedValue))}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        } else if (event.key === 'Escape') {
+          reset();
+          event.currentTarget.blur();
+        }
+      }}
+      pattern="[0-9]*"
+      type="text"
+      value={draft}
+    />
   );
 };
 

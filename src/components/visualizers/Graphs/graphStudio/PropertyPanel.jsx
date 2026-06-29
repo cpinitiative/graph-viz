@@ -39,8 +39,8 @@ const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const TOOLTIP_WIDTH = 176;
-const TOOLTIP_ESTIMATED_HEIGHT = 64;
+const TOOLTIP_WIDTH = 244;
+const TOOLTIP_ESTIMATED_HEIGHT = 40;
 const TOOLTIP_GUTTER = 12;
 const TOOLTIP_OFFSET = 6;
 
@@ -148,7 +148,7 @@ const InfoHelp = ({ label, text }) => {
       {tooltipPosition && (
         <span
           role="tooltip"
-          className="pointer-events-none fixed z-50 w-44 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          className="pointer-events-none fixed z-50 w-[244px] whitespace-nowrap border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
           data-testid="inspector-info-tooltip"
           style={{
             left: `${tooltipPosition.left}px`,
@@ -683,8 +683,7 @@ const GlobalSettingsPanel = ({
             }
             min={NODE_LABEL_FONT_SIZE_RANGE.min}
             max={NODE_LABEL_FONT_SIZE_RANGE.max}
-            step="0.5"
-            suffix="px"
+            step="1"
             testId="node-label-font-size-input"
             onChange={nodeLabelFontSize =>
               onUpdateGlobal({ nodeLabelFontSize })
@@ -706,8 +705,7 @@ const GlobalSettingsPanel = ({
             }
             min={EDGE_LABEL_FONT_SIZE_RANGE.min}
             max={EDGE_LABEL_FONT_SIZE_RANGE.max}
-            step="0.5"
-            suffix="px"
+            step="1"
             testId="edge-label-font-size-input"
             onChange={edgeLabelFontSize =>
               onUpdateGlobal({ edgeLabelFontSize })
