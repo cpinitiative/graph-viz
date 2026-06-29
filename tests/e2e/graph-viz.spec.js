@@ -624,38 +624,54 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(fitViewButton).toBeEnabled();
     await expect(zoomValueInput).toBeVisible();
     await expect(zoomField.getByText('%', { exact: true })).toBeVisible();
+    const assertZoomRowLayout = async () => {
+      await expect
+        .poll(async () => {
+          const rowBox = await zoomRow.boundingBox();
+          const zoomUnitBox = await zoomUnit.boundingBox();
+          const boxes = await Promise.all(
+            [fitViewButton, zoomOutButton, zoomField, zoomInButton].map(
+              locator => locator.boundingBox()
+            )
+          );
+          if (!rowBox || !zoomUnitBox || boxes.some(box => !box)) return false;
+          const centers = boxes.map(box => box.y + box.height / 2);
+          const minCenter = Math.min(...centers);
+          const maxCenter = Math.max(...centers);
+          const rowLeftInset = boxes[0].x - rowBox.x;
+          const rowRightInset =
+            rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
+          const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
+          const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
+          return (
+            maxCenter - minCenter <= 3 &&
+            boxes[0].width >= 60 &&
+            boxes[0].height <= 34 &&
+            Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
+            boxes[2].width >= 52 &&
+            boxes[2].width <= 64 &&
+            Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
+            rowLeftInset >= 12 &&
+            rowRightInset >= 12 &&
+            Math.abs(rowLeftInset - rowRightInset) <= 2
+          );
+        })
+        .toBe(true);
+    };
+    await assertZoomRowLayout();
+    const html = page.locator('html');
+    const initiallyDark = await html.evaluate(element =>
+      element.classList.contains('dark')
+    );
+    await themeToggle.click();
     await expect
-      .poll(async () => {
-        const rowBox = await zoomRow.boundingBox();
-        const zoomUnitBox = await zoomUnit.boundingBox();
-        const boxes = await Promise.all(
-          [fitViewButton, zoomOutButton, zoomField, zoomInButton].map(locator =>
-            locator.boundingBox()
-          )
-        );
-        if (!rowBox || !zoomUnitBox || boxes.some(box => !box)) return false;
-        const centers = boxes.map(box => box.y + box.height / 2);
-        const minCenter = Math.min(...centers);
-        const maxCenter = Math.max(...centers);
-        const rowLeftInset = boxes[0].x - rowBox.x;
-        const rowRightInset =
-          rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
-        const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
-        const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
-        return (
-          maxCenter - minCenter <= 3 &&
-          boxes[0].width >= 60 &&
-          boxes[0].height <= 34 &&
-          Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
-          boxes[2].width >= 52 &&
-          boxes[2].width <= 64 &&
-          Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
-          rowLeftInset >= 10 &&
-          rowRightInset >= 10 &&
-          Math.abs(rowLeftInset - rowRightInset) <= 3
-        );
-      })
-      .toBe(true);
+      .poll(() => html.evaluate(element => element.classList.contains('dark')))
+      .toBe(!initiallyDark);
+    await assertZoomRowLayout();
+    await themeToggle.click();
+    await expect
+      .poll(() => html.evaluate(element => element.classList.contains('dark')))
+      .toBe(initiallyDark);
     const zoomBefore = Number(
       await graphCanvas(page).getAttribute('data-view-zoom')
     );
