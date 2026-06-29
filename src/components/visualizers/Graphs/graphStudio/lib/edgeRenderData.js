@@ -182,7 +182,13 @@ export const getEdgeRenderData = ({
         );
       }
 
-      return { edge, pathD: geometry.d, labelPosition };
+      return {
+        edge,
+        pathD: geometry.d,
+        pathType: geometry.pathType,
+        pathPoints: geometry.pathPoints,
+        labelPosition,
+      };
     })
     .filter(Boolean);
 };

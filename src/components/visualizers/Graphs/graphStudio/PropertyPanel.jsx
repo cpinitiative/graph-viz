@@ -104,7 +104,7 @@ const InfoHelp = ({ label, text }) => {
       : viewportMaxLeft;
     const preferredLeft = bounds.left - TOOLTIP_WIDTH + bounds.width;
     const fallbackLeft = panelBounds
-      ? panelBounds.right - TOOLTIP_WIDTH
+      ? panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
       : viewportMaxLeft;
     const left = Math.min(
       viewportMaxLeft,
@@ -148,7 +148,7 @@ const InfoHelp = ({ label, text }) => {
       {tooltipPosition && (
         <span
           role="tooltip"
-          className="pointer-events-none fixed z-50 w-44 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          className="pointer-events-none fixed z-50 w-44 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
           data-testid="inspector-info-tooltip"
           style={{
             left: `${tooltipPosition.left}px`,
@@ -662,7 +662,7 @@ const GlobalSettingsPanel = ({
             help={
               <InfoHelp
                 label="Curve Amount help"
-                text="Only affects Curved routing."
+                text="Only affects Curved edge routing"
               />
             }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}

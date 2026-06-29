@@ -123,53 +123,6 @@ const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 const getSelectedEdgeStrokeWidth = edgeWidth =>
   Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
 
-const getArrowMarkerMetrics = edgeWidth => {
-  const effectiveWidth = Math.max(1, Number(edgeWidth) || 2.2);
-  const round = value => Number(value.toFixed(2));
-  const markerWidth = round(clampNumber(effectiveWidth * 5 + 7, 14, 44));
-  const markerHeight = round(clampNumber(effectiveWidth * 3.6 + 7, 13, 38));
-  const tipPadding = round(clampNumber(effectiveWidth * 0.3, 0.75, 2.8));
-  const refX = round(markerWidth - tipPadding);
-  const refY = round(markerHeight / 2);
-  const baseX = round(clampNumber(effectiveWidth * 0.75, 1.4, 7));
-  const halfBase = round(
-    Math.min(markerHeight / 2 - 1.2, effectiveWidth * 1.45 + 3.5)
-  );
-  const topY = round(refY - halfBase);
-  const bottomY = round(refY + halfBase);
-
-  return {
-    markerWidth,
-    markerHeight,
-    refX,
-    refY,
-    pathD: `M${baseX},${topY} L${refX},${refY} L${baseX},${bottomY} z`,
-  };
-};
-
-const hashMarkerColor = color => {
-  let hash = 2166136261;
-  for (let index = 0; index < color.length; index += 1) {
-    hash ^= color.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-};
-
-const getArrowMarkerId = (color, edgeWidth) => {
-  const normalizedColor = String(color).trim().toLowerCase();
-  const widthKey = String(Math.round((Number(edgeWidth) || 0) * 10));
-  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3,8})$/);
-  if (hexMatch) return `graphstudio-arrow-${hexMatch[1]}-${widthKey}`;
-
-  const safeColor =
-    normalizedColor
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24) || 'color';
-  return `graphstudio-arrow-${safeColor}-${hashMarkerColor(normalizedColor)}-${widthKey}`;
-};
-
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
   if (text.length <= maxLength) return text;
@@ -900,24 +853,10 @@ const GraphCanvas = ({
           multiSelected: false,
           strokeColor,
           strokeWidth,
-          markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor, strokeWidth)}`,
         };
       }),
-    [edgeRenderData, effectiveSelectedObject, svgResourcePrefix, edgeWidth]
+    [edgeRenderData, effectiveSelectedObject, edgeWidth]
   );
-  const arrowMarkers = useMemo(() => {
-    const markers = new Map();
-    edgeVisualData.forEach(({ edge, markerId, strokeColor, strokeWidth }) => {
-      if (edge.directed) {
-        markers.set(markerId, {
-          color: strokeColor,
-          metrics: getArrowMarkerMetrics(strokeWidth),
-          strokeWidth,
-        });
-      }
-    });
-    return Array.from(markers, ([id, marker]) => ({ id, ...marker }));
-  }, [edgeVisualData]);
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   useEffect(() => {
     const el = svgRef.current;
@@ -1253,29 +1192,6 @@ const GraphCanvas = ({
           >
             <circle cx="1.2" cy="1.2" r="1.2" fill="#e2e2e2" />
           </pattern>
-          {arrowMarkers.map(({ id, color, metrics, strokeWidth }) => (
-            <marker
-              key={id}
-              id={id}
-              data-edge-color={color}
-              data-edge-width={strokeWidth}
-              markerWidth={metrics.markerWidth}
-              markerHeight={metrics.markerHeight}
-              refX={metrics.refX}
-              refY={metrics.refY}
-              orient="auto"
-              markerUnits="userSpaceOnUse"
-              viewBox={`0 0 ${metrics.markerWidth} ${metrics.markerHeight}`}
-            >
-              <path
-                d={metrics.pathD}
-                fill={color}
-                stroke={color}
-                strokeLinejoin="round"
-                strokeWidth="0.6"
-              />
-            </marker>
-          ))}
           <filter
             id={captionShadowFilterId}
             x="-12%"
@@ -1316,11 +1232,12 @@ const GraphCanvas = ({
               ({
                 edge,
                 pathD,
+                pathType,
+                pathPoints,
                 labelPosition,
                 selected,
                 multiSelected,
                 strokeColor,
-                markerId,
                 strokeWidth,
               }) => {
                 const endpointMoved =
@@ -1331,10 +1248,11 @@ const GraphCanvas = ({
                     key={edge.id}
                     edge={edge}
                     pathD={pathD}
+                    pathType={pathType}
+                    pathPoints={pathPoints}
                     strokeColor={strokeColor}
                     selected={selected}
                     multiSelected={multiSelected}
-                    markerId={markerId}
                     labelPosition={labelPosition}
                     labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}

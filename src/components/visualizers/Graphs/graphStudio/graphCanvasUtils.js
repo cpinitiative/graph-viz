@@ -369,6 +369,8 @@ const buildCurvedSegment = ({
   const preferredSide = shift >= 0 ? 1 : -1;
   return {
     d: `M ${segment.x1} ${segment.y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${segment.x2} ${segment.y2}`,
+    pathType: 'cubic',
+    pathPoints: points,
     labelOptions: getLabelTValues(edgeIndex, edgeCount).flatMap(t => {
       const point = cubicBezierPoint(...points, t);
       const tangent = cubicBezierTangent(...points, t);
@@ -403,8 +405,19 @@ export const buildEdgePath = ({
     const startY = from.y - nodeRadius * 0.866;
     const endX = from.x + nodeRadius * 0.5;
     const endY = from.y - nodeRadius * 0.866;
+    const points = [
+      { x: startX, y: startY },
+      { x: from.x - loopRadius * 1.5, y: from.y - loopRadius * 2.5 },
+      { x: from.x + loopRadius * 1.5, y: from.y - loopRadius * 2.5 },
+      { x: endX, y: endY },
+    ];
     const d = `M ${startX} ${startY} C ${from.x - loopRadius * 1.5} ${from.y - loopRadius * 2.5}, ${from.x + loopRadius * 1.5} ${from.y - loopRadius * 2.5}, ${endX} ${endY}`;
-    return { d, labelOptions: [{ x: from.x, y: from.y - loopRadius * 2.2 }] };
+    return {
+      d,
+      pathType: 'cubic',
+      pathPoints: points,
+      labelOptions: [{ x: from.x, y: from.y - loopRadius * 2.2 }],
+    };
   }
   const segment = insetSegment(from, to, edge.directed, nodeRadius);
   if (edgeCount > 1) {
@@ -488,6 +501,11 @@ export const buildEdgePath = ({
   };
   return {
     d: `M ${segment.x1} ${segment.y1} L ${segment.x2} ${segment.y2}`,
+    pathType: 'line',
+    pathPoints: [
+      { x: segment.x1, y: segment.y1 },
+      { x: segment.x2, y: segment.y2 },
+    ],
     labelOptions: [
       {
         x: straightMidpoint.x + segment.nx * 14 * side,

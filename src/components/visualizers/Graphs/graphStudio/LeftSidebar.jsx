@@ -297,7 +297,7 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="grid grid-cols-[minmax(68px,1fr)_32px_62px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
+        <div className="grid grid-cols-[minmax(74px,1fr)_34px_64px_34px] items-center gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 dark:border-[#475569] dark:bg-[#111827]">
           <button
             type="button"
             className={fitViewButtonClass}

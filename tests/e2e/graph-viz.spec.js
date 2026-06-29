@@ -69,8 +69,8 @@ const choosePreset = async (page, value) => {
 
 const getDirectedEdgeEndpointOffsets = async page =>
   graphCanvas(page).evaluate((svg, selector) => {
-    const edgePaths = Array.from(
-      svg.querySelectorAll('path[marker-end^="url(#graphstudio-arrow-"]')
+    const arrowheads = Array.from(
+      svg.querySelectorAll('polygon[data-edge-arrowhead-id]')
     );
     const nodeCircles = Array.from(svg.querySelectorAll(selector))
       .map(circle => ({
@@ -85,14 +85,13 @@ const getDirectedEdgeEndpointOffsets = async page =>
           Number.isFinite(circle.r)
       );
 
-    return edgePaths
-      .map(path => {
-        const values = (path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [])
-          .map(Number)
-          .filter(Number.isFinite);
-        if (values.length < 4 || !nodeCircles.length) return null;
-        const x = values[values.length - 2];
-        const y = values[values.length - 1];
+    return arrowheads
+      .map(arrowhead => {
+        const x = Number(arrowhead.getAttribute('data-edge-arrow-tip-x'));
+        const y = Number(arrowhead.getAttribute('data-edge-arrow-tip-y'));
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !nodeCircles.length) {
+          return null;
+        }
         const nearest = nodeCircles.reduce((best, circle) => {
           const distance = Math.hypot(x - circle.x, y - circle.y);
           const offset = Math.abs(distance - circle.r);
@@ -2135,7 +2134,7 @@ while (true) {}
     await expectTooltipInsideViewport(
       page
         .getByRole('tooltip')
-        .filter({ hasText: 'Only affects Curved routing.' })
+        .filter({ hasText: 'Only affects Curved edge routing' })
         .last()
     );
 
@@ -2151,7 +2150,7 @@ while (true) {}
     await expectTooltipInsideViewport(
       page
         .getByRole('tooltip')
-        .filter({ hasText: 'Only affects Curved routing.' })
+        .filter({ hasText: 'Only affects Curved edge routing' })
         .last()
     );
     await expect
@@ -3034,15 +3033,17 @@ while (true) {}
     await expect(page.getByTestId('custom-export-legend')).toBeHidden();
 
     const selfLoopEdge = graphCanvas(page).locator(
-      'path[marker-end^="url(#graphstudio-arrow-"]'
+      '[data-edge-path-id="loop"]'
+    );
+    const selfLoopArrowhead = graphCanvas(page).locator(
+      '[data-edge-arrowhead-id="loop"]'
     );
     await expect(selfLoopEdge).toHaveCount(1);
     await expect(selfLoopEdge.first()).toBeVisible();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#64748b');
-    await expect(selfLoopEdge.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-64748b-22)'
-    );
+    await expect(selfLoopEdge.first()).not.toHaveAttribute('marker-end', /./);
+    await expect(selfLoopArrowhead).toBeVisible();
+    await expect(selfLoopArrowhead).toHaveAttribute('fill', '#64748b');
     const selfLoopLabel = graphCanvas(page).locator(
       '[data-edge-label-id="loop"]'
     );
@@ -3057,6 +3058,7 @@ while (true) {}
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
+    await expect(selfLoopArrowhead).toHaveAttribute('fill', '#f59e0b');
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await page.locator('[data-testid="script-modal"] textarea').fill(`
@@ -3146,10 +3148,15 @@ api.edge('loop', '#3b82f6');
         .dispatchEvent('click');
       await expect(page.getByText('Edge Properties')).toBeVisible();
       await expect(
-        graphCanvas(page).locator(`[data-edge-path-id="${edgeId}"]`)
-      ).toHaveAttribute('marker-end', /^url\(#graphstudio-arrow-[^)]+\)$/);
+        graphCanvas(page).locator(`[data-edge-arrowhead-id="${edgeId}"]`)
+      ).toBeVisible();
     }
 
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
     await page.getByText('Frame 2').click();
     await expect.poll(getPathMap).toEqual(straightPaths);
 
@@ -3176,9 +3183,16 @@ api.edge('loop', '#3b82f6');
       .filter(Boolean);
     expect(exportedEdgeTags).toHaveLength(7);
     expect(new Set(exportedPathData).size).toBe(7);
-    expect(
-      exportedEdgeTags.every(tag => tag.includes('marker-end="url(#'))
-    ).toBe(true);
+    const exportedArrowheadTags =
+      exportedSvg.match(
+        /<polygon\b[^>]*data-edge-arrowhead-id="[^"]+"[^>]*>/g
+      ) ?? [];
+    expect(exportedArrowheadTags).toHaveLength(7);
+    expect(exportedEdgeTags.some(tag => tag.includes('marker-end='))).toBe(
+      false
+    );
+    expect(exportedSvg).toContain('data-edge-arrowhead-id="forward-1"');
+    expect(exportedSvg).toContain('data-edge-arrowhead-id="reverse-1"');
     expect(exportedSvg).toContain('data-edge-label-id="forward-1"');
     expect(exportedSvg).toContain('data-edge-label-id="reverse-1"');
 
@@ -3294,42 +3308,56 @@ api.edge('loop', '#3b82f6');
 
     await choosePreset(page, 'dfs');
 
-    const marker = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-64748b-22'
+    const directedEdge = graphCanvas(page).locator('[data-edge-path-id="e0"]');
+    const arrowhead = graphCanvas(page).locator(
+      '[data-edge-arrowhead-id="e0"]'
     );
-    await expect
-      .poll(async () => Number(await marker.getAttribute('markerWidth')))
-      .toBeGreaterThan(12);
-    await expect
-      .poll(async () => Number(await marker.getAttribute('markerHeight')))
-      .toBeGreaterThan(10);
-    await expect
-      .poll(async () => Number(await marker.getAttribute('refX')))
-      .toBeGreaterThan(10);
-    await expect
-      .poll(async () => Number(await marker.getAttribute('refY')))
-      .toBeGreaterThan(5);
-    await expect(marker).toHaveAttribute('orient', 'auto');
-    await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
-    await expect(marker).toHaveAttribute('viewBox', /^0 0 \d/);
+    const edgeHitTarget = graphCanvas(page).locator(
+      '[data-edge-hit-target-id="e0"]'
+    );
+    const expectBodyEndsAtArrowBase = async () => {
+      await expect
+        .poll(async () =>
+          graphCanvas(page).evaluate(() => {
+            const path = document.querySelector('[data-edge-path-id="e0"]');
+            const arrow = document.querySelector(
+              '[data-edge-arrowhead-id="e0"]'
+            );
+            const values = (
+              path?.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? []
+            )
+              .map(Number)
+              .filter(Number.isFinite);
+            const baseX = Number(arrow?.getAttribute('data-edge-arrow-base-x'));
+            const baseY = Number(arrow?.getAttribute('data-edge-arrow-base-y'));
+            if (values.length < 4 || !Number.isFinite(baseX)) return 999;
+            const endX = values[values.length - 2];
+            const endY = values[values.length - 1];
+            return Math.hypot(endX - baseX, endY - baseY);
+          })
+        )
+        .toBeLessThanOrEqual(0.75);
+    };
 
-    const markerTriangle = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-64748b-22 path'
-    );
-    await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
-    await expect(markerTriangle).toHaveAttribute('d', / L.* z$/);
-    const markerPathD = await markerTriangle.getAttribute('d');
-    expect(markerPathD.match(/ L/g)).toHaveLength(2);
-
-    const directedEdges = graphCanvas(page).locator(
-      'path[marker-end^="url(#graphstudio-arrow-"]'
-    );
-    await expect(directedEdges.first()).toBeVisible();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#64748B');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-64748b-22)'
-    );
+    await expect(directedEdge).toBeVisible();
+    await expect(directedEdge).toHaveAttribute('stroke', '#64748B');
+    await expect(directedEdge).not.toHaveAttribute('marker-end', /./);
+    await expect(directedEdge).toHaveAttribute('stroke-linecap', 'butt');
+    await expect(arrowhead).toBeVisible();
+    await expect(arrowhead).toHaveAttribute('fill', '#64748B');
+    await expect(arrowhead).toHaveAttribute('stroke', '#64748B');
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
+      )
+      .toBeGreaterThan(14);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
+      )
+      .toBeGreaterThan(13);
+    await expectBodyEndsAtArrowBase();
+    await expectDirectedEdgesAnchored(page);
 
     await openExportMenu(page);
     const defaultSvgDownload = await expectDownloadFrom({
@@ -3340,23 +3368,15 @@ api.edge('loop', '#3b82f6');
     const defaultSvgPath = await defaultSvgDownload.path();
     expect(defaultSvgPath).not.toBeNull();
     const defaultExportedSvg = await fs.readFile(defaultSvgPath, 'utf8');
-    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-64748b-22"');
-    expect(defaultExportedSvg).toContain('data-edge-color="#64748B"');
+    expect(defaultExportedSvg).toContain('data-edge-arrowhead-id="e0"');
     expect(defaultExportedSvg).toContain('fill="#64748B"');
-    expect(defaultExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-64748b-22)"'
-    );
+    expect(defaultExportedSvg).not.toContain('marker-end=');
     await closeExportMenu(page);
 
     await page.getByText('Frame 2').click();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#3b82f6');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-3b82f6-22)'
-    );
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-3b82f6-22 path')
-    ).toHaveAttribute('fill', '#3b82f6');
+    await expect(directedEdge).toHaveAttribute('stroke', '#3b82f6');
+    await expect(arrowhead).toHaveAttribute('fill', '#3b82f6');
+    await expectBodyEndsAtArrowBase();
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await page.locator('[data-testid="script-modal"] textarea').fill(`
@@ -3365,14 +3385,9 @@ api.edge('e0', '#f59e0b');
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await page.getByText('Frame 2').click();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-f59e0b-22)'
-    );
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b-22 path')
-    ).toHaveAttribute('fill', '#f59e0b');
+    await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
+    await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
+    await expectBodyEndsAtArrowBase();
 
     await openExportMenu(page);
     const overrideSvgDownload = await expectDownloadFrom({
@@ -3383,35 +3398,29 @@ api.edge('e0', '#f59e0b');
     const overrideSvgPath = await overrideSvgDownload.path();
     expect(overrideSvgPath).not.toBeNull();
     const overrideExportedSvg = await fs.readFile(overrideSvgPath, 'utf8');
-    expect(overrideExportedSvg).toContain('id="graphstudio-arrow-f59e0b-22"');
-    expect(overrideExportedSvg).toContain('data-edge-color="#f59e0b"');
+    expect(overrideExportedSvg).toContain('data-edge-arrowhead-id="e0"');
     expect(overrideExportedSvg).toContain('fill="#f59e0b"');
-    expect(overrideExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-f59e0b-22)"'
-    );
+    expect(overrideExportedSvg).not.toContain('marker-end=');
     await closeExportMenu(page);
 
-    const firstEdgeHitTarget = directedEdges
-      .first()
-      .locator('xpath=..')
-      .locator('path[stroke="rgba(0,0,0,0)"]');
-    await firstEdgeHitTarget.dispatchEvent('click');
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-f59e0b-34)'
+    const arrowLengthBeforeSelection = Number(
+      await arrowhead.getAttribute('data-edge-arrow-length')
     );
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b-34 path')
-    ).toHaveAttribute('fill', '#f59e0b');
+    await edgeHitTarget.dispatchEvent('click');
+    await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
+    await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
     ).toHaveCount(0);
     await expect
-      .poll(async () =>
-        Number(await directedEdges.first().getAttribute('stroke-width'))
-      )
+      .poll(async () => Number(await directedEdge.getAttribute('stroke-width')))
       .toBeGreaterThan(2.2);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
+      )
+      .toBeGreaterThan(arrowLengthBeforeSelection);
+    await expectBodyEndsAtArrowBase();
 
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -3421,22 +3430,15 @@ api.edge('e0', '#f59e0b');
     await setRangeValue(page, 'Edge width', 5);
     await expect
       .poll(async () =>
-        Number(
-          await graphCanvas(page)
-            .locator('marker#graphstudio-arrow-f59e0b-50')
-            .getAttribute('markerWidth')
-        )
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
       )
-      .toBeGreaterThan(12);
+      .toBeGreaterThan(25);
     await expect
       .poll(async () =>
-        Number(
-          await graphCanvas(page)
-            .locator('marker#graphstudio-arrow-f59e0b-50')
-            .getAttribute('refY')
-        )
+        Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
       )
-      .toBeGreaterThan(7);
+      .toBeGreaterThan(20);
+    await expectBodyEndsAtArrowBase();
 
     expect(errors).toEqual([]);
   });
