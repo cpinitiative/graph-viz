@@ -315,7 +315,7 @@ const LeftSidebar = ({
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
         <div
-          className="grid grid-cols-[minmax(58px,1fr)_30px_54px_30px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-[14px] py-1.5 dark:border-[#475569] dark:bg-[#111827]"
+          className="grid grid-cols-[minmax(60px,1fr)_30px_56px_30px] items-center gap-2 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-1.5 dark:border-[#475569] dark:bg-[#111827]"
           data-testid="view-canvas-zoom-row"
         >
           <button
