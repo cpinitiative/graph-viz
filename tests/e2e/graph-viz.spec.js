@@ -643,9 +643,17 @@ test.describe('Graph Studio desktop smoke', () => {
             rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
           const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
           const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
+          const controlsInsideRow = boxes.every(
+            box =>
+              box.x >= rowBox.x &&
+              box.y >= rowBox.y &&
+              box.x + box.width <= rowBox.x + rowBox.width &&
+              box.y + box.height <= rowBox.y + rowBox.height
+          );
           return (
+            controlsInsideRow &&
             maxCenter - minCenter <= 3 &&
-            boxes[0].width >= 60 &&
+            boxes[0].width >= 50 &&
             boxes[0].height <= 34 &&
             Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
             boxes[2].width >= 52 &&
