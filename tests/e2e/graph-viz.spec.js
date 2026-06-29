@@ -650,8 +650,8 @@ test.describe('Graph Studio desktop smoke', () => {
           boxes[2].width >= 52 &&
           boxes[2].width <= 64 &&
           Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
-          rowLeftInset >= 6 &&
-          rowRightInset >= 6 &&
+          rowLeftInset >= 10 &&
+          rowRightInset >= 10 &&
           Math.abs(rowLeftInset - rowRightInset) <= 3
         );
       })
