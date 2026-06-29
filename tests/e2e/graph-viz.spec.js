@@ -640,8 +640,8 @@ test.describe('Graph Studio desktop smoke', () => {
           boxes[0].width >= 60 &&
           boxes[0].height <= 34 &&
           boxes[2].width <= 48 &&
-          rowLeftInset >= 6 &&
-          rowRightInset >= 6 &&
+          rowLeftInset >= 4 &&
+          rowRightInset >= 4 &&
           Math.abs(rowLeftInset - rowRightInset) <= 3
         );
       })

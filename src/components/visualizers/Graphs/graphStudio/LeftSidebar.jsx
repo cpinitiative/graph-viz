@@ -36,9 +36,9 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const iconButtonClass =
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
+  'flex h-7 w-full shrink-0 items-center justify-center border-l border-[#E2E8F0] bg-transparent p-1 text-[#334155] transition-colors hover:bg-[#F8F9FA] focus:outline-none focus:ring-1 focus:ring-inset focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:border-[#334155] dark:text-[#CBD5E1] dark:hover:bg-[#1E293B] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
-  'flex h-8 min-w-0 items-center justify-center whitespace-nowrap rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 text-[11px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
+  'flex h-7 min-w-0 items-center justify-center whitespace-nowrap bg-transparent px-2 text-[11px] font-semibold text-[#334155] transition-colors hover:bg-[#F8F9FA] focus:outline-none focus:ring-1 focus:ring-inset focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:text-[#CBD5E1] dark:hover:bg-[#1E293B] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -122,7 +122,7 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
   return (
     <input
       aria-label="Zoom percent"
-      className="h-8 w-10 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+      className="h-7 w-full border-l border-[#E2E8F0] bg-[#F8FAFC] px-1 text-center font-mono text-[11px] font-semibold tabular-nums text-[#334155] focus:outline-none focus:ring-1 focus:ring-inset focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]"
       disabled={disabled}
       inputMode="numeric"
       onBlur={commit}
@@ -298,7 +298,7 @@ const LeftSidebar = ({
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
         <div
-          className="grid grid-cols-[minmax(64px,1fr)_32px_54px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1.5 dark:border-[#475569] dark:bg-[#111827]"
+          className="grid grid-cols-[minmax(64px,1fr)_28px_42px_16px_28px] items-center overflow-hidden rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1 dark:border-[#334155] dark:bg-[#111827]"
           data-testid="view-canvas-zoom-row"
         >
           <button
@@ -319,16 +319,14 @@ const LeftSidebar = ({
           >
             <ZoomOutIcon />
           </IconButton>
-          <div className="flex min-w-0 items-center justify-center gap-0.5">
-            <ZoomValueInput
-              disabled={lockCanvas}
-              value={zoomPercent}
-              onCommit={onZoomCommit}
-            />
-            <span className="w-3 text-center text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
-              %
-            </span>
-          </div>
+          <ZoomValueInput
+            disabled={lockCanvas}
+            value={zoomPercent}
+            onCommit={onZoomCommit}
+          />
+          <span className="flex h-7 items-center justify-center border-l border-[#E2E8F0] text-[10px] font-semibold text-[#64748B] dark:border-[#334155] dark:text-[#94A3B8]">
+            %
+          </span>
           <IconButton title="Zoom In" disabled={lockCanvas} onClick={onZoomIn}>
             <ZoomInIcon />
           </IconButton>
