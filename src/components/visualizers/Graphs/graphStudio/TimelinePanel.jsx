@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  CAPTION_FONT_SIZE_RANGE,
   CAPTION_SIZE_OPTIONS,
   CAPTION_STYLE_OPTIONS,
 } from './lib/captionOverlay';
@@ -115,6 +116,60 @@ const DurationInput = ({ durationMs, onCommit }) => {
   );
 };
 
+const CaptionFontSizeInput = ({ value, onCommit }) => {
+  const normalizedValue = Number.isFinite(Number(value)) ? Number(value) : 12;
+  const [draft, setDraft] = useState(String(normalizedValue));
+
+  const reset = () => setDraft(String(normalizedValue));
+  const commit = () => {
+    if (!draft.trim()) {
+      reset();
+      return;
+    }
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed)) {
+      reset();
+      return;
+    }
+    const nextValue = Math.round(
+      Math.max(
+        CAPTION_FONT_SIZE_RANGE.min,
+        Math.min(CAPTION_FONT_SIZE_RANGE.max, parsed)
+      )
+    );
+    setDraft(String(nextValue));
+    onCommit?.(nextValue);
+  };
+
+  return (
+    <span className="flex items-center gap-1.5">
+      <input
+        aria-label="Caption Font Size"
+        className="h-8 w-[58px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-1 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+        data-testid="caption-font-size-input"
+        inputMode="numeric"
+        onBlur={commit}
+        onChange={event => setDraft(event.target.value)}
+        onFocus={() => setDraft(String(normalizedValue))}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur();
+          } else if (event.key === 'Escape') {
+            reset();
+            event.currentTarget.blur();
+          }
+        }}
+        pattern="[0-9]*"
+        type="text"
+        value={draft}
+      />
+      <span className="text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
+        px
+      </span>
+    </span>
+  );
+};
+
 const TimelinePanel = ({
   steps,
   currentFrame,
@@ -124,9 +179,11 @@ const TimelinePanel = ({
   captionEnabled,
   captionStyle,
   captionSize,
+  captionFontSize,
   onCaptionEnabledChange,
   onCaptionStyleChange,
   onCaptionSizeChange,
+  onCaptionFontSizeChange,
   onAddStep,
   onDuplicateStep,
   onDeleteStep,
@@ -134,6 +191,15 @@ const TimelinePanel = ({
   onPlay,
   isPlaying,
 }) => {
+  const frameRefs = useRef([]);
+  const moveFrameFocus = (index, delta) => {
+    const nextIndex = Math.max(0, Math.min(steps.length - 1, index + delta));
+    onFrameChange(nextIndex);
+    window.requestAnimationFrame(() => {
+      frameRefs.current[nextIndex]?.focus();
+    });
+  };
+
   return (
     <div
       aria-label="Animation timeline"
@@ -234,9 +300,12 @@ const TimelinePanel = ({
           {steps.map((step, index) => (
             <div
               key={`${step.id ?? 'step'}-${index}`}
+              ref={element => {
+                frameRefs.current[index] = element;
+              }}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border border-l-4 bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
+              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border border-l-4 bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#94A3B8] dark:bg-[#1E293B] dark:focus-visible:ring-[#64748B] md:min-w-[128px] ${
                 index === currentFrame
                   ? 'border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
                   : 'border-[#D7DEE8] border-l-transparent hover:border-[#94A3B8] hover:border-l-transparent hover:bg-[#F8F9FA] dark:border-[#334155] dark:border-l-transparent dark:hover:border-[#64748B] dark:hover:border-l-transparent dark:hover:bg-[#233044]'
@@ -244,11 +313,21 @@ const TimelinePanel = ({
               data-current={index === currentFrame}
               data-frame-navigation-surface="true"
               data-testid="timeline-frame-card"
-              onClick={() => onFrameChange(index)}
+              onClick={event => {
+                event.currentTarget.focus();
+                onFrameChange(index);
+              }}
               onKeyDown={event => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   onFrameChange(index);
+                } else if (
+                  event.key === 'ArrowLeft' ||
+                  event.key === 'ArrowRight'
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  moveFrameFocus(index, event.key === 'ArrowLeft' ? -1 : 1);
                 }
               }}
               role="option"
@@ -370,6 +449,14 @@ const TimelinePanel = ({
                       </option>
                     ))}
                   </NativeSelect>
+                </label>
+                <label className={detailControlLabelClass}>
+                  <span>Caption Font Size</span>
+                  <CaptionFontSizeInput
+                    key={`${captionSize}-${captionFontSize}`}
+                    value={captionFontSize}
+                    onCommit={onCaptionFontSizeChange}
+                  />
                 </label>
               </div>
             </div>

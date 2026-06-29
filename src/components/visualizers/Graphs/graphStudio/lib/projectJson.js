@@ -4,6 +4,14 @@ import {
   normalizeCaptionOverlay,
 } from './captionOverlay';
 import { DEFAULT_CUSTOM_LEGEND, normalizeCustomLegend } from './customLegend';
+import {
+  DEFAULT_EDGE_WIDTH,
+  DEFAULT_NODE_SIZE,
+  EDGE_LABEL_FONT_SIZE_RANGE,
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  NODE_LABEL_FONT_SIZE_RANGE,
+} from './fontSizing';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
@@ -25,8 +33,10 @@ const DEFAULT_SETTINGS = {
   globalSettings: {
     forceStrength: 1,
     edgeCurvature: 46,
-    nodeSize: 22,
-    edgeWidth: 2.2,
+    nodeSize: DEFAULT_NODE_SIZE,
+    nodeLabelFontSize: getDefaultNodeLabelFontSize(DEFAULT_NODE_SIZE),
+    edgeWidth: DEFAULT_EDGE_WIDTH,
+    edgeLabelFontSize: getDefaultEdgeLabelFontSize(DEFAULT_EDGE_WIDTH),
   },
 };
 
@@ -195,11 +205,27 @@ const sanitizeSettings = settings => {
         12,
         44
       ),
+      nodeLabelFontSize: numberOrDefault(
+        globalInput.nodeLabelFontSize,
+        getDefaultNodeLabelFontSize(
+          globalInput.nodeSize ?? DEFAULT_SETTINGS.globalSettings.nodeSize
+        ),
+        NODE_LABEL_FONT_SIZE_RANGE.min,
+        NODE_LABEL_FONT_SIZE_RANGE.max
+      ),
       edgeWidth: numberOrDefault(
         globalInput.edgeWidth,
         DEFAULT_SETTINGS.globalSettings.edgeWidth,
         1,
         8
+      ),
+      edgeLabelFontSize: numberOrDefault(
+        globalInput.edgeLabelFontSize,
+        getDefaultEdgeLabelFontSize(
+          globalInput.edgeWidth ?? DEFAULT_SETTINGS.globalSettings.edgeWidth
+        ),
+        EDGE_LABEL_FONT_SIZE_RANGE.min,
+        EDGE_LABEL_FONT_SIZE_RANGE.max
       ),
     },
   };

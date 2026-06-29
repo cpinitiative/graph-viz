@@ -68,6 +68,8 @@ const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
         edgeCurvature={canvas?.edgeCurvature}
         nodeRadius={canvas?.nodeRadius}
         edgeWidth={canvas?.edgeWidth}
+        nodeLabelFontSize={canvas?.nodeLabelFontSize}
+        edgeLabelFontSize={canvas?.edgeLabelFontSize}
         svgElementId={PREVIEW_SVG_ELEMENT_ID}
         svgTestId="export-preview-renderer-svg"
         svgResourcePrefix="export-preview"
@@ -175,13 +177,17 @@ const ExportModal = ({
         edgeRouting: previewCanvas?.edgeRouting,
         edgeCurvature: previewCanvas?.edgeCurvature,
         nodeRadius: previewCanvas?.nodeRadius,
+        nodeLabelFontSize: previewCanvas?.nodeLabelFontSize,
         edgeWidth: previewCanvas?.edgeWidth,
+        edgeLabelFontSize: previewCanvas?.edgeLabelFontSize,
       }),
     [
       previewCanvas?.customLegend,
       previewCanvas?.edgeCurvature,
       previewCanvas?.edgeRouting,
+      previewCanvas?.edgeLabelFontSize,
       previewCanvas?.edgeWidth,
+      previewCanvas?.nodeLabelFontSize,
       previewCanvas?.nodeRadius,
       previewCanvas?.showGrid,
       previewCanvas?.viewState,

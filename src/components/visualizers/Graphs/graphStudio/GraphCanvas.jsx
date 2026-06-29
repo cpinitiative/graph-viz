@@ -12,8 +12,14 @@ import {
   toWorld,
 } from './graphCanvasUtils';
 import { normalizeCaptionOverlay } from './lib/captionOverlay';
-import { normalizeCustomLegend } from './lib/customLegend';
+import { getLegendEntryGroup, normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
+import {
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  normalizeEdgeLabelFontSize,
+  normalizeNodeLabelFontSize,
+} from './lib/fontSizing';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
@@ -78,14 +84,14 @@ const CAPTION_STYLE_PRESETS = {
 };
 const CAPTION_SIZE_PRESETS = {
   small: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
     horizontalPadding: 12,
     verticalPadding: 8,
     minWidth: 104,
     maxWidth: 360,
     maxWidthRatio: 0.38,
-    characterWidth: 5.8,
+    characterWidth: 6.2,
   },
   medium: {
     fontSize: 12,
@@ -116,9 +122,6 @@ const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const getSelectedEdgeStrokeWidth = edgeWidth =>
   Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
-
-const getEdgeLabelFontSize = edgeWidth =>
-  clampNumber(edgeWidth * 2.5 + 10, 12, 22);
 
 const getArrowMarkerMetrics = edgeWidth => {
   const effectiveWidth = Math.max(1, Number(edgeWidth) || 2.2);
@@ -171,27 +174,20 @@ const truncateLegendText = (value, maxLength = 34) => {
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
-const LEGEND_KIND_GROUPS = [
-  ['node', 'Nodes'],
-  ['edge', 'Edges'],
-];
-
 const buildLegendRows = (
   entries,
   { groupMaxLength = 28, entryMaxLength = 34 } = {}
 ) => {
-  const groupedEntries = new Map(
-    LEGEND_KIND_GROUPS.map(([kind, label]) => [
-      kind,
-      {
-        label,
-        entries: [],
-      },
-    ])
-  );
+  const groupedEntries = new Map();
   entries.forEach((entry, index) => {
-    const kind = entry.kind === 'edge' ? 'edge' : 'node';
-    groupedEntries.get(kind).entries.push({ entry, index });
+    const groupLabel = getLegendEntryGroup(entry);
+    if (!groupedEntries.has(groupLabel)) {
+      groupedEntries.set(groupLabel, {
+        label: groupLabel,
+        entries: [],
+      });
+    }
+    groupedEntries.get(groupLabel).entries.push({ entry, index });
   });
 
   const rows = [];
@@ -595,6 +591,17 @@ const FrameCaption = ({
       : baseStylePreset;
   const sizePreset =
     CAPTION_SIZE_PRESETS[caption.size] ?? CAPTION_SIZE_PRESETS.medium;
+  const fontSize = Number(caption.fontSize) || sizePreset.fontSize;
+  const fontScale = fontSize / sizePreset.fontSize;
+  const paddingScale = clampNumber(fontScale, 0.9, 1.6);
+  const horizontalPadding = Math.round(
+    clampNumber(sizePreset.horizontalPadding * paddingScale, 10, 28)
+  );
+  const verticalPadding = Math.round(
+    clampNumber(sizePreset.verticalPadding * paddingScale, 7, 22)
+  );
+  const lineHeight = Math.round(Math.max(fontSize + 4, fontSize * 1.35));
+  const characterWidth = Math.max(5.8, fontSize * 0.56);
   const text = String(captionText ?? '').trim();
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -616,19 +623,27 @@ const FrameCaption = ({
     )
   );
   const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
+  const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
   const presetMaxWidth = Math.min(
     sizePreset.maxWidth,
     canvasSize.width * sizePreset.maxWidthRatio
   );
   const contentMaxWidth = Math.max(
     1,
-    Math.min(presetMaxWidth, maxBoxWidth) - sizePreset.horizontalPadding * 2
+    Math.min(presetMaxWidth, maxBoxWidth) - horizontalPadding * 2
   );
   const maxCharacters = Math.max(
     8,
-    Math.floor(contentMaxWidth / sizePreset.characterWidth)
+    Math.floor(contentMaxWidth / characterWidth)
   );
-  const lines = wrapCaptionText(text, maxCharacters, CAPTION_MAX_LINES);
+  const maxVisibleLines = Math.max(
+    1,
+    Math.min(
+      CAPTION_MAX_LINES,
+      Math.floor((maxBoxHeight - verticalPadding * 2) / lineHeight)
+    )
+  );
+  const lines = wrapCaptionText(text, maxCharacters, maxVisibleLines);
   const unclampedLineCount = wrapCaptionText(
     text,
     maxCharacters,
@@ -638,16 +653,15 @@ const FrameCaption = ({
     unclampedLineCount > lines.length ||
     lines.some(line => line.endsWith('...'));
   const estimatedTextWidth =
-    Math.max(...lines.map(line => line.length), 1) * sizePreset.characterWidth;
+    Math.max(...lines.map(line => line.length), 1) * characterWidth;
   const boxWidth = Math.min(
     maxBoxWidth,
-    Math.max(
-      sizePreset.minWidth,
-      estimatedTextWidth + sizePreset.horizontalPadding * 2
-    )
+    Math.max(sizePreset.minWidth, estimatedTextWidth + horizontalPadding * 2)
   );
-  const boxHeight =
-    sizePreset.verticalPadding * 2 + lines.length * sizePreset.lineHeight;
+  const boxHeight = Math.min(
+    maxBoxHeight,
+    verticalPadding * 2 + lines.length * lineHeight
+  );
   const maxX = Math.max(0, canvasSize.width - boxWidth);
   const maxY = Math.max(0, canvasSize.height - boxHeight);
   const leftX = Math.min(margin, maxX);
@@ -704,6 +718,9 @@ const FrameCaption = ({
       data-caption-position-y={caption.position.y}
       data-caption-size={caption.size}
       data-caption-style={caption.style}
+      data-caption-font-size={fontSize}
+      data-caption-box-width={Math.round(boxWidth)}
+      data-caption-box-height={Math.round(boxHeight)}
       data-caption-theme={theme}
       data-caption-line-count={lines.length}
       data-caption-truncated={isTruncated}
@@ -749,11 +766,11 @@ const FrameCaption = ({
         }
       />
       <text
-        x={sizePreset.horizontalPadding}
-        y={sizePreset.verticalPadding + sizePreset.fontSize}
+        x={horizontalPadding}
+        y={verticalPadding + fontSize}
         fill={stylePreset.text}
         fontFamily="Arial, sans-serif"
-        fontSize={sizePreset.fontSize}
+        fontSize={fontSize}
         fontWeight="600"
         letterSpacing="0"
         paintOrder={stylePreset.textStroke ? 'stroke' : undefined}
@@ -764,8 +781,8 @@ const FrameCaption = ({
         {lines.map((line, index) => (
           <tspan
             key={`${line}-${index}`}
-            x={sizePreset.horizontalPadding}
-            dy={index === 0 ? 0 : sizePreset.lineHeight}
+            x={horizontalPadding}
+            dy={index === 0 ? 0 : lineHeight}
           >
             {line}
           </tspan>
@@ -796,6 +813,8 @@ const GraphCanvas = ({
   edgeCurvature,
   nodeRadius = NODE_RADIUS,
   edgeWidth = 2.2,
+  nodeLabelFontSize,
+  edgeLabelFontSize,
   resetViewTrigger = 0,
   svgElementId = 'graph-studio-canvas-svg',
   svgTestId = 'graph-canvas-svg',
@@ -825,8 +844,18 @@ const GraphCanvas = ({
     return map;
   }, [graph.nodes]);
   const edgeLabelSize = useMemo(
-    () => getEdgeLabelFontSize(edgeWidth),
-    [edgeWidth]
+    () =>
+      Number.isFinite(Number(edgeLabelFontSize))
+        ? normalizeEdgeLabelFontSize(edgeLabelFontSize)
+        : getDefaultEdgeLabelFontSize(edgeWidth),
+    [edgeLabelFontSize, edgeWidth]
+  );
+  const nodeLabelSize = useMemo(
+    () =>
+      Number.isFinite(Number(nodeLabelFontSize))
+        ? normalizeNodeLabelFontSize(nodeLabelFontSize)
+        : getDefaultNodeLabelFontSize(nodeRadius),
+    [nodeLabelFontSize, nodeRadius]
   );
   const edgeRenderData = useMemo(() => {
     return getEdgeRenderData({
@@ -1337,6 +1366,7 @@ const GraphCanvas = ({
                     key={node.id}
                     node={node}
                     nodeRadius={nodeRadius}
+                    labelFontSize={nodeLabelSize}
                     selected={selected}
                     multiSelected={multiSelected}
                     drawAnchor={String(effectiveDrawFrom) === String(node.id)}

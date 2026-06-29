@@ -1,6 +1,10 @@
 import { motion } from 'framer-motion';
 import { useTheme } from '../../../../context/useTheme';
 import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
+import {
+  getDefaultNodeLabelFontSize,
+  normalizeNodeLabelFontSize,
+} from './lib/fontSizing';
 
 const EDITOR_RING_COLORS = {
   light: {
@@ -51,6 +55,7 @@ const GraphNode = ({
   onClick,
   mode,
   nodeRadius = NODE_RADIUS,
+  labelFontSize,
 }) => {
   const { theme } = useTheme();
   const palette = getNodePalette(node, theme);
@@ -58,7 +63,9 @@ const GraphNode = ({
   const selectionRingColor = selected
     ? ringColors.selected
     : ringColors.multiSelected;
-  const labelFontSize = Math.max(12, Math.min(28, nodeRadius * 0.55));
+  const effectiveLabelFontSize = Number.isFinite(Number(labelFontSize))
+    ? normalizeNodeLabelFontSize(labelFontSize)
+    : getDefaultNodeLabelFontSize(nodeRadius);
 
   return (
     <g
@@ -120,12 +127,13 @@ const GraphNode = ({
         />
       )}
       <text
+        data-node-label-id={node.id}
         x={node.x}
-        y={node.y + labelFontSize * 0.35}
+        y={node.y + effectiveLabelFontSize * 0.35}
         textAnchor="middle"
         fill={palette.text}
         style={{
-          fontSize: `${labelFontSize}px`,
+          fontSize: `${effectiveLabelFontSize}px`,
           fontWeight: 600,
           userSelect: 'none',
           pointerEvents: 'none',

@@ -1,6 +1,12 @@
 import { useId, useRef, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
+import {
+  EDGE_LABEL_FONT_SIZE_RANGE,
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  NODE_LABEL_FONT_SIZE_RANGE,
+} from './lib/fontSizing';
 
 const NODE_STATUS_OPTIONS = [
   ['default', 'Default'],
@@ -339,6 +345,96 @@ const RangeControl = ({
   );
 };
 
+const NumberControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  suffix,
+  testId,
+}) => {
+  const labelId = useId();
+  const [draftValue, setDraftValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : String(value);
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const numericStep = Number(step);
+  const decimalPlaces = String(step).includes('.')
+    ? String(step).split('.')[1].length
+    : 0;
+
+  const normalizeValue = rawValue => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
+    if (!Number.isFinite(numericStep) || numericStep <= 0) {
+      return Number(clamped.toFixed(decimalPlaces));
+    }
+    const stepped =
+      numericMin +
+      Math.round((clamped - numericMin) / numericStep) * numericStep;
+    return Number(
+      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
+    );
+  };
+
+  const commitDraftValue = () => {
+    const nextValue = normalizeValue(displayValue);
+    if (nextValue === null) {
+      setDraftValue('');
+      setIsEditing(false);
+      return;
+    }
+    setDraftValue('');
+    setIsEditing(false);
+    onChange(nextValue);
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span id={labelId} className={fieldLabelClass}>
+        {label}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <input
+          aria-labelledby={labelId}
+          className="h-8 w-[70px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 text-right font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+          data-testid={testId}
+          inputMode="decimal"
+          onBlur={commitDraftValue}
+          onChange={event => {
+            setIsEditing(true);
+            setDraftValue(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraftValue(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              setDraftValue('');
+              setIsEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
+        {suffix && (
+          <span className="w-4 text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
+            {suffix}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+};
+
 const LinkedList = ({ items, emptyLabel, renderItem, onSelect }) => {
   if (!items?.length) {
     return (
@@ -577,6 +673,21 @@ const GlobalSettingsPanel = ({
             step="1"
             onChange={nodeSize => onUpdateGlobal({ nodeSize })}
           />
+          <NumberControl
+            label="Node Label Size"
+            value={
+              globalSettings.nodeLabelFontSize ??
+              getDefaultNodeLabelFontSize(globalSettings.nodeSize)
+            }
+            min={NODE_LABEL_FONT_SIZE_RANGE.min}
+            max={NODE_LABEL_FONT_SIZE_RANGE.max}
+            step="0.5"
+            suffix="px"
+            testId="node-label-font-size-input"
+            onChange={nodeLabelFontSize =>
+              onUpdateGlobal({ nodeLabelFontSize })
+            }
+          />
           <RangeControl
             label="Edge width"
             value={globalSettings.edgeWidth ?? 2.2}
@@ -584,6 +695,21 @@ const GlobalSettingsPanel = ({
             max="8"
             step="0.2"
             onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
+          />
+          <NumberControl
+            label="Edge Label Size"
+            value={
+              globalSettings.edgeLabelFontSize ??
+              getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
+            }
+            min={EDGE_LABEL_FONT_SIZE_RANGE.min}
+            max={EDGE_LABEL_FONT_SIZE_RANGE.max}
+            step="0.5"
+            suffix="px"
+            testId="edge-label-font-size-input"
+            onChange={edgeLabelFontSize =>
+              onUpdateGlobal({ edgeLabelFontSize })
+            }
           />
         </div>
       </Section>

@@ -211,15 +211,9 @@ const LeftSidebar = ({
     drawFrom !== null && drawFrom !== undefined
       ? `Source node ${drawFrom} selected. Click a target node.`
       : 'Click a source node, then a target node.';
-  const legendEntries = Array.isArray(customLegend.entries)
-    ? customLegend.entries
-    : [];
   const legendPosition = CUSTOM_LEGEND_POSITIONS.includes(customLegend.position)
     ? customLegend.position
     : DEFAULT_CUSTOM_LEGEND.position;
-  const legendSummary = `${legendEntries.length} ${
-    legendEntries.length === 1 ? 'entry' : 'entries'
-  } · ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -277,7 +271,7 @@ const LeftSidebar = ({
             event.target.value = '';
           }}
         >
-          <option value="">Choose preset...</option>
+          <option value="">Load preset...</option>
           {PRESET_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -390,12 +384,6 @@ const LeftSidebar = ({
                 />
                 <span>Show legend</span>
               </label>
-              <div
-                className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]"
-                data-testid="custom-legend-summary"
-              >
-                {legendSummary}
-              </div>
             </div>
             <button
               type="button"

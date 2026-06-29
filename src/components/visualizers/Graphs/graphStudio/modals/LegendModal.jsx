@@ -24,6 +24,42 @@ const dataButtonClass =
   'rounded bg-surface-container px-3 py-2 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:text-dark-on-surface dark:hover:bg-dark-surface-container-high';
 const dangerButtonClass =
   'min-h-8 rounded-sm border border-[#B91C1C] bg-transparent px-2 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#B91C1C] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:ring-[#F87171]';
+const reorderButtonClass =
+  'flex h-8 w-8 items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] text-xs font-bold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-35 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
+
+const MoveUpIcon = () => (
+  <svg
+    aria-hidden="true"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 19V5" />
+    <path d="M5 12l7-7 7 7" />
+  </svg>
+);
+
+const MoveDownIcon = () => (
+  <svg
+    aria-hidden="true"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 5v14" />
+    <path d="M19 12l-7 7-7-7" />
+  </svg>
+);
 
 const LegendModal = ({
   open,
@@ -123,6 +159,30 @@ const LegendModal = ({
       const entries = Array.isArray(current.entries)
         ? current.entries.filter((_, entryIndex) => entryIndex !== index)
         : [];
+      return { ...current, entries };
+    });
+  };
+
+  const moveLegendEntry = (fromIndex, toIndex) => {
+    setCustomLegend?.(prev => {
+      const current = {
+        ...DEFAULT_CUSTOM_LEGEND,
+        ...(prev ?? {}),
+      };
+      const entries = Array.isArray(current.entries)
+        ? [...current.entries]
+        : [];
+      if (
+        fromIndex < 0 ||
+        fromIndex >= entries.length ||
+        toIndex < 0 ||
+        toIndex >= entries.length ||
+        fromIndex === toIndex
+      ) {
+        return current;
+      }
+      const [entry] = entries.splice(fromIndex, 1);
+      entries.splice(toIndex, 0, entry);
       return { ...current, entries };
     });
   };
@@ -233,7 +293,34 @@ const LegendModal = ({
                   key={`custom-legend-entry-${index}`}
                   className="grid gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest p-2 dark:border-dark-outline-variant/20 dark:bg-dark-surface"
                 >
-                  <div className="grid gap-2 md:grid-cols-[minmax(108px,0.75fr)_minmax(160px,1fr)_104px_64px_72px] md:items-end">
+                  <div className="grid gap-2 md:grid-cols-[72px_minmax(108px,0.75fr)_minmax(160px,1fr)_104px_64px_72px] md:items-end">
+                    <div className="space-y-1">
+                      <span className={fieldLabelClass}>Order</span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          title={`Move legend entry ${index + 1} up`}
+                          aria-label={`Move legend entry ${index + 1} up`}
+                          data-testid={`custom-legend-move-up-${index}`}
+                          disabled={index === 0}
+                          onClick={() => moveLegendEntry(index, index - 1)}
+                          className={reorderButtonClass}
+                        >
+                          <MoveUpIcon />
+                        </button>
+                        <button
+                          type="button"
+                          title={`Move legend entry ${index + 1} down`}
+                          aria-label={`Move legend entry ${index + 1} down`}
+                          data-testid={`custom-legend-move-down-${index}`}
+                          disabled={index === legendEntries.length - 1}
+                          onClick={() => moveLegendEntry(index, index + 1)}
+                          className={reorderButtonClass}
+                        >
+                          <MoveDownIcon />
+                        </button>
+                      </div>
+                    </div>
                     <label
                       className="space-y-1"
                       htmlFor={`custom-legend-entry-group-${index}`}
