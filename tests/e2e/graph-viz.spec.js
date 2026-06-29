@@ -615,9 +615,30 @@ test.describe('Graph Studio desktop smoke', () => {
 
     const lockView = page.getByRole('checkbox', { name: 'Lock View' });
     const fitViewButton = page.getByRole('button', { name: 'Fit View' });
+    const zoomOutButton = page.getByRole('button', { name: 'Zoom Out' });
+    const zoomValueInput = page.getByLabel('Zoom percent');
     const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
     await expect(lockView).not.toBeChecked();
     await expect(fitViewButton).toBeEnabled();
+    await expect
+      .poll(async () => {
+        const boxes = await Promise.all(
+          [fitViewButton, zoomOutButton, zoomValueInput, zoomInButton].map(
+            locator => locator.boundingBox()
+          )
+        );
+        if (boxes.some(box => !box)) return false;
+        const centers = boxes.map(box => box.y + box.height / 2);
+        const minCenter = Math.min(...centers);
+        const maxCenter = Math.max(...centers);
+        return (
+          maxCenter - minCenter <= 3 &&
+          boxes[0].width >= 60 &&
+          boxes[0].height <= 34 &&
+          boxes[2].width <= 48
+        );
+      })
+      .toBe(true);
     const zoomBefore = Number(
       await graphCanvas(page).getAttribute('data-view-zoom')
     );
@@ -1432,6 +1453,19 @@ while (true) {}
     await expect(edgeLabelFontSizeInput).toBeVisible();
     await expect(firstNodeLabel).toBeVisible();
     await expect(firstEdgeLabel).toBeVisible();
+    for (const control of [
+      page.getByLabel('Gravity (force) value'),
+      page.getByLabel('Curve Amount value'),
+      page.getByLabel('Node size value'),
+      nodeLabelFontSizeInput,
+      page.getByLabel('Edge width value'),
+      edgeLabelFontSizeInput,
+    ]) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeLessThanOrEqual(64);
+      expect(box.height).toBeLessThanOrEqual(30);
+    }
 
     await setRangeValue(page, 'Node size', 40);
     await expect(nodeLabelFontSizeInput).toHaveValue('22');
@@ -1456,6 +1490,8 @@ while (true) {}
     expect(previewSvgText).toContain('data-node-label-id=');
     expect(previewSvgText).toContain('font-size: 24px');
     expect(previewSvgText).toContain('data-edge-label-text="true"');
+    expect(previewSvgText).toContain('data-edge-label-halo="wide"');
+    expect(previewSvgText).not.toContain('data-edge-label-background');
     expect(previewSvgText).toContain('font-size="21"');
 
     const svgDownload = await expectDownloadFrom({
@@ -1468,6 +1504,8 @@ while (true) {}
     const svgText = await fs.readFile(svgPath, 'utf8');
     expect(svgText).toContain('font-size: 24px');
     expect(svgText).toContain('font-size="21"');
+    expect(svgText).toContain('data-edge-label-halo="wide"');
+    expect(svgText).not.toContain('data-edge-label-background');
 
     const projectDownload = await expectDownloadFrom({
       page,
@@ -1644,6 +1682,19 @@ while (true) {}
     await expect(page.getByLabel('Show State Legend')).toBeHidden();
     await expect(legendToggle).toBeVisible();
     await expect(legendEditToggle).toBeVisible();
+    await expect
+      .poll(async () => {
+        const [toggleBox, editBox] = await Promise.all([
+          legendToggle.boundingBox(),
+          legendEditToggle.boundingBox(),
+        ]);
+        if (!toggleBox || !editBox) return false;
+        const centerDelta = Math.abs(
+          toggleBox.y + toggleBox.height / 2 - (editBox.y + editBox.height / 2)
+        );
+        return editBox.height >= 28 && editBox.width >= 42 && centerDelta <= 4;
+      })
+      .toBe(true);
     await expect(page.getByTestId('custom-legend-summary')).toHaveCount(0);
     await expect(legendPlacement).toHaveValue('auto');
     await expect(legendEditor).toBeHidden();
@@ -2343,6 +2394,12 @@ while (true) {}
     await expect(
       graphCanvas(page).locator('[data-edge-label-id="e0"]')
     ).toContainText('7');
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-background]')
+    ).toHaveCount(0);
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-halo="wide"]').first()
+    ).toBeVisible();
     await expect(
       graphCanvas(page).locator('[data-edge-label-id="e1"]')
     ).toContainText('-3');
@@ -3261,6 +3318,8 @@ api.edge('loop', '#3b82f6');
     );
     await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
     await expect(markerTriangle).toHaveAttribute('d', / L.* z$/);
+    const markerPathD = await markerTriangle.getAttribute('d');
+    expect(markerPathD.match(/ L/g)).toHaveLength(2);
 
     const directedEdges = graphCanvas(page).locator(
       'path[marker-end^="url(#graphstudio-arrow-"]'

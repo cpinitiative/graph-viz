@@ -36,9 +36,9 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const iconButtonClass =
-  'flex min-h-[36px] min-w-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:min-w-8 md:p-1.5';
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
-  'flex min-h-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:py-1.5';
+  'flex h-8 min-w-0 items-center justify-center whitespace-nowrap rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 text-[11px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -122,7 +122,7 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
   return (
     <input
       aria-label="Zoom percent"
-      className="h-8 w-[58px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+      className="h-8 w-11 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
       disabled={disabled}
       inputMode="numeric"
       onBlur={commit}
@@ -297,7 +297,7 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="flex items-center justify-between gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
+        <div className="grid grid-cols-[minmax(68px,1fr)_32px_62px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
           <button
             type="button"
             className={fitViewButtonClass}
@@ -309,32 +309,26 @@ const LeftSidebar = ({
           >
             Fit View
           </button>
-          <div className="flex items-center gap-2">
-            <IconButton
-              title="Zoom Out"
+          <IconButton
+            title="Zoom Out"
+            disabled={lockCanvas}
+            onClick={onZoomOut}
+          >
+            <ZoomOutIcon />
+          </IconButton>
+          <div className="flex min-w-0 items-center justify-center gap-0.5">
+            <ZoomValueInput
               disabled={lockCanvas}
-              onClick={onZoomOut}
-            >
-              <ZoomOutIcon />
-            </IconButton>
-            <div className="flex items-center gap-1">
-              <ZoomValueInput
-                disabled={lockCanvas}
-                value={zoomPercent}
-                onCommit={onZoomCommit}
-              />
-              <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
-                %
-              </span>
-            </div>
-            <IconButton
-              title="Zoom In"
-              disabled={lockCanvas}
-              onClick={onZoomIn}
-            >
-              <ZoomInIcon />
-            </IconButton>
+              value={zoomPercent}
+              onCommit={onZoomCommit}
+            />
+            <span className="w-3 text-center text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
+              %
+            </span>
           </div>
+          <IconButton title="Zoom In" disabled={lockCanvas} onClick={onZoomIn}>
+            <ZoomInIcon />
+          </IconButton>
         </div>
         <div className="space-y-2">
           <ToggleRow
@@ -370,21 +364,19 @@ const LeftSidebar = ({
       <SidebarSection>
         <SectionTitle>Legend</SectionTitle>
         <div className="space-y-2.5" data-testid="custom-legend-controls">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
-                <input
-                  type="checkbox"
-                  aria-label="Legend"
-                  checked={Boolean(customLegend.enabled)}
-                  onChange={event =>
-                    patchCustomLegend({ enabled: event.target.checked })
-                  }
-                  className={checkboxClass}
-                />
-                <span>Show legend</span>
-              </label>
-            </div>
+          <div className="flex min-h-10 items-center justify-between gap-3 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
+            <label className="flex min-w-0 cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
+              <input
+                type="checkbox"
+                aria-label="Legend"
+                checked={Boolean(customLegend.enabled)}
+                onChange={event =>
+                  patchCustomLegend({ enabled: event.target.checked })
+                }
+                className={checkboxClass}
+              />
+              <span className="whitespace-nowrap">Show legend</span>
+            </label>
             <button
               type="button"
               aria-haspopup="dialog"
@@ -392,7 +384,7 @@ const LeftSidebar = ({
               aria-controls="custom-legend-editor"
               data-testid="custom-legend-edit-toggle"
               onClick={onOpenLegendEditor}
-              className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 text-[10px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]"
+              className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]"
             >
               Edit
             </button>

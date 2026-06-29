@@ -23,6 +23,8 @@ const sectionTitleClass =
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+const compactNumberInputClass =
+  'h-7 w-14 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const inputClass =
   'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const inspectorButtonFocusClass =
@@ -291,17 +293,17 @@ const RangeControl = ({
   };
 
   return (
-    <div className="block space-y-1.5">
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2">
-          <span id={labelId} className={fieldLabelClass}>
+    <div className="space-y-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span id={labelId} className={`${fieldLabelClass} truncate`}>
             {label}
           </span>
           {help}
         </span>
         <input
           aria-label={`${label} value`}
-          className="h-8 w-[70px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 text-right font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+          className={compactNumberInputClass}
           disabled={disabled}
           inputMode="decimal"
           onBlur={commitDraftValue}
@@ -336,7 +338,7 @@ const RangeControl = ({
         aria-labelledby={labelId}
         onChange={event => onChange(Number(event.target.value))}
         className={joinClasses(
-          'h-2 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
+          'h-1.5 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
           disabled &&
             'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
         )}
@@ -394,14 +396,14 @@ const NumberControl = ({
   };
 
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span id={labelId} className={fieldLabelClass}>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+      <span id={labelId} className={`${fieldLabelClass} truncate`}>
         {label}
       </span>
-      <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-1">
         <input
           aria-labelledby={labelId}
-          className="h-8 w-[70px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 text-right font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+          className={compactNumberInputClass}
           data-testid={testId}
           inputMode="decimal"
           onBlur={commitDraftValue}
@@ -426,7 +428,7 @@ const NumberControl = ({
           value={displayValue}
         />
         {suffix && (
-          <span className="w-4 text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
+          <span className="w-4 text-left text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
             {suffix}
           </span>
         )}
@@ -641,7 +643,7 @@ const GlobalSettingsPanel = ({
   return (
     <PanelShell title="Canvas Inspector" inspectorType="canvas">
       <Section title="Canvas Settings">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <RangeControl
             label="Gravity (force)"
             value={globalSettings.forceStrength}

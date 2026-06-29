@@ -173,8 +173,8 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
 
 export const measureLabelRect = (point, labelText, fontSize = 12) => {
   const text = String(labelText ?? '');
-  const width = Math.max(22, text.length * fontSize * 0.58 + fontSize * 0.9);
-  const height = fontSize + 8;
+  const width = Math.max(18, text.length * fontSize * 0.56 + fontSize * 0.55);
+  const height = fontSize + 5;
   return {
     left: point.x - width / 2,
     right: point.x + width / 2,

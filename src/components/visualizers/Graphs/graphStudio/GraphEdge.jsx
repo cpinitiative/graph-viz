@@ -1,12 +1,18 @@
 import { motion } from 'framer-motion';
+import { useTheme } from '../../../../context/useTheme';
 
-const getEdgeLabelRect = (label, fontSize) => {
-  const text = String(label ?? '');
-  return {
-    width: Math.max(22, text.length * fontSize * 0.58 + fontSize * 0.9),
-    height: fontSize + 8,
-  };
-};
+const getEdgeLabelTone = theme =>
+  theme === 'dark'
+    ? {
+        text: '#F8FAFC',
+        wideHalo: '#0F172A',
+        fineHalo: '#111827',
+      }
+    : {
+        text: '#1E293B',
+        wideHalo: '#FFFFFF',
+        fineHalo: '#F8FAFC',
+      };
 
 const GraphEdge = ({
   edge,
@@ -23,10 +29,12 @@ const GraphEdge = ({
   onClick,
   strokeWidth,
 }) => {
+  const { theme } = useTheme();
   const isHighlighted = selected || multiSelected;
-  const labelRect = edge.label
-    ? getEdgeLabelRect(edge.label, labelFontSize)
-    : null;
+  const labelTone = getEdgeLabelTone(theme);
+  const labelY = labelPosition ? labelPosition.y + labelFontSize * 0.35 : 0;
+  const wideHaloWidth = Math.max(2.8, labelFontSize * 0.28);
+  const fineHaloWidth = Math.max(1.2, labelFontSize * 0.12);
 
   return (
     <g data-edge-id={edge.id} style={{ cursor: 'pointer' }}>
@@ -71,32 +79,58 @@ const GraphEdge = ({
         <g
           pointerEvents="none"
           data-edge-label-id={edge.id}
+          data-edge-label-theme={theme}
           aria-hidden="true"
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         >
-          <rect
-            data-edge-label-background="true"
-            x={labelPosition.x - labelRect.width / 2}
-            y={labelPosition.y - labelRect.height / 2}
-            width={labelRect.width}
-            height={labelRect.height}
-            fill="#FFFFFF"
-            stroke="#E2E8F0"
-            strokeWidth="1"
-            className="fill-white stroke-slate-200 transition-colors duration-200 dark:fill-[#111827] dark:stroke-slate-600"
-          />
+          <text
+            data-edge-label-halo="wide"
+            x={labelPosition.x}
+            y={labelY}
+            textAnchor="middle"
+            fill="none"
+            stroke={labelTone.wideHalo}
+            strokeWidth={wideHaloWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fontSize={labelFontSize}
+            fontWeight="650"
+            fontFamily="Arial, sans-serif"
+            opacity="0.92"
+            paintOrder="stroke"
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          >
+            {edge.label}
+          </text>
+          <text
+            data-edge-label-halo="fine"
+            x={labelPosition.x}
+            y={labelY}
+            textAnchor="middle"
+            fill="none"
+            stroke={labelTone.fineHalo}
+            strokeWidth={fineHaloWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fontSize={labelFontSize}
+            fontWeight="650"
+            fontFamily="Arial, sans-serif"
+            opacity="0.78"
+            paintOrder="stroke"
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          >
+            {edge.label}
+          </text>
           <text
             data-edge-label-text="true"
             x={labelPosition.x}
-            y={labelPosition.y + labelFontSize * 0.35}
+            y={labelY}
             textAnchor="middle"
-            fill="#262626"
+            fill={labelTone.text}
             fontSize={labelFontSize}
-            fontWeight="700"
+            fontWeight="650"
             fontFamily="Arial, sans-serif"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-            // Handles light mode (neutral-800) and dark mode (neutral-200)
-            className="fill-neutral-800 font-bold transition-colors duration-200 dark:fill-neutral-200"
           >
             {edge.label}
           </text>

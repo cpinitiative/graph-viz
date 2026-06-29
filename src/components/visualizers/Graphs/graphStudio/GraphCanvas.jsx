@@ -126,22 +126,24 @@ const getSelectedEdgeStrokeWidth = edgeWidth =>
 const getArrowMarkerMetrics = edgeWidth => {
   const effectiveWidth = Math.max(1, Number(edgeWidth) || 2.2);
   const round = value => Number(value.toFixed(2));
-  const markerWidth = round(clampNumber(effectiveWidth * 4.2 + 5, 11, 34));
-  const markerHeight = round(clampNumber(effectiveWidth * 3.2 + 5, 9, 28));
-  const refX = markerWidth;
+  const markerWidth = round(clampNumber(effectiveWidth * 5 + 7, 14, 44));
+  const markerHeight = round(clampNumber(effectiveWidth * 3.6 + 7, 13, 38));
+  const tipPadding = round(clampNumber(effectiveWidth * 0.3, 0.75, 2.8));
+  const refX = round(markerWidth - tipPadding);
   const refY = round(markerHeight / 2);
-  const baseX = round(Math.max(1, effectiveWidth * 0.42));
-  const notchX = round(Math.max(baseX + 1, effectiveWidth * 1.55));
-  const wing = round(markerHeight * 0.36);
-  const topY = round(refY - wing);
-  const bottomY = round(refY + wing);
+  const baseX = round(clampNumber(effectiveWidth * 0.75, 1.4, 7));
+  const halfBase = round(
+    Math.min(markerHeight / 2 - 1.2, effectiveWidth * 1.45 + 3.5)
+  );
+  const topY = round(refY - halfBase);
+  const bottomY = round(refY + halfBase);
 
   return {
     markerWidth,
     markerHeight,
     refX,
     refY,
-    pathD: `M${baseX},${topY} L${refX},${refY} L${baseX},${bottomY} L${notchX},${refY} z`,
+    pathD: `M${baseX},${topY} L${refX},${refY} L${baseX},${bottomY} z`,
   };
 };
 
