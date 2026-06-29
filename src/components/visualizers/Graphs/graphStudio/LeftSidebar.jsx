@@ -128,36 +128,38 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
       )}
       data-testid="zoom-percent-field"
     >
-      <input
-        aria-label="Zoom percent"
-        className="w-[30px] bg-transparent text-right font-mono text-xs font-semibold tabular-nums text-inherit focus:outline-none disabled:cursor-not-allowed"
-        disabled={disabled}
-        inputMode="numeric"
-        onBlur={commit}
-        onChange={event => {
-          setIsEditing(true);
-          setDraft(event.target.value);
-        }}
-        onFocus={() => {
-          setIsEditing(true);
-          setDraft(String(value));
-        }}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          } else if (event.key === 'Escape') {
-            reset();
-            event.currentTarget.blur();
-          }
-        }}
-        type="text"
-        value={displayValue}
-      />
       <span
-        aria-hidden="true"
-        className="pl-0.5 text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8]"
+        className="inline-grid grid-cols-[3ch_auto] items-baseline justify-center gap-0.5 font-mono text-xs font-semibold tabular-nums leading-none text-inherit"
+        data-testid="zoom-percent-unit"
       >
-        %
+        <input
+          aria-label="Zoom percent"
+          className="w-[3ch] bg-transparent text-right font-mono text-xs font-semibold tabular-nums leading-none text-inherit focus:outline-none disabled:cursor-not-allowed"
+          disabled={disabled}
+          inputMode="numeric"
+          onBlur={commit}
+          onChange={event => {
+            setIsEditing(true);
+            setDraft(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraft(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              reset();
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
+        <span aria-hidden="true" className="text-inherit">
+          %
+        </span>
       </span>
     </span>
   );

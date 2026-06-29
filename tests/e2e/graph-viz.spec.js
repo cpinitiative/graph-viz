@@ -619,6 +619,7 @@ test.describe('Graph Studio desktop smoke', () => {
     const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
     const zoomRow = page.getByTestId('view-canvas-zoom-row');
     const zoomField = page.getByTestId('zoom-percent-field');
+    const zoomUnit = page.getByTestId('zoom-percent-unit');
     await expect(lockView).not.toBeChecked();
     await expect(fitViewButton).toBeEnabled();
     await expect(zoomValueInput).toBeVisible();
@@ -626,18 +627,21 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect
       .poll(async () => {
         const rowBox = await zoomRow.boundingBox();
+        const zoomUnitBox = await zoomUnit.boundingBox();
         const boxes = await Promise.all(
           [fitViewButton, zoomOutButton, zoomField, zoomInButton].map(locator =>
             locator.boundingBox()
           )
         );
-        if (!rowBox || boxes.some(box => !box)) return false;
+        if (!rowBox || !zoomUnitBox || boxes.some(box => !box)) return false;
         const centers = boxes.map(box => box.y + box.height / 2);
         const minCenter = Math.min(...centers);
         const maxCenter = Math.max(...centers);
         const rowLeftInset = boxes[0].x - rowBox.x;
         const rowRightInset =
           rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
+        const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
+        const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
         return (
           maxCenter - minCenter <= 3 &&
           boxes[0].width >= 60 &&
@@ -645,6 +649,7 @@ test.describe('Graph Studio desktop smoke', () => {
           Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
           boxes[2].width >= 52 &&
           boxes[2].width <= 64 &&
+          Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
           rowLeftInset >= 6 &&
           rowRightInset >= 6 &&
           Math.abs(rowLeftInset - rowRightInset) <= 3
