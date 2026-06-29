@@ -18,10 +18,6 @@ import { getEdgeRenderData } from './lib/edgeRenderData';
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
 const EMPTY_SELECTED_NODE_IDS = new Set();
-const EDGE_SELECTION_UNDERLAY_COLORS = {
-  light: '#93C5FD',
-  dark: '#38BDF8',
-};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -116,23 +112,33 @@ const CAPTION_MAX_LINES = 3;
 
 const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
 
+const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const getSelectedEdgeStrokeWidth = edgeWidth =>
+  Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
+
+const getEdgeLabelFontSize = edgeWidth =>
+  clampNumber(edgeWidth * 2.5 + 10, 12, 22);
+
 const getArrowMarkerMetrics = edgeWidth => {
-  const scale = Math.max(0.82, Math.min(1.45, edgeWidth / 2.2));
+  const effectiveWidth = Math.max(1, Number(edgeWidth) || 2.2);
   const round = value => Number(value.toFixed(2));
-  const markerWidth = round(12 * scale);
-  const markerHeight = round(12 * scale);
-  const refX = round(10 * scale);
-  const refY = round(6 * scale);
-  const baseX = round(1 * scale);
-  const topY = round(1.5 * scale);
-  const bottomY = round(10.5 * scale);
+  const markerWidth = round(clampNumber(effectiveWidth * 4.2 + 5, 11, 34));
+  const markerHeight = round(clampNumber(effectiveWidth * 3.2 + 5, 9, 28));
+  const refX = markerWidth;
+  const refY = round(markerHeight / 2);
+  const baseX = round(Math.max(1, effectiveWidth * 0.42));
+  const notchX = round(Math.max(baseX + 1, effectiveWidth * 1.55));
+  const wing = round(markerHeight * 0.36);
+  const topY = round(refY - wing);
+  const bottomY = round(refY + wing);
 
   return {
     markerWidth,
     markerHeight,
     refX,
     refY,
-    pathD: `M${baseX},${topY} L${baseX},${bottomY} L${refX},${refY} z`,
+    pathD: `M${baseX},${topY} L${refX},${refY} L${baseX},${bottomY} L${notchX},${refY} z`,
   };
 };
 
@@ -145,17 +151,18 @@ const hashMarkerColor = color => {
   return (hash >>> 0).toString(36);
 };
 
-const getArrowMarkerId = color => {
+const getArrowMarkerId = (color, edgeWidth) => {
   const normalizedColor = String(color).trim().toLowerCase();
+  const widthKey = String(Math.round((Number(edgeWidth) || 0) * 10));
   const hexMatch = normalizedColor.match(/^#([0-9a-f]{3,8})$/);
-  if (hexMatch) return `graphstudio-arrow-${hexMatch[1]}`;
+  if (hexMatch) return `graphstudio-arrow-${hexMatch[1]}-${widthKey}`;
 
   const safeColor =
     normalizedColor
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 24) || 'color';
-  return `graphstudio-arrow-${safeColor}-${hashMarkerColor(normalizedColor)}`;
+  return `graphstudio-arrow-${safeColor}-${hashMarkerColor(normalizedColor)}-${widthKey}`;
 };
 
 const truncateLegendText = (value, maxLength = 34) => {
@@ -806,7 +813,6 @@ const GraphCanvas = ({
   onViewportSizeChange,
   isExporting = false,
 }) => {
-  const { theme } = useTheme();
   const svgRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragRect, setDragRect] = useState(null);
@@ -818,6 +824,10 @@ const GraphCanvas = ({
     graph.nodes.forEach(node => map.set(String(node.id), node));
     return map;
   }, [graph.nodes]);
+  const edgeLabelSize = useMemo(
+    () => getEdgeLabelFontSize(edgeWidth),
+    [edgeWidth]
+  );
   const edgeRenderData = useMemo(() => {
     return getEdgeRenderData({
       edges: graph.edges,
@@ -826,6 +836,7 @@ const GraphCanvas = ({
       edgeRouting,
       edgeCurvature,
       nodeRadius,
+      edgeLabelSize,
     });
   }, [
     graph.edges,
@@ -834,6 +845,7 @@ const GraphCanvas = ({
     edgeRouting,
     edgeCurvature,
     nodeRadius,
+    edgeLabelSize,
   ]);
   const effectiveSelectedObject = isExporting ? null : selectedObject;
   const effectiveSelectedNodeIds = isExporting
@@ -848,31 +860,33 @@ const GraphCanvas = ({
           effectiveSelectedObject?.type === 'edge' &&
           String(effectiveSelectedObject.id) === String(edge.id);
         const strokeColor = getEffectiveEdgeColor(edge);
-        const selectionUnderlayColor =
-          EDGE_SELECTION_UNDERLAY_COLORS[theme] ??
-          EDGE_SELECTION_UNDERLAY_COLORS.light;
+        const strokeWidth = selected
+          ? getSelectedEdgeStrokeWidth(edgeWidth)
+          : edgeWidth;
         return {
           ...renderData,
           selected,
           multiSelected: false,
           strokeColor,
-          selectionUnderlayColor,
-          markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
+          strokeWidth,
+          markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor, strokeWidth)}`,
         };
       }),
-    [edgeRenderData, effectiveSelectedObject, svgResourcePrefix, theme]
+    [edgeRenderData, effectiveSelectedObject, svgResourcePrefix, edgeWidth]
   );
   const arrowMarkers = useMemo(() => {
     const markers = new Map();
-    edgeVisualData.forEach(({ edge, markerId, strokeColor }) => {
-      if (edge.directed) markers.set(markerId, strokeColor);
+    edgeVisualData.forEach(({ edge, markerId, strokeColor, strokeWidth }) => {
+      if (edge.directed) {
+        markers.set(markerId, {
+          color: strokeColor,
+          metrics: getArrowMarkerMetrics(strokeWidth),
+          strokeWidth,
+        });
+      }
     });
-    return Array.from(markers, ([id, color]) => ({ id, color }));
+    return Array.from(markers, ([id, marker]) => ({ id, ...marker }));
   }, [edgeVisualData]);
-  const arrowMarkerMetrics = useMemo(
-    () => getArrowMarkerMetrics(edgeWidth),
-    [edgeWidth]
-  );
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   useEffect(() => {
     const el = svgRef.current;
@@ -1208,20 +1222,27 @@ const GraphCanvas = ({
           >
             <circle cx="1.2" cy="1.2" r="1.2" fill="#e2e2e2" />
           </pattern>
-          {arrowMarkers.map(({ id, color }) => (
+          {arrowMarkers.map(({ id, color, metrics, strokeWidth }) => (
             <marker
               key={id}
               id={id}
               data-edge-color={color}
-              markerWidth={arrowMarkerMetrics.markerWidth}
-              markerHeight={arrowMarkerMetrics.markerHeight}
-              refX={arrowMarkerMetrics.refX}
-              refY={arrowMarkerMetrics.refY}
+              data-edge-width={strokeWidth}
+              markerWidth={metrics.markerWidth}
+              markerHeight={metrics.markerHeight}
+              refX={metrics.refX}
+              refY={metrics.refY}
               orient="auto"
               markerUnits="userSpaceOnUse"
-              viewBox={`0 0 ${arrowMarkerMetrics.markerWidth} ${arrowMarkerMetrics.markerHeight}`}
+              viewBox={`0 0 ${metrics.markerWidth} ${metrics.markerHeight}`}
             >
-              <path d={arrowMarkerMetrics.pathD} fill={color} />
+              <path
+                d={metrics.pathD}
+                fill={color}
+                stroke={color}
+                strokeLinejoin="round"
+                strokeWidth="0.6"
+              />
             </marker>
           ))}
           <filter
@@ -1268,24 +1289,23 @@ const GraphCanvas = ({
                 selected,
                 multiSelected,
                 strokeColor,
-                selectionUnderlayColor,
                 markerId,
+                strokeWidth,
               }) => {
                 const endpointMoved =
                   diff.changedNodes.has(String(edge.from)) ||
                   diff.changedNodes.has(String(edge.to));
-                const strokeWidth = edgeWidth;
                 return (
                   <GraphEdge
                     key={edge.id}
                     edge={edge}
                     pathD={pathD}
                     strokeColor={strokeColor}
-                    selectionUnderlayColor={selectionUnderlayColor}
                     selected={selected}
                     multiSelected={multiSelected}
                     markerId={markerId}
                     labelPosition={labelPosition}
+                    labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}
                     layoutIdPrefix={layoutIdPrefix}
                     shouldAnimate={

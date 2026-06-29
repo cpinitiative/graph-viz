@@ -101,6 +101,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     centerViewOnContent,
     zoomIn,
     zoomOut,
+    setZoomPercent,
     zoomPercent,
   } = useGraphStudioView({
     initialNodes: seedTimeline.baseGraph.nodes,
@@ -441,6 +442,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       zoomPercent,
       onZoomIn: zoomIn,
       onZoomOut: zoomOut,
+      onZoomCommit: setZoomPercent,
     },
     canvas: {
       graph: computedGraph,

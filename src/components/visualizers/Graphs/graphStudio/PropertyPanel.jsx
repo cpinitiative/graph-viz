@@ -31,7 +31,7 @@ const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const TOOLTIP_WIDTH = 192;
+const TOOLTIP_WIDTH = 176;
 const TOOLTIP_ESTIMATED_HEIGHT = 64;
 const TOOLTIP_GUTTER = 12;
 const TOOLTIP_OFFSET = 6;
@@ -77,16 +77,36 @@ const InfoHelp = ({ label, text }) => {
     const bounds = buttonRef.current?.getBoundingClientRect();
     if (!bounds) return;
 
-    const rightOpeningLeft = bounds.left;
-    const leftOpeningLeft = bounds.right - TOOLTIP_WIDTH;
-    const maxLeft = Math.max(
+    const panelBounds = buttonRef.current
+      ?.closest('[data-testid="property-panel"]')
+      ?.getBoundingClientRect();
+    const viewportMinLeft = TOOLTIP_GUTTER;
+    const viewportMaxLeft = Math.max(
       TOOLTIP_GUTTER,
       window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_GUTTER
     );
-    const left =
-      rightOpeningLeft + TOOLTIP_WIDTH <= window.innerWidth - TOOLTIP_GUTTER
-        ? rightOpeningLeft
-        : Math.min(maxLeft, Math.max(TOOLTIP_GUTTER, leftOpeningLeft));
+    const panelMinLeft = panelBounds
+      ? Math.max(viewportMinLeft, panelBounds.left + TOOLTIP_GUTTER)
+      : viewportMinLeft;
+    const panelMaxLeft = panelBounds
+      ? Math.min(
+          viewportMaxLeft,
+          panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
+        )
+      : viewportMaxLeft;
+    const preferredLeft = bounds.left - TOOLTIP_WIDTH + bounds.width;
+    const fallbackLeft = panelBounds
+      ? panelBounds.right - TOOLTIP_WIDTH
+      : viewportMaxLeft;
+    const left = Math.min(
+      viewportMaxLeft,
+      Math.max(
+        viewportMinLeft,
+        panelMaxLeft >= panelMinLeft
+          ? Math.min(panelMaxLeft, Math.max(panelMinLeft, preferredLeft))
+          : Math.min(fallbackLeft, viewportMaxLeft)
+      )
+    );
     const belowTop = bounds.bottom + TOOLTIP_OFFSET;
     const aboveTop = bounds.top - TOOLTIP_ESTIMATED_HEIGHT - TOOLTIP_OFFSET;
     const top =
@@ -120,7 +140,7 @@ const InfoHelp = ({ label, text }) => {
       {tooltipPosition && (
         <span
           role="tooltip"
-          className="pointer-events-none fixed z-50 w-48 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          className="pointer-events-none fixed z-50 w-44 whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
           data-testid="inspector-info-tooltip"
           style={{
             left: `${tooltipPosition.left}px`,
@@ -227,19 +247,78 @@ const RangeControl = ({
   help,
 }) => {
   const labelId = useId();
+  const [draftValue, setDraftValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : String(value);
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const numericStep = Number(step);
+  const decimalPlaces = String(step).includes('.')
+    ? String(step).split('.')[1].length
+    : 0;
+
+  const normalizeValue = rawValue => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
+    if (!Number.isFinite(numericStep) || numericStep <= 0) {
+      return Number(clamped.toFixed(decimalPlaces));
+    }
+    const stepped =
+      numericMin +
+      Math.round((clamped - numericMin) / numericStep) * numericStep;
+    return Number(
+      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
+    );
+  };
+
+  const commitDraftValue = () => {
+    const nextValue = normalizeValue(displayValue);
+    if (nextValue === null) {
+      setDraftValue('');
+      setIsEditing(false);
+      return;
+    }
+    setDraftValue('');
+    setIsEditing(false);
+    onChange(nextValue);
+  };
 
   return (
     <div className="block space-y-1.5">
-      <div className="flex justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2">
           <span id={labelId} className={fieldLabelClass}>
             {label}
           </span>
           {help}
         </span>
-        <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
-          {value}
-        </span>
+        <input
+          aria-label={`${label} value`}
+          className="h-8 w-[70px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 text-right font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+          disabled={disabled}
+          inputMode="decimal"
+          onBlur={commitDraftValue}
+          onChange={event => {
+            setIsEditing(true);
+            setDraftValue(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraftValue(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              setDraftValue('');
+              setIsEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
       </div>
       <input
         type="range"
@@ -485,7 +564,7 @@ const GlobalSettingsPanel = ({
             help={
               <InfoHelp
                 label="Curve Amount help"
-                text="Only works when Edge Routing is Curved."
+                text="Only affects Curved routing."
               />
             }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}

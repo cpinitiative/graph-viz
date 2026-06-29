@@ -15,7 +15,22 @@ const EDITOR_RING_COLORS = {
   },
 };
 
-const getNodePalette = node => {
+const getNodePalette = (node, theme) => {
+  if (theme === 'dark') {
+    if (node?.color) {
+      return { fill: node.color, stroke: '#E2E8F0', text: '#0F172A' };
+    }
+    const status = String(node?.status ?? 'default').toLowerCase();
+    const darkPalettes = {
+      default: { fill: '#FFFFFF', stroke: '#CBD5E1', text: '#0F172A' },
+      active: { fill: '#000000', stroke: '#E2E8F0', text: '#FFFFFF' },
+      queued: { fill: '#EEEEEE', stroke: '#CBD5E1', text: '#0F172A' },
+      visited: { fill: '#E2E8F0', stroke: '#CBD5E1', text: '#0F172A' },
+      discarded: { fill: '#FFFFFF', stroke: '#94A3B8', text: '#64748B' },
+    };
+    return darkPalettes[status] ?? darkPalettes.default;
+  }
+
   if (node?.color) {
     return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
   }
@@ -38,11 +53,12 @@ const GraphNode = ({
   nodeRadius = NODE_RADIUS,
 }) => {
   const { theme } = useTheme();
-  const palette = getNodePalette(node);
+  const palette = getNodePalette(node, theme);
   const ringColors = EDITOR_RING_COLORS[theme] ?? EDITOR_RING_COLORS.light;
   const selectionRingColor = selected
     ? ringColors.selected
     : ringColors.multiSelected;
+  const labelFontSize = Math.max(12, Math.min(28, nodeRadius * 0.55));
 
   return (
     <g
@@ -105,11 +121,11 @@ const GraphNode = ({
       )}
       <text
         x={node.x}
-        y={node.y + 4}
+        y={node.y + labelFontSize * 0.35}
         textAnchor="middle"
         fill={palette.text}
         style={{
-          fontSize: '12px',
+          fontSize: `${labelFontSize}px`,
           fontWeight: 600,
           userSelect: 'none',
           pointerEvents: 'none',

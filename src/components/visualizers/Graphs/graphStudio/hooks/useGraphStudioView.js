@@ -62,6 +62,27 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
 
   const zoomIn = useCallback(() => adjustZoom(1), [adjustZoom]);
   const zoomOut = useCallback(() => adjustZoom(-1), [adjustZoom]);
+  const setZoomPercent = useCallback(
+    percent => {
+      if (lockCanvas) return;
+      const nextZoom = clamp(Number(percent) / 100, 0.05, 2.6);
+      if (!Number.isFinite(nextZoom)) return;
+      setViewState(prev => {
+        const { width, height } = viewportSizeRef.current;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const worldCenterX = (centerX - prev.x) / prev.zoom;
+        const worldCenterY = (centerY - prev.y) / prev.zoom;
+        return {
+          ...prev,
+          zoom: nextZoom,
+          x: centerX - worldCenterX * nextZoom,
+          y: centerY - worldCenterY * nextZoom,
+        };
+      });
+    },
+    [lockCanvas]
+  );
 
   return {
     viewState,
@@ -75,6 +96,7 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     centerViewOnContent,
     zoomIn,
     zoomOut,
+    setZoomPercent,
     zoomPercent: Math.round(viewState.zoom * 100),
   };
 };

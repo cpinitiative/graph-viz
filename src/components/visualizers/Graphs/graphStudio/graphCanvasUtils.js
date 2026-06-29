@@ -171,10 +171,10 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
   return Math.sqrt(diffX * diffX + diffY * diffY);
 };
 
-export const measureLabelRect = (point, labelText) => {
+export const measureLabelRect = (point, labelText, fontSize = 12) => {
   const text = String(labelText ?? '');
-  const width = Math.max(22, text.length * 6.9 + 10);
-  const height = 15;
+  const width = Math.max(22, text.length * fontSize * 0.58 + fontSize * 0.9);
+  const height = fontSize + 8;
   return {
     left: point.x - width / 2,
     right: point.x + width / 2,
@@ -206,6 +206,7 @@ export const scoreLabelCandidate = ({
   segmentsById,
   placedLabelRects,
   nodeRadius,
+  labelFontSize = 12,
 }) => {
   let score = 0;
   if (labelIndex === 0) score += 5;
@@ -216,7 +217,7 @@ export const scoreLabelCandidate = ({
   if (candidate.y < margin) score -= (margin - candidate.y) * 8;
   if (candidate.y > VIEWBOX_HEIGHT - margin)
     score -= (candidate.y - (VIEWBOX_HEIGHT - margin)) * 8;
-  const rect = measureLabelRect(candidate, labelText);
+  const rect = measureLabelRect(candidate, labelText, labelFontSize);
   placedLabelRects.forEach(placedRect => {
     const overlap = rectOverlapArea(rect, placedRect);
     if (overlap > 0) score -= 900 + overlap * 2.2;
@@ -256,6 +257,7 @@ export const chooseBestLabelPosition = ({
   segmentsById,
   placedLabelRects,
   nodeRadius,
+  labelFontSize = 12,
 }) => {
   if (!Array.isArray(labelOptions) || !labelOptions.length) return null;
   let best = labelOptions[0];
@@ -270,6 +272,7 @@ export const chooseBestLabelPosition = ({
       segmentsById,
       placedLabelRects,
       nodeRadius,
+      labelFontSize,
     });
     if (score > bestScore) {
       bestScore = score;

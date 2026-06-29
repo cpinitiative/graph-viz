@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   CUSTOM_LEGEND_POSITION_LABELS,
   CUSTOM_LEGEND_POSITIONS,
@@ -97,6 +98,56 @@ const ToggleRow = ({ label, checked, onChange }) => (
   </label>
 );
 
+const ZoomValueInput = ({ value, disabled, onCommit }) => {
+  const [draft, setDraft] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draft : String(value);
+
+  const reset = () => {
+    setDraft('');
+    setIsEditing(false);
+  };
+  const commit = () => {
+    const parsed = Number(displayValue);
+    if (!Number.isFinite(parsed)) {
+      reset();
+      return;
+    }
+    const nextValue = Math.round(Math.max(5, Math.min(260, parsed)));
+    setDraft('');
+    setIsEditing(false);
+    onCommit?.(nextValue);
+  };
+
+  return (
+    <input
+      aria-label="Zoom percent"
+      className="h-8 w-[58px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-center font-mono text-xs font-semibold tabular-nums text-[#334155] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]"
+      disabled={disabled}
+      inputMode="numeric"
+      onBlur={commit}
+      onChange={event => {
+        setIsEditing(true);
+        setDraft(event.target.value);
+      }}
+      onFocus={() => {
+        setIsEditing(true);
+        setDraft(String(value));
+      }}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        } else if (event.key === 'Escape') {
+          reset();
+          event.currentTarget.blur();
+        }
+      }}
+      type="text"
+      value={displayValue}
+    />
+  );
+};
+
 const ZoomOutIcon = () => (
   <svg
     width="16"
@@ -154,6 +205,7 @@ const LeftSidebar = ({
   zoomPercent,
   onZoomIn,
   onZoomOut,
+  onZoomCommit,
 }) => {
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
@@ -271,9 +323,16 @@ const LeftSidebar = ({
             >
               <ZoomOutIcon />
             </IconButton>
-            <span className="w-10 text-center text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-              {zoomPercent}%
-            </span>
+            <div className="flex items-center gap-1">
+              <ZoomValueInput
+                disabled={lockCanvas}
+                value={zoomPercent}
+                onCommit={onZoomCommit}
+              />
+              <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
+                %
+              </span>
+            </div>
             <IconButton
               title="Zoom In"
               disabled={lockCanvas}
@@ -284,19 +343,6 @@ const LeftSidebar = ({
           </div>
         </div>
         <div className="space-y-2">
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]">
-              Edge Routing
-            </div>
-            <NativeSelect
-              value={routing}
-              aria-label="Edge routing"
-              onChange={event => setRouting(event.target.value)}
-            >
-              <option value="straight">Straight</option>
-              <option value="bezier">Curved</option>
-            </NativeSelect>
-          </div>
           <ToggleRow
             label="Dot Grid"
             checked={showGrid}
@@ -313,6 +359,18 @@ const LeftSidebar = ({
             onChange={setLockCanvas}
           />
         </div>
+      </SidebarSection>
+
+      <SidebarSection>
+        <SectionTitle>Edge Routing</SectionTitle>
+        <NativeSelect
+          value={routing}
+          aria-label="Edge routing"
+          onChange={event => setRouting(event.target.value)}
+        >
+          <option value="straight">Straight</option>
+          <option value="bezier">Curved</option>
+        </NativeSelect>
       </SidebarSection>
 
       <SidebarSection>

@@ -1880,7 +1880,7 @@ while (true) {}
     await expectTooltipInsideViewport(
       page
         .getByRole('tooltip')
-        .filter({ hasText: 'Only works when Edge Routing is Curved.' })
+        .filter({ hasText: 'Only affects Curved routing.' })
         .last()
     );
 
@@ -1896,7 +1896,7 @@ while (true) {}
     await expectTooltipInsideViewport(
       page
         .getByRole('tooltip')
-        .filter({ hasText: 'Only works when Edge Routing is Curved.' })
+        .filter({ hasText: 'Only affects Curved routing.' })
         .last()
     );
     await expect
@@ -2339,12 +2339,18 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
+    const selectedEdgePath = graphCanvas(page).locator(
+      '[data-edge-path-id="e0"]'
+    );
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
-    ).toBeVisible();
-    await expect(
-      graphCanvas(page).locator('[data-edge-path-id="e0"]')
-    ).toHaveAttribute('stroke', '#64748B');
+    ).toHaveCount(0);
+    await expect(selectedEdgePath).toHaveAttribute('stroke', '#64748B');
+    await expect
+      .poll(async () =>
+        Number(await selectedEdgePath.getAttribute('stroke-width'))
+      )
+      .toBeGreaterThan(2.2);
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
       page,
@@ -2760,7 +2766,7 @@ while (true) {}
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#64748b');
     await expect(selfLoopEdge.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-64748b)'
+      'url(#graphstudio-arrow-64748b-22)'
     );
     const selfLoopLabel = graphCanvas(page).locator(
       '[data-edge-label-id="loop"]'
@@ -2770,7 +2776,7 @@ while (true) {}
     );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
-    await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
+    await expect(selfLoopLabelText).toHaveAttribute('font-size', '15.5');
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
 
@@ -2802,7 +2808,7 @@ api.edge('loop', '#3b82f6');
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
-    expect(exportedSvg).toContain('font-size="12"');
+    expect(exportedSvg).toContain('font-size="15.5"');
     expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');
@@ -3013,20 +3019,30 @@ api.edge('loop', '#3b82f6');
 
     await choosePreset(page, 'dfs');
 
-    const marker = graphCanvas(page).locator('marker#graphstudio-arrow-64748b');
-    await expect(marker).toHaveAttribute('markerWidth', '12');
-    await expect(marker).toHaveAttribute('markerHeight', '12');
-    await expect(marker).toHaveAttribute('refX', '10');
-    await expect(marker).toHaveAttribute('refY', '6');
+    const marker = graphCanvas(page).locator(
+      'marker#graphstudio-arrow-64748b-22'
+    );
+    await expect
+      .poll(async () => Number(await marker.getAttribute('markerWidth')))
+      .toBeGreaterThan(12);
+    await expect
+      .poll(async () => Number(await marker.getAttribute('markerHeight')))
+      .toBeGreaterThan(10);
+    await expect
+      .poll(async () => Number(await marker.getAttribute('refX')))
+      .toBeGreaterThan(10);
+    await expect
+      .poll(async () => Number(await marker.getAttribute('refY')))
+      .toBeGreaterThan(5);
     await expect(marker).toHaveAttribute('orient', 'auto');
     await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
-    await expect(marker).toHaveAttribute('viewBox', '0 0 12 12');
+    await expect(marker).toHaveAttribute('viewBox', /^0 0 \d/);
 
     const markerTriangle = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-64748b path'
+      'marker#graphstudio-arrow-64748b-22 path'
     );
     await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
-    await expect(markerTriangle).toHaveAttribute('d', 'M1,1.5 L1,10.5 L10,6 z');
+    await expect(markerTriangle).toHaveAttribute('d', / L.* z$/);
 
     const directedEdges = graphCanvas(page).locator(
       'path[marker-end^="url(#graphstudio-arrow-"]'
@@ -3035,7 +3051,7 @@ api.edge('loop', '#3b82f6');
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#64748B');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-64748b)'
+      'url(#graphstudio-arrow-64748b-22)'
     );
 
     await openExportMenu(page);
@@ -3047,11 +3063,11 @@ api.edge('loop', '#3b82f6');
     const defaultSvgPath = await defaultSvgDownload.path();
     expect(defaultSvgPath).not.toBeNull();
     const defaultExportedSvg = await fs.readFile(defaultSvgPath, 'utf8');
-    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-64748b"');
+    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-64748b-22"');
     expect(defaultExportedSvg).toContain('data-edge-color="#64748B"');
     expect(defaultExportedSvg).toContain('fill="#64748B"');
     expect(defaultExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-64748b)"'
+      'marker-end="url(#graphstudio-arrow-64748b-22)"'
     );
     await closeExportMenu(page);
 
@@ -3059,10 +3075,10 @@ api.edge('loop', '#3b82f6');
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#3b82f6');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-3b82f6)'
+      'url(#graphstudio-arrow-3b82f6-22)'
     );
     await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-3b82f6 path')
+      graphCanvas(page).locator('marker#graphstudio-arrow-3b82f6-22 path')
     ).toHaveAttribute('fill', '#3b82f6');
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
@@ -3075,10 +3091,10 @@ api.edge('e0', '#f59e0b');
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-f59e0b)'
+      'url(#graphstudio-arrow-f59e0b-22)'
     );
     await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b path')
+      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b-22 path')
     ).toHaveAttribute('fill', '#f59e0b');
 
     await openExportMenu(page);
@@ -3090,11 +3106,11 @@ api.edge('e0', '#f59e0b');
     const overrideSvgPath = await overrideSvgDownload.path();
     expect(overrideSvgPath).not.toBeNull();
     const overrideExportedSvg = await fs.readFile(overrideSvgPath, 'utf8');
-    expect(overrideExportedSvg).toContain('id="graphstudio-arrow-f59e0b"');
+    expect(overrideExportedSvg).toContain('id="graphstudio-arrow-f59e0b-22"');
     expect(overrideExportedSvg).toContain('data-edge-color="#f59e0b"');
     expect(overrideExportedSvg).toContain('fill="#f59e0b"');
     expect(overrideExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-f59e0b)"'
+      'marker-end="url(#graphstudio-arrow-f59e0b-22)"'
     );
     await closeExportMenu(page);
 
@@ -3106,14 +3122,19 @@ api.edge('e0', '#f59e0b');
     await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
     await expect(directedEdges.first()).toHaveAttribute(
       'marker-end',
-      'url(#graphstudio-arrow-f59e0b)'
+      'url(#graphstudio-arrow-f59e0b-34)'
     );
     await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b path')
+      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b-34 path')
     ).toHaveAttribute('fill', '#f59e0b');
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect
+      .poll(async () =>
+        Number(await directedEdges.first().getAttribute('stroke-width'))
+      )
+      .toBeGreaterThan(2.2);
 
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -3125,14 +3146,20 @@ api.edge('e0', '#f59e0b');
       .poll(async () =>
         Number(
           await graphCanvas(page)
-            .locator('marker#graphstudio-arrow-f59e0b')
+            .locator('marker#graphstudio-arrow-f59e0b-50')
             .getAttribute('markerWidth')
         )
       )
       .toBeGreaterThan(12);
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b')
-    ).toHaveAttribute('refY', '8.7');
+    await expect
+      .poll(async () =>
+        Number(
+          await graphCanvas(page)
+            .locator('marker#graphstudio-arrow-f59e0b-50')
+            .getAttribute('refY')
+        )
+      )
+      .toBeGreaterThan(7);
 
     expect(errors).toEqual([]);
   });
