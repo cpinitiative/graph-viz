@@ -757,10 +757,14 @@ test.describe('Graph Studio desktop smoke', () => {
     await importMenu
       .getByRole('button', { name: 'Paste / Import Edge List' })
       .click();
-    await expect(page.getByText('Text-to-Graph Parser')).toBeVisible();
+    await expect(page.getByText('Import Edge List')).toBeVisible();
+    await expect(page.getByTestId('parser-modal')).toHaveAttribute(
+      'data-modal-frame',
+      'true'
+    );
     await page.locator('textarea').last().fill('3 3\n0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
-    await expect(page.getByText('Text-to-Graph Parser')).toBeHidden();
+    await expect(page.getByText('Import Edge List')).toBeHidden();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
@@ -770,9 +774,16 @@ test.describe('Graph Studio desktop smoke', () => {
     await choosePreset(page, 'bfs');
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
+    await expect(page.getByTestId('script-modal')).toHaveAttribute(
+      'data-modal-frame',
+      'true'
+    );
     await expect(
       page.getByText(/Script Mode executes local JavaScript/)
     ).toBeVisible();
+    await expect(
+      page.getByLabel('Load script example').locator('option[value=""]')
+    ).toHaveText('Load script example...');
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
@@ -1055,6 +1066,19 @@ while (true) {}
       .poll(async () => frameCounter.textContent(), { timeout: 3000 })
       .not.toBe(`1 / ${initialFrameCount + 3}`);
     await page.getByRole('button', { name: 'Pause timeline' }).click();
+    await cards.last().click();
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          page.getByRole('button', { name: 'Play timeline' }).isVisible(),
+        { timeout: 4000 }
+      )
+      .toBe(true);
+    await expect(page.getByText('Playback complete')).toHaveCount(0);
 
     await openExportMenu(page);
     await expectExportPreview(page);
@@ -1485,6 +1509,9 @@ while (true) {}
     const editor = page.locator('[data-testid="script-modal"] textarea');
 
     await expect(exampleSelect).toBeVisible();
+    await expect(exampleSelect.locator('option[value=""]')).toHaveText(
+      'Load script example...'
+    );
     const scriptExamples = [
       ['bfs', /Breadth-first search/],
       ['dfs', /Depth-first search/],
@@ -2178,6 +2205,8 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
 
     const importMenu = await openImportMenu(page);
+    await expect(importMenu).toHaveAttribute('data-modal-frame', 'true');
+    await expect(importMenu.locator('[data-modal-shell="true"]')).toBeVisible();
     await expect(
       importMenu.getByRole('heading', { name: 'Import' })
     ).toBeVisible();
@@ -2197,6 +2226,8 @@ while (true) {}
     await expect(importMenu).toBeHidden();
 
     const exportMenu = await openExportMenu(page);
+    await expect(exportMenu).toHaveAttribute('data-modal-frame', 'true');
+    await expect(exportMenu.locator('[data-modal-shell="true"]')).toBeVisible();
     await expect(
       exportMenu.getByRole('heading', { name: 'Export' })
     ).toBeVisible();
