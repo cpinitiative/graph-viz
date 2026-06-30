@@ -126,6 +126,7 @@ export const getEdgeRenderData = ({
   edgeRouting,
   edgeCurvature,
   nodeRadius,
+  edgeLabelSize = 12,
 }) => {
   const visibleEdges = edges.filter(edge => edge.visible !== false);
   const segmentsById = new Map();
@@ -171,14 +172,23 @@ export const getEdgeRenderData = ({
             segmentsById,
             placedLabelRects,
             nodeRadius,
+            labelFontSize: edgeLabelSize,
           })
         : null;
 
       if (labelPosition && labelText) {
-        placedLabelRects.push(measureLabelRect(labelPosition, labelText));
+        placedLabelRects.push(
+          measureLabelRect(labelPosition, labelText, edgeLabelSize)
+        );
       }
 
-      return { edge, pathD: geometry.d, labelPosition };
+      return {
+        edge,
+        pathD: geometry.d,
+        pathType: geometry.pathType,
+        pathPoints: geometry.pathPoints,
+        labelPosition,
+      };
     })
     .filter(Boolean);
 };

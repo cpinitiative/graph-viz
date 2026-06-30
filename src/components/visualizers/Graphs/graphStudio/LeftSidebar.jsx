@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   CUSTOM_LEGEND_POSITION_LABELS,
   CUSTOM_LEGEND_POSITIONS,
@@ -35,9 +36,9 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const iconButtonClass =
-  'flex min-h-[36px] min-w-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:min-w-8 md:p-1.5';
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
-  'flex min-h-[36px] items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] md:min-h-8 md:py-1.5';
+  'flex h-8 min-w-0 items-center justify-center whitespace-nowrap rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 text-[11px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
@@ -97,6 +98,73 @@ const ToggleRow = ({ label, checked, onChange }) => (
   </label>
 );
 
+const ZoomValueInput = ({ value, disabled, onCommit }) => {
+  const [draft, setDraft] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draft : String(value);
+
+  const reset = () => {
+    setDraft('');
+    setIsEditing(false);
+  };
+  const commit = () => {
+    const parsed = Number(displayValue);
+    if (!Number.isFinite(parsed)) {
+      reset();
+      return;
+    }
+    const nextValue = Math.round(Math.max(5, Math.min(260, parsed)));
+    setDraft('');
+    setIsEditing(false);
+    onCommit?.(nextValue);
+  };
+
+  return (
+    <span
+      className={joinClasses(
+        'box-border flex h-8 w-full min-w-0 items-center justify-center overflow-hidden rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-[#334155] transition-colors focus-within:border-[#0F2747] focus-within:ring-1 focus-within:ring-[#0F2747] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus-within:border-[#60A5FA] dark:focus-within:ring-[#60A5FA]',
+        disabled &&
+          'bg-[#F8F9FA] text-[#94A3B8] dark:bg-[#111827] dark:text-[#64748B]'
+      )}
+      data-testid="zoom-percent-field"
+    >
+      <span
+        className="inline-grid grid-cols-[3ch_auto] items-baseline justify-center gap-0.5 font-mono text-xs font-semibold tabular-nums leading-none text-inherit"
+        data-testid="zoom-percent-unit"
+      >
+        <input
+          aria-label="Zoom percent"
+          className="w-[3ch] bg-transparent text-right font-mono text-xs font-semibold tabular-nums leading-none text-inherit focus:outline-none disabled:cursor-not-allowed"
+          disabled={disabled}
+          inputMode="numeric"
+          onBlur={commit}
+          onChange={event => {
+            setIsEditing(true);
+            setDraft(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraft(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              reset();
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
+        <span aria-hidden="true" className="text-inherit">
+          %
+        </span>
+      </span>
+    </span>
+  );
+};
+
 const ZoomOutIcon = () => (
   <svg
     width="16"
@@ -154,20 +222,15 @@ const LeftSidebar = ({
   zoomPercent,
   onZoomIn,
   onZoomOut,
+  onZoomCommit,
 }) => {
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
       ? `Source node ${drawFrom} selected. Click a target node.`
       : 'Click a source node, then a target node.';
-  const legendEntries = Array.isArray(customLegend.entries)
-    ? customLegend.entries
-    : [];
   const legendPosition = CUSTOM_LEGEND_POSITIONS.includes(customLegend.position)
     ? customLegend.position
     : DEFAULT_CUSTOM_LEGEND.position;
-  const legendSummary = `${legendEntries.length} ${
-    legendEntries.length === 1 ? 'entry' : 'entries'
-  } · ${CUSTOM_LEGEND_POSITION_LABELS[legendPosition] ?? 'Auto'}`;
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -178,7 +241,7 @@ const LeftSidebar = ({
 
   return (
     <div
-      className="flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
+      className="graphstudio-scroll-panel flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
       data-testid="left-sidebar"
     >
       <SidebarSection>
@@ -225,7 +288,7 @@ const LeftSidebar = ({
             event.target.value = '';
           }}
         >
-          <option value="">Choose preset...</option>
+          <option value="">Load preset...</option>
           {PRESET_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -251,7 +314,10 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
-        <div className="flex items-center justify-between gap-1.5 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 dark:border-[#475569] dark:bg-[#111827]">
+        <div
+          className="grid grid-cols-[minmax(64px,1fr)_32px_54px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1.5 dark:border-[#475569] dark:bg-[#111827]"
+          data-testid="view-canvas-zoom-row"
+        >
           <button
             type="button"
             className={fitViewButtonClass}
@@ -263,40 +329,23 @@ const LeftSidebar = ({
           >
             Fit View
           </button>
-          <div className="flex items-center gap-2">
-            <IconButton
-              title="Zoom Out"
-              disabled={lockCanvas}
-              onClick={onZoomOut}
-            >
-              <ZoomOutIcon />
-            </IconButton>
-            <span className="w-10 text-center text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-              {zoomPercent}%
-            </span>
-            <IconButton
-              title="Zoom In"
-              disabled={lockCanvas}
-              onClick={onZoomIn}
-            >
-              <ZoomInIcon />
-            </IconButton>
-          </div>
+          <IconButton
+            title="Zoom Out"
+            disabled={lockCanvas}
+            onClick={onZoomOut}
+          >
+            <ZoomOutIcon />
+          </IconButton>
+          <ZoomValueInput
+            disabled={lockCanvas}
+            value={zoomPercent}
+            onCommit={onZoomCommit}
+          />
+          <IconButton title="Zoom In" disabled={lockCanvas} onClick={onZoomIn}>
+            <ZoomInIcon />
+          </IconButton>
         </div>
         <div className="space-y-2">
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]">
-              Edge Routing
-            </div>
-            <NativeSelect
-              value={routing}
-              aria-label="Edge routing"
-              onChange={event => setRouting(event.target.value)}
-            >
-              <option value="straight">Straight</option>
-              <option value="bezier">Curved</option>
-            </NativeSelect>
-          </div>
           <ToggleRow
             label="Dot Grid"
             checked={showGrid}
@@ -316,29 +365,33 @@ const LeftSidebar = ({
       </SidebarSection>
 
       <SidebarSection>
+        <SectionTitle>Edge Routing</SectionTitle>
+        <NativeSelect
+          value={routing}
+          aria-label="Edge routing"
+          onChange={event => setRouting(event.target.value)}
+        >
+          <option value="straight">Straight</option>
+          <option value="bezier">Curved</option>
+        </NativeSelect>
+      </SidebarSection>
+
+      <SidebarSection>
         <SectionTitle>Legend</SectionTitle>
         <div className="space-y-2.5" data-testid="custom-legend-controls">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
-                <input
-                  type="checkbox"
-                  aria-label="Legend"
-                  checked={Boolean(customLegend.enabled)}
-                  onChange={event =>
-                    patchCustomLegend({ enabled: event.target.checked })
-                  }
-                  className={checkboxClass}
-                />
-                <span>Show legend</span>
-              </label>
-              <div
-                className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]"
-                data-testid="custom-legend-summary"
-              >
-                {legendSummary}
-              </div>
-            </div>
+          <div className="flex min-h-10 items-center justify-between gap-3 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
+            <label className="flex min-w-0 cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
+              <input
+                type="checkbox"
+                aria-label="Legend"
+                checked={Boolean(customLegend.enabled)}
+                onChange={event =>
+                  patchCustomLegend({ enabled: event.target.checked })
+                }
+                className={checkboxClass}
+              />
+              <span className="whitespace-nowrap">Show legend</span>
+            </label>
             <button
               type="button"
               aria-haspopup="dialog"
@@ -346,7 +399,7 @@ const LeftSidebar = ({
               aria-controls="custom-legend-editor"
               data-testid="custom-legend-edit-toggle"
               onClick={onOpenLegendEditor}
-              className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 text-[10px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]"
+              className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]"
             >
               Edit
             </button>

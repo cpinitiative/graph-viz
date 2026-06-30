@@ -69,6 +69,16 @@ const transformBounds = (element, matrix) => {
   };
 };
 
+const getUntransformedBounds = element => {
+  const box = element.getBBox();
+  return {
+    minX: box.x,
+    minY: box.y,
+    maxX: box.x + box.width,
+    maxY: box.y + box.height,
+  };
+};
+
 const combineBounds = boundsList => ({
   minX: Math.min(...boundsList.map(bounds => bounds.minX)),
   minY: Math.min(...boundsList.map(bounds => bounds.minY)),
@@ -126,15 +136,28 @@ const expandViewportToAspectRatio = ({ width, height }, aspectRatio) => {
   };
 };
 
-export const getFitContentViewBox = ({ svgEl, aspectRatio }) => {
-  const exportElements = [
-    svgEl.querySelector('[data-export-content="true"]'),
+export const getFitContentViewBox = ({
+  svgEl,
+  aspectRatio,
+  normalizeGraphTransform = false,
+}) => {
+  const graphContent = svgEl.querySelector('[data-export-content="true"]');
+  const overlayElements = [
     svgEl.querySelector('[data-testid="custom-export-legend"]'),
     svgEl.querySelector('[data-testid="frame-caption-overlay"]'),
   ].filter(Boolean);
+  const exportElements = [
+    ...(graphContent ? [{ element: graphContent, isGraphContent: true }] : []),
+    ...overlayElements.map(element => ({ element, isGraphContent: false })),
+  ];
 
-  const boundsList = exportElements.flatMap(element => {
+  const boundsList = exportElements.flatMap(({ element, isGraphContent }) => {
     try {
+      if (normalizeGraphTransform && isGraphContent) {
+        const bounds = getUntransformedBounds(element);
+        const values = Object.values(bounds);
+        return values.every(Number.isFinite) ? [bounds] : [];
+      }
       const matrix = element.getCTM();
       if (!matrix) return [];
       const bounds = transformBounds(element, matrix);
@@ -170,10 +193,16 @@ export const serializeSvgElement = ({
   const outputAspectRatio = width / height;
   const isFitFraming =
     framingMode === IMAGE_FRAMING.fit || framingMode === IMAGE_FRAMING.slide;
+  if (isFitFraming) {
+    exportSvg
+      .querySelector('[data-graph-view-transform="true"]')
+      ?.setAttribute('transform', 'translate(0 0) scale(1)');
+  }
   const fitViewBox = isFitFraming
     ? getFitContentViewBox({
         svgEl,
         aspectRatio: outputAspectRatio,
+        normalizeGraphTransform: true,
       })
     : null;
   const finalViewBox =

@@ -4,6 +4,14 @@ import {
   normalizeCaptionOverlay,
 } from './captionOverlay';
 import { DEFAULT_CUSTOM_LEGEND, normalizeCustomLegend } from './customLegend';
+import {
+  DEFAULT_EDGE_WIDTH,
+  DEFAULT_NODE_SIZE,
+  EDGE_LABEL_FONT_SIZE_RANGE,
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  NODE_LABEL_FONT_SIZE_RANGE,
+} from './fontSizing';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
@@ -25,8 +33,10 @@ const DEFAULT_SETTINGS = {
   globalSettings: {
     forceStrength: 1,
     edgeCurvature: 46,
-    nodeSize: 22,
-    edgeWidth: 2.2,
+    nodeSize: DEFAULT_NODE_SIZE,
+    nodeLabelFontSize: getDefaultNodeLabelFontSize(DEFAULT_NODE_SIZE),
+    edgeWidth: DEFAULT_EDGE_WIDTH,
+    edgeLabelFontSize: getDefaultEdgeLabelFontSize(DEFAULT_EDGE_WIDTH),
   },
 };
 
@@ -97,7 +107,11 @@ const sanitizeOverrideMap = (value, validIds, label) => {
 const sanitizeStep = (step, index, nodeIds, edgeIds) => {
   if (!isRecord(step))
     throw new Error(`Timeline step ${index + 1} must be an object`);
-  return {
+  const captionVisible =
+    typeof step.captionVisible === 'boolean'
+      ? step.captionVisible
+      : step.showCaption;
+  const sanitized = {
     ...cloneJson(step),
     id: String(step.id ?? `step-${index}`),
     description: String(step.description ?? `Step ${index + 1}`),
@@ -115,6 +129,13 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
       `Timeline step ${index + 1} edgeOverrides`
     ),
   };
+  delete sanitized.showCaption;
+  if (typeof captionVisible === 'boolean') {
+    sanitized.captionVisible = captionVisible;
+  } else {
+    delete sanitized.captionVisible;
+  }
+  return sanitized;
 };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -184,14 +205,45 @@ const sanitizeSettings = settings => {
         12,
         44
       ),
+      nodeLabelFontSize: numberOrDefault(
+        globalInput.nodeLabelFontSize,
+        getDefaultNodeLabelFontSize(
+          globalInput.nodeSize ?? DEFAULT_SETTINGS.globalSettings.nodeSize
+        ),
+        NODE_LABEL_FONT_SIZE_RANGE.min,
+        NODE_LABEL_FONT_SIZE_RANGE.max
+      ),
       edgeWidth: numberOrDefault(
         globalInput.edgeWidth,
         DEFAULT_SETTINGS.globalSettings.edgeWidth,
         1,
         8
       ),
+      edgeLabelFontSize: numberOrDefault(
+        globalInput.edgeLabelFontSize,
+        getDefaultEdgeLabelFontSize(
+          globalInput.edgeWidth ?? DEFAULT_SETTINGS.globalSettings.edgeWidth
+        ),
+        EDGE_LABEL_FONT_SIZE_RANGE.min,
+        EDGE_LABEL_FONT_SIZE_RANGE.max
+      ),
     },
   };
+};
+
+const normalizeStepForExport = step => {
+  const cloned = isRecord(step) ? cloneJson(step) : {};
+  const captionVisible =
+    typeof cloned.captionVisible === 'boolean'
+      ? cloned.captionVisible
+      : cloned.showCaption;
+  delete cloned.showCaption;
+  if (typeof captionVisible === 'boolean') {
+    cloned.captionVisible = captionVisible;
+  } else {
+    delete cloned.captionVisible;
+  }
+  return cloned;
 };
 
 export const exportProjectJson = ({
@@ -208,7 +260,7 @@ export const exportProjectJson = ({
     edges: cloneJson(baseGraph?.edges ?? []),
   },
   timeline: {
-    steps: cloneJson(steps ?? []),
+    steps: (Array.isArray(steps) ? steps : []).map(normalizeStepForExport),
     currentFrame: Number.isInteger(currentFrame) ? currentFrame : 0,
   },
   settings: cloneJson(settings ?? {}),

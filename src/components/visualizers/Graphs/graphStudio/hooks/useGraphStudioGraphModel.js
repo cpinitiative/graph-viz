@@ -151,10 +151,11 @@ export const useGraphStudioGraphModel = ({
           },
         ],
       }));
+      setSelectedNodeIds([]);
       setSelectedObject({ type: 'edge', id });
       setStatus(`Edge ${from} → ${to} added`);
     },
-    [setBaseGraph, setSelectedObject, setStatus]
+    [setBaseGraph, setSelectedNodeIds, setSelectedObject, setStatus]
   );
 
   const deleteSelection = useCallback(() => {
@@ -224,8 +225,15 @@ export const useGraphStudioGraphModel = ({
       if (type === 'tree')
         nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
       if (type === 'force') {
-        const iterations = Math.round(100 * forceStrength);
-        nextGraph = forceDirectedLayout(baseGraph, iterations);
+        const normalizedStrength = Number.isFinite(Number(forceStrength))
+          ? Number(forceStrength)
+          : 1;
+        const iterations = Math.round(80 + 60 * normalizedStrength);
+        nextGraph = forceDirectedLayout(
+          baseGraph,
+          iterations,
+          normalizedStrength
+        );
       }
       setBaseGraph(nextGraph);
       setStatus(`Applied ${type} layout`);

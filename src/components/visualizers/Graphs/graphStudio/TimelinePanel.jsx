@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
-  CAPTION_SIZE_OPTIONS,
+  CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
 } from './lib/captionOverlay';
 import NativeSelect from './NativeSelect';
@@ -19,9 +19,9 @@ const moveButtonClass =
 const playbackButtonClass =
   'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
 const detailLabelClass =
-  'shrink-0 text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]';
+  'shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const detailControlLabelClass =
-  'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide text-[#334155] dark:text-[#CBD5E1]';
+  'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -95,11 +95,60 @@ const DurationInput = ({ durationMs, onCommit }) => {
   return (
     <input
       aria-label="Duration (ms)"
-      className="h-8 w-[72px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-center font-mono text-xs tabular-nums text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+      className="h-8 w-[68px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-0 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
       data-testid="frame-duration-input"
       inputMode="numeric"
       onBlur={commit}
       onChange={event => setDraft(event.target.value)}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        } else if (event.key === 'Escape') {
+          reset();
+          event.currentTarget.blur();
+        }
+      }}
+      pattern="[0-9]*"
+      type="text"
+      value={draft}
+    />
+  );
+};
+
+const CaptionFontSizeInput = ({ value, onCommit }) => {
+  const normalizedValue = Number.isFinite(Number(value)) ? Number(value) : 12;
+  const [draft, setDraft] = useState(String(normalizedValue));
+
+  const reset = () => setDraft(String(normalizedValue));
+  const commit = () => {
+    if (!draft.trim()) {
+      reset();
+      return;
+    }
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed)) {
+      reset();
+      return;
+    }
+    const nextValue = Math.round(
+      Math.max(
+        CAPTION_FONT_SIZE_RANGE.min,
+        Math.min(CAPTION_FONT_SIZE_RANGE.max, parsed)
+      )
+    );
+    setDraft(String(nextValue));
+    onCommit?.(nextValue);
+  };
+
+  return (
+    <input
+      aria-label="Caption Font Size"
+      className="h-8 w-14 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-1 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+      data-testid="caption-font-size-input"
+      inputMode="numeric"
+      onBlur={commit}
+      onChange={event => setDraft(event.target.value)}
+      onFocus={() => setDraft(String(normalizedValue))}
       onKeyDown={event => {
         if (event.key === 'Enter') {
           event.currentTarget.blur();
@@ -123,10 +172,10 @@ const TimelinePanel = ({
   onDescriptionChange,
   captionEnabled,
   captionStyle,
-  captionSize,
+  captionFontSize,
   onCaptionEnabledChange,
   onCaptionStyleChange,
-  onCaptionSizeChange,
+  onCaptionFontSizeChange,
   onAddStep,
   onDuplicateStep,
   onDeleteStep,
@@ -134,6 +183,15 @@ const TimelinePanel = ({
   onPlay,
   isPlaying,
 }) => {
+  const frameRefs = useRef([]);
+  const moveFrameFocus = (index, delta) => {
+    const nextIndex = Math.max(0, Math.min(steps.length - 1, index + delta));
+    onFrameChange(nextIndex);
+    window.requestAnimationFrame(() => {
+      frameRefs.current[nextIndex]?.focus();
+    });
+  };
+
   return (
     <div
       aria-label="Animation timeline"
@@ -234,26 +292,46 @@ const TimelinePanel = ({
           {steps.map((step, index) => (
             <div
               key={`${step.id ?? 'step'}-${index}`}
+              ref={element => {
+                frameRefs.current[index] = element;
+              }}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] md:min-w-[128px] ${
+              className={`relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#CBD5E1] dark:bg-[#1E293B] dark:focus-visible:ring-[#94A3B8] md:min-w-[128px] ${
                 index === currentFrame
-                  ? 'border-l-4 border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
-                  : 'border-[#D7DEE8] hover:border-[#94A3B8] dark:border-[#334155] dark:hover:border-[#64748B]'
+                  ? 'border-[#0F2747] shadow-sm dark:border-[#60A5FA]'
+                  : 'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044]'
               }`}
               data-current={index === currentFrame}
               data-frame-navigation-surface="true"
               data-testid="timeline-frame-card"
-              onClick={() => onFrameChange(index)}
+              onClick={event => {
+                event.currentTarget.focus();
+                onFrameChange(index);
+              }}
               onKeyDown={event => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
                   onFrameChange(index);
+                } else if (
+                  event.key === 'ArrowLeft' ||
+                  event.key === 'ArrowRight'
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  moveFrameFocus(index, event.key === 'ArrowLeft' ? -1 : 1);
                 }
               }}
               role="option"
               tabIndex="0"
             >
+              {index === currentFrame && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-1 bg-[#B45309] dark:bg-[#60A5FA]"
+                  data-testid="timeline-frame-selected-accent"
+                />
+              )}
               <div className="px-2 py-1">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
                   <div
@@ -288,7 +366,7 @@ const TimelinePanel = ({
         data-testid="frame-description-row"
       >
         <div className="grid min-w-0 gap-2">
-          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:gap-2">
+          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[116px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <span className={detailLabelClass}>Description</span>
             <input
               aria-label="Frame Description"
@@ -300,21 +378,26 @@ const TimelinePanel = ({
               placeholder="Enter a description for this frame..."
             />
           </label>
-          <div className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center lg:gap-2">
+          <div className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[116px_minmax(0,1fr)] lg:items-center lg:gap-3">
             <div className={detailLabelClass}>Timing &amp; Caption</div>
             <div
-              className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
+              className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2"
               data-testid="frame-detail-controls"
             >
-              <label className={detailControlLabelClass}>
-                <span>Duration</span>
-                <DurationInput
-                  key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
-                  durationMs={steps[currentFrame]?.durationMs ?? 600}
-                  onCommit={value => onStepDurationChange(currentFrame, value)}
-                />
-              </label>
-              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-[#D7DEE8] dark:border-[#334155] lg:border-l lg:pl-3">
+              <div className="flex shrink-0 items-center gap-2">
+                <label className={detailControlLabelClass}>
+                  <span>Duration</span>
+                  <DurationInput
+                    key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
+                    durationMs={steps[currentFrame]?.durationMs ?? 600}
+                    onCommit={value =>
+                      onStepDurationChange(currentFrame, value)
+                    }
+                  />
+                </label>
+              </div>
+              <div className="h-5 w-px bg-[#D7DEE8] dark:bg-[#334155]" />
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                 <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
                   <input
                     aria-label="Show caption"
@@ -338,7 +421,7 @@ const TimelinePanel = ({
                     }
                     size="dense"
                     value={captionStyle}
-                    wrapperClassName="w-[132px]"
+                    wrapperClassName="w-[108px]"
                   >
                     {CAPTION_STYLE_OPTIONS.map(option => (
                       <option key={option.value} value={option.value}>
@@ -348,23 +431,12 @@ const TimelinePanel = ({
                   </NativeSelect>
                 </label>
                 <label className={detailControlLabelClass}>
-                  <span>Size</span>
-                  <NativeSelect
-                    aria-label="Caption Size"
-                    data-testid="caption-size-select"
-                    onChange={event =>
-                      onCaptionSizeChange?.(event.target.value)
-                    }
-                    size="dense"
-                    value={captionSize}
-                    wrapperClassName="w-[124px]"
-                  >
-                    {CAPTION_SIZE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                  <span>Caption Font Size</span>
+                  <CaptionFontSizeInput
+                    key={captionFontSize}
+                    value={captionFontSize}
+                    onCommit={onCaptionFontSizeChange}
+                  />
                 </label>
               </div>
             </div>

@@ -32,6 +32,36 @@ const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
 
+const getCanvasViewSnapshot = async page => ({
+  x: await graphCanvas(page).getAttribute('data-view-x'),
+  y: await graphCanvas(page).getAttribute('data-view-y'),
+  zoom: await graphCanvas(page).getAttribute('data-view-zoom'),
+});
+
+const getNodePositionSnapshot = async page =>
+  graphCanvas(page).evaluate((svg, selector) => {
+    return Array.from(svg.querySelectorAll(selector)).map(circle => ({
+      id: circle.closest('g')?.textContent?.trim() ?? '',
+      x: Number(circle.getAttribute('cx')),
+      y: Number(circle.getAttribute('cy')),
+    }));
+  }, nodeCircleSelector);
+
+const expectTooltipInsideViewport = async tooltip => {
+  await expect(tooltip).toBeVisible();
+  expect(
+    await tooltip.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return (
+        bounds.left >= 0 &&
+        bounds.top >= 0 &&
+        bounds.right <= window.innerWidth &&
+        bounds.bottom <= window.innerHeight
+      );
+    })
+  ).toBe(true);
+};
+
 const choosePreset = async (page, value) => {
   await page.getByLabel('Load graph preset').selectOption(value);
   await expect(graphCanvas(page)).toBeVisible();
@@ -39,8 +69,8 @@ const choosePreset = async (page, value) => {
 
 const getDirectedEdgeEndpointOffsets = async page =>
   graphCanvas(page).evaluate((svg, selector) => {
-    const edgePaths = Array.from(
-      svg.querySelectorAll('path[marker-end^="url(#graphstudio-arrow-"]')
+    const arrowheads = Array.from(
+      svg.querySelectorAll('polygon[data-edge-arrowhead-id]')
     );
     const nodeCircles = Array.from(svg.querySelectorAll(selector))
       .map(circle => ({
@@ -55,14 +85,13 @@ const getDirectedEdgeEndpointOffsets = async page =>
           Number.isFinite(circle.r)
       );
 
-    return edgePaths
-      .map(path => {
-        const values = (path.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? [])
-          .map(Number)
-          .filter(Number.isFinite);
-        if (values.length < 4 || !nodeCircles.length) return null;
-        const x = values[values.length - 2];
-        const y = values[values.length - 1];
+    return arrowheads
+      .map(arrowhead => {
+        const x = Number(arrowhead.getAttribute('data-edge-arrow-tip-x'));
+        const y = Number(arrowhead.getAttribute('data-edge-arrow-tip-y'));
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !nodeCircles.length) {
+          return null;
+        }
         const nearest = nodeCircles.reduce((best, circle) => {
           const distance = Math.hypot(x - circle.x, y - circle.y);
           const offset = Math.abs(distance - circle.r);
@@ -164,6 +193,12 @@ const setRangeValue = async (page, label, value) => {
     }, value);
 };
 
+const commitInputValue = async (locator, value) => {
+  await locator.fill(String(value));
+  await locator.press('Enter');
+  await expect(locator).toHaveValue(String(value));
+};
+
 const expectDownloadFrom = async ({ page, locator, filenamePattern }) => {
   const downloadPromise = page.waitForEvent('download');
   await locator.click();
@@ -193,15 +228,29 @@ const getSvgRootAttribute = (svgText, name) => {
   return match?.[1] ?? null;
 };
 
-const expectSlideFramedSvg = svgText => {
-  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
-  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
-  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+const getSvgViewBox = svgText => {
   const viewBoxText = getSvgRootAttribute(svgText, 'viewBox');
   expect(viewBoxText).not.toBeNull();
   const viewBox = viewBoxText.split(/\s+/).map(Number);
   expect(viewBox).toHaveLength(4);
   expect(viewBox.every(Number.isFinite)).toBe(true);
+  return viewBox;
+};
+
+const expectReasonableFittedViewBox = svgText => {
+  const viewBox = getSvgViewBox(svgText);
+  expect(viewBox[2]).toBeGreaterThan(0);
+  expect(viewBox[3]).toBeGreaterThan(0);
+  expect(viewBox[2]).toBeLessThan(1800);
+  expect(viewBox[3]).toBeLessThan(1200);
+  return viewBox;
+};
+
+const expectSlideFramedSvg = svgText => {
+  expect(getSvgRootAttribute(svgText, 'data-export-framing')).toBe('slide');
+  expect(getSvgRootAttribute(svgText, 'width')).toBe('1040');
+  expect(getSvgRootAttribute(svgText, 'height')).toBe('585');
+  const viewBox = expectReasonableFittedViewBox(svgText);
   expect(viewBox[2] / viewBox[3]).toBeCloseTo(1040 / 585, 3);
 };
 
@@ -218,6 +267,9 @@ const getSvgPresentationState = async (page, svgText) =>
       const firstEdge =
         doc.querySelector('path[data-edge-path-id="e0"]') ??
         doc.querySelector('path[data-edge-path-id]');
+      const edgeSelectionUnderlays = doc.querySelectorAll(
+        '[data-edge-selection-underlay-id]'
+      );
 
       return {
         firstNode: firstNode
@@ -233,6 +285,7 @@ const getSvgPresentationState = async (page, svgText) =>
               strokeWidth: Number(firstEdge.getAttribute('stroke-width')),
             }
           : null,
+        edgeSelectionUnderlayCount: edgeSelectionUnderlays.length,
       };
     },
     { text: svgText, selector: nodeCircleSelector }
@@ -258,6 +311,16 @@ const openImportMenu = async page => {
   await page.getByTestId('open-import-menu').click();
   await expect(page.getByTestId('import-menu-modal')).toBeVisible();
   return page.getByTestId('import-menu-modal');
+};
+
+const openEdgeListParser = async page => {
+  const importMenu = await openImportMenu(page);
+  await importMenu
+    .getByRole('button', { name: 'Paste / Import Edge List' })
+    .click();
+  const parserModal = page.getByTestId('parser-modal');
+  await expect(parserModal).toBeVisible();
+  return parserModal;
 };
 
 const openExportMenu = async page => {
@@ -417,6 +480,7 @@ const pastedProject = {
         id: 'step-0',
         description: 'Pasted JSON import test',
         durationMs: 600,
+        showCaption: true,
         nodeOverrides: {},
         edgeOverrides: {},
       },
@@ -427,7 +491,7 @@ const pastedProject = {
     snapEnabled: true,
     showGrid: false,
     captionOverlay: {
-      enabled: true,
+      enabled: false,
       position: { x: 0.2, y: 0.7 },
     },
     lockCanvas: true,
@@ -508,6 +572,15 @@ test.describe('Graph Studio desktop smoke', () => {
 
     const graphNodes = graphNodeCircles(page);
     const initialNodeCount = await graphNodes.count();
+    await graphCanvas(page).dblclick({ position: { x: 24, y: 24 } });
+    await expect(graphNodes).toHaveCount(initialNodeCount);
+    await graphNodes.first().dblclick();
+    await expect(graphNodes).toHaveCount(initialNodeCount);
+    await graphCanvas(page)
+      .locator('[data-edge-hit-target-id]')
+      .first()
+      .dblclick();
+    await expect(graphNodes).toHaveCount(initialNodeCount);
     await page.getByRole('button', { name: 'Add Node' }).click();
     await expect(page.getByTestId('tool-button-add')).toHaveAttribute(
       'aria-pressed',
@@ -531,20 +604,82 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(
-      page.getByText('Click a source node, then a target node.')
-    ).toBeVisible();
+    const drawEdgeHelper = page.getByText(
+      /Click a source node, then a target node\.|Source node .* selected\. Click a target node\./
+    );
+    await expect(drawEdgeHelper).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(
-      page.getByText('Click a source node, then a target node.')
-    ).toBeHidden();
+    await expect(drawEdgeHelper).toBeHidden();
 
     const lockView = page.getByRole('checkbox', { name: 'Lock View' });
     const fitViewButton = page.getByRole('button', { name: 'Fit View' });
+    const zoomOutButton = page.getByRole('button', { name: 'Zoom Out' });
+    const zoomValueInput = page.getByLabel('Zoom percent');
     const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
+    const zoomRow = page.getByTestId('view-canvas-zoom-row');
+    const zoomField = page.getByTestId('zoom-percent-field');
+    const zoomUnit = page.getByTestId('zoom-percent-unit');
     await expect(lockView).not.toBeChecked();
     await expect(fitViewButton).toBeEnabled();
+    await expect(zoomValueInput).toBeVisible();
+    await expect(zoomField.getByText('%', { exact: true })).toBeVisible();
+    const assertZoomRowLayout = async () => {
+      await expect
+        .poll(async () => {
+          const rowBox = await zoomRow.boundingBox();
+          const zoomUnitBox = await zoomUnit.boundingBox();
+          const boxes = await Promise.all(
+            [fitViewButton, zoomOutButton, zoomField, zoomInButton].map(
+              locator => locator.boundingBox()
+            )
+          );
+          if (!rowBox || !zoomUnitBox || boxes.some(box => !box)) return false;
+          const centers = boxes.map(box => box.y + box.height / 2);
+          const minCenter = Math.min(...centers);
+          const maxCenter = Math.max(...centers);
+          const rowLeftInset = boxes[0].x - rowBox.x;
+          const rowRightInset =
+            rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
+          const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
+          const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
+          const controlsInsideRow = boxes.every(
+            box =>
+              box.x >= rowBox.x &&
+              box.y >= rowBox.y &&
+              box.x + box.width <= rowBox.x + rowBox.width &&
+              box.y + box.height <= rowBox.y + rowBox.height
+          );
+          return (
+            controlsInsideRow &&
+            maxCenter - minCenter <= 3 &&
+            boxes[0].width >= 60 &&
+            boxes[0].height <= 34 &&
+            Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
+            boxes[2].width >= 52 &&
+            boxes[2].width <= 64 &&
+            Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
+            rowLeftInset >= 7 &&
+            rowRightInset >= 7 &&
+            Math.abs(rowLeftInset - rowRightInset) <= 2
+          );
+        })
+        .toBe(true);
+    };
+    await assertZoomRowLayout();
+    const html = page.locator('html');
+    const initiallyDark = await html.evaluate(element =>
+      element.classList.contains('dark')
+    );
+    await themeToggle.click();
+    await expect
+      .poll(() => html.evaluate(element => element.classList.contains('dark')))
+      .toBe(!initiallyDark);
+    await assertZoomRowLayout();
+    await themeToggle.click();
+    await expect
+      .poll(() => html.evaluate(element => element.classList.contains('dark')))
+      .toBe(initiallyDark);
     const zoomBefore = Number(
       await graphCanvas(page).getAttribute('data-view-zoom')
     );
@@ -559,6 +694,15 @@ test.describe('Graph Studio desktop smoke', () => {
     await lockView.check();
     await expect(fitViewButton).toBeDisabled();
     await expect(zoomInButton).toBeDisabled();
+    const lockedViewBeforeAdd = await getCanvasViewSnapshot(page);
+    const nodeCountBeforeLockedAdd = await graphNodes.count();
+    await page.getByRole('button', { name: 'Add Node' }).click();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await graphCanvas(page).click({ position: { x: 120, y: 120 } });
+    await expect(graphNodes).toHaveCount(nodeCountBeforeLockedAdd + 1);
+    await expect
+      .poll(() => getCanvasViewSnapshot(page))
+      .toEqual(lockedViewBeforeAdd);
     await lockView.uncheck();
 
     await page.getByRole('button', { name: 'Pan' }).click();
@@ -587,6 +731,23 @@ test.describe('Graph Studio desktop smoke', () => {
       await page.getByRole('button', { name: layout }).click();
       await expect(graphCanvas(page)).toBeVisible();
     }
+
+    await choosePreset(page, 'bfs');
+    await page.getByTestId('tool-button-select').click();
+    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await setRangeValue(page, 'Gravity (force)', 0.2);
+    await page.getByRole('button', { name: 'Force' }).click();
+    const lowForcePositions = await getNodePositionSnapshot(page);
+    await choosePreset(page, 'bfs');
+    await setRangeValue(page, 'Gravity (force)', 2);
+    await page.getByRole('button', { name: 'Force' }).click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .not.toBe(JSON.stringify(lowForcePositions));
 
     for (const preset of ['bfs', 'dfs', 'dijkstra']) {
       await choosePreset(page, preset);
@@ -645,22 +806,46 @@ test.describe('Graph Studio desktop smoke', () => {
     await frameDescription.fill('Smoke test frame');
     await expect(frameDescription).toHaveValue('Smoke test frame');
 
+    await graphNodes.first().click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
     const importMenu = await openImportMenu(page);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
     await importMenu
       .getByRole('button', { name: 'Paste / Import Edge List' })
       .click();
-    await expect(page.getByText('Text-to-Graph Parser')).toBeVisible();
-    await page.locator('textarea').last().fill('0 1\n1 2\n2 0');
+    await expect(page.getByText('Import Edge List')).toBeVisible();
+    await expect(page.getByTestId('parser-modal')).toHaveAttribute(
+      'data-modal-frame',
+      'true'
+    );
+    await page.locator('textarea').last().fill('3 3\n0 1\n1 2\n2 0');
     await page.getByRole('button', { name: 'Generate graph' }).click();
-    await expect(page.getByText('Text-to-Graph Parser')).toBeHidden();
+    await expect(page.getByText('Import Edge List')).toBeHidden();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
     await expect(graphCanvas(page)).toBeVisible();
 
     await choosePreset(page, 'bfs');
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
+    await expect(page.getByTestId('script-modal')).toHaveAttribute(
+      'data-modal-frame',
+      'true'
+    );
     await expect(
       page.getByText(/Script Mode executes local JavaScript/)
     ).toBeVisible();
+    await expect(
+      page.getByLabel('Load script example').locator('option[value=""]')
+    ).toHaveText('Load script example...');
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await expect(graphCanvas(page)).toBeVisible();
@@ -668,16 +853,40 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
-    await page.locator('[data-testid="script-modal"] textarea').fill(`
+    const scriptModal = page.getByTestId('script-modal');
+    const scriptEditor = scriptModal.locator('textarea');
+    const scriptOutputArea = page.getByTestId('script-output-area');
+    const outputBoxBeforeError = await scriptOutputArea.boundingBox();
+    await scriptEditor.fill('wow');
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(scriptModal.getByRole('alert')).toContainText(
+      'Script error: wow is not defined'
+    );
+    await expect(scriptEditor).toHaveValue('wow');
+    await expect(scriptModal.getByRole('alert')).toHaveCount(1);
+    const outputBoxAfterError = await scriptOutputArea.boundingBox();
+    expect(outputBoxBeforeError).not.toBeNull();
+    expect(outputBoxAfterError).not.toBeNull();
+    expect(outputBoxAfterError.y).toBeCloseTo(outputBoxBeforeError.y, 0);
+    expect(outputBoxAfterError.height).toBeCloseTo(
+      outputBoxBeforeError.height,
+      0
+    );
+    await page.getByRole('button', { name: 'Generate timeline' }).click();
+    await expect(scriptModal.getByRole('alert')).toHaveCount(1);
+    await expect(scriptEditor).toHaveValue('wow');
+
+    await scriptEditor.fill(`
 while (true) {}
 `);
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(
-      page
-        .getByTestId('script-modal')
-        .getByText(
-          'Script error: Script timed out. Check for infinite loops or expensive work.'
-        )
+      page.getByRole('button', { name: 'Generating...' })
+    ).toBeDisabled();
+    await expect(
+      scriptModal.getByText(
+        'Script error: Script timed out. Check for infinite loops or expensive work.'
+      )
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     await page.getByRole('button', { name: 'Cancel' }).click();
@@ -696,6 +905,11 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
+    await expect(page.getByTestId('left-sidebar')).toHaveClass(
+      /graphstudio-scroll-panel/
+    );
+    await expect(propertyPanel(page)).toHaveClass(/graphstudio-scroll-panel/);
+
     const cards = page.getByTestId('timeline-frame-card');
     const frameCounter = page.getByTestId('timeline-frame-counter');
     const timelinePanel = page.getByTestId('timeline-panel');
@@ -703,8 +917,66 @@ while (true) {}
     const durationInput = page.getByTestId('frame-duration-input');
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
-    const captionSizeSelect = page.getByLabel('Caption Size');
+    const captionSizeControl = page.getByLabel('Caption Size', {
+      exact: true,
+    });
+    const captionFontSizeInput = page.getByLabel('Caption Font Size');
     const initialFrameCount = await cards.count();
+    expect(initialFrameCount).toBeGreaterThan(1);
+
+    await cards.first().click();
+    const frameOneLabel = cards.first().getByText('Frame 1');
+    const selectedFrameOneCardBox = await cards.first().boundingBox();
+    const selectedFrameOneLabelBox = await frameOneLabel.boundingBox();
+    await expect(
+      cards.first().getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
+    await expect(cards.first()).toHaveCSS('border-left-width', '1px');
+    await cards.nth(1).click();
+    const deselectedFrameOneCardBox = await cards.first().boundingBox();
+    const deselectedFrameOneLabelBox = await frameOneLabel.boundingBox();
+    expect(selectedFrameOneCardBox).not.toBeNull();
+    expect(deselectedFrameOneCardBox).not.toBeNull();
+    expect(selectedFrameOneLabelBox).not.toBeNull();
+    expect(deselectedFrameOneLabelBox).not.toBeNull();
+    expect(
+      Math.abs(selectedFrameOneCardBox.x - deselectedFrameOneCardBox.x)
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(selectedFrameOneCardBox.width - deselectedFrameOneCardBox.width)
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(
+        selectedFrameOneCardBox.height - deselectedFrameOneCardBox.height
+      )
+    ).toBeLessThanOrEqual(0.5);
+    expect(
+      Math.abs(selectedFrameOneLabelBox.x - deselectedFrameOneLabelBox.x)
+    ).toBeLessThanOrEqual(0.5);
+    await expect(
+      cards.first().getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(0);
+    await expect(
+      cards.nth(1).getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
+
+    await cards.nth(1).click();
+    await cards.nth(1).press('ArrowRight');
+    await expect(cards.nth(2)).toHaveAttribute('data-current', 'true');
+    await expect(cards.nth(2)).toBeFocused();
+    await expect(cards.nth(1)).toHaveAttribute('data-current', 'false');
+    await expect(
+      page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
+    ).toHaveCount(1);
+    await expect(
+      page.getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(1);
+    await expect(
+      cards.nth(1).getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(0);
+    await expect(
+      cards.nth(2).getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
 
     await cards.last().click();
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
@@ -803,7 +1075,16 @@ while (true) {}
     await expect(durationInput).toBeVisible();
     await expect(captionToggle).toBeVisible();
     await expect(captionStyleSelect).toBeVisible();
-    await expect(captionSizeSelect).toBeVisible();
+    await expect(captionSizeControl).toHaveCount(0);
+    await expect(captionFontSizeInput).toBeVisible();
+    await expect(captionFontSizeInput).toHaveAttribute('inputmode', 'numeric');
+    await expect(durationInput).toHaveClass(/text-center/);
+    await expect(durationInput).toHaveClass(/leading-8/);
+    await expect(captionStyleSelect.locator('xpath=..')).toHaveClass(
+      /w-\[108px\]/
+    );
+    expect((await captionStyleSelect.boundingBox())?.width).toBeLessThan(120);
+    expect((await captionFontSizeInput.boundingBox())?.width).toBeLessThan(68);
     await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
     await expect(frameCounter).toHaveText(
       `${initialFrameCount + 2} / ${initialFrameCount + 3}`
@@ -838,7 +1119,7 @@ while (true) {}
       durationInput.boundingBox(),
       captionToggle.boundingBox(),
       captionStyleSelect.boundingBox(),
-      captionSizeSelect.boundingBox(),
+      captionFontSizeInput.boundingBox(),
     ])) {
       expectBoxInsideTimeline(controlBox);
     }
@@ -860,11 +1141,27 @@ while (true) {}
     await graphCanvas(page).focus();
     await graphCanvas(page).press('ArrowLeft');
     await expect(cards.first()).toHaveAttribute('data-current', 'true');
+    await expect(cards.first()).toHaveClass(/focus-visible:ring-1/);
+    await expect(cards.first()).toHaveClass(/focus-visible:ring-inset/);
+    await expect(cards.first()).not.toHaveClass(/focus-visible:ring-2/);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
       .poll(async () => frameCounter.textContent(), { timeout: 3000 })
       .not.toBe(`1 / ${initialFrameCount + 3}`);
     await page.getByRole('button', { name: 'Pause timeline' }).click();
+    await cards.last().click();
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          page.getByRole('button', { name: 'Play timeline' }).isVisible(),
+        { timeout: 4000 }
+      )
+      .toBe(true);
+    await expect(page.getByText('Playback complete')).toHaveCount(0);
 
     await openExportMenu(page);
     await expectExportPreview(page);
@@ -911,14 +1208,18 @@ while (true) {}
 
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
-    const captionSizeSelect = page.getByLabel('Caption Size');
+    const captionSizeControl = page.getByLabel('Caption Size', {
+      exact: true,
+    });
+    const captionFontSizeInput = page.getByLabel('Caption Font Size');
     const caption = page.getByTestId('frame-caption-overlay');
     const frameDescription = page.getByLabel('Frame Description');
     const frameCards = page.getByTestId('timeline-frame-card');
 
     await expect(captionToggle).not.toBeChecked();
     await expect(captionStyleSelect).toHaveValue('subtle');
-    await expect(captionSizeSelect).toHaveValue('medium');
+    await expect(captionSizeControl).toHaveCount(0);
+    await expect(captionFontSizeInput).toHaveValue('12');
     await expect(caption).toHaveCount(0);
 
     await captionToggle.check();
@@ -927,6 +1228,65 @@ while (true) {}
     await expect(caption).toHaveAttribute('data-caption-overlay', 'true');
     await expect(caption).toHaveAttribute('data-caption-style', 'subtle');
     await expect(caption).toHaveAttribute('data-caption-size', 'medium');
+    await expect(caption).toHaveAttribute('data-caption-font-size', '12');
+    await expect(caption.locator('rect')).toHaveAttribute('fill-opacity', '0');
+    await expect(caption.locator('rect')).toHaveAttribute('stroke', 'none');
+    await expect(caption.locator('text')).toHaveAttribute('stroke', '#FFFFFF');
+
+    await frameCards.nth(1).click();
+    await expect(captionToggle).not.toBeChecked();
+    await expect(caption).toHaveCount(0);
+    await captionToggle.check();
+    await expect(caption).toContainText('Queue B and C');
+    await frameCards.first().click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Start BFS at A');
+    await captionToggle.uncheck();
+    await expect(caption).toHaveCount(0);
+    await frameCards.nth(1).click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Queue B and C');
+
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(captionToggle).toBeChecked();
+    await frameDescription.fill('Inherited caption visibility');
+    await expect(caption).toContainText('Inherited caption visibility');
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(captionToggle).toBeChecked();
+    await expect(caption).toContainText('Inherited caption visibility');
+    await frameCards.nth(1).click();
+    await expect(caption).toContainText('Queue B and C');
+
+    const captionBoxBeforeGraphControls = await caption.boundingBox();
+    const captionFontSizeBeforeGraphControls = await caption
+      .locator('text')
+      .getAttribute('font-size');
+    expect(captionBoxBeforeGraphControls).not.toBeNull();
+    await page.getByRole('button', { name: 'Zoom In' }).click();
+    await setRangeValue(page, 'Node size', 36);
+    await setRangeValue(page, 'Edge width', 5);
+    const captionBoxAfterGraphControls = await caption.boundingBox();
+    expect(captionBoxAfterGraphControls).not.toBeNull();
+    expect(captionBoxAfterGraphControls.x).toBeCloseTo(
+      captionBoxBeforeGraphControls.x,
+      0
+    );
+    expect(captionBoxAfterGraphControls.y).toBeCloseTo(
+      captionBoxBeforeGraphControls.y,
+      0
+    );
+    expect(captionBoxAfterGraphControls.width).toBeCloseTo(
+      captionBoxBeforeGraphControls.width,
+      0
+    );
+    expect(captionBoxAfterGraphControls.height).toBeCloseTo(
+      captionBoxBeforeGraphControls.height,
+      0
+    );
+    await expect(caption.locator('text')).toHaveAttribute(
+      'font-size',
+      captionFontSizeBeforeGraphControls
+    );
 
     for (const style of ['subtle', 'light', 'dark', 'plain']) {
       await captionStyleSelect.selectOption(style);
@@ -934,31 +1294,51 @@ while (true) {}
       await expect(caption).toHaveAttribute('data-caption-style', style);
     }
 
-    const expectedFontSizes = {
-      small: '11',
-      medium: '12',
-      large: '14',
-    };
-    for (const size of ['small', 'medium', 'large']) {
-      await captionSizeSelect.selectOption(size);
-      await expect(caption).toBeVisible();
-      await expect(caption).toHaveAttribute('data-caption-size', size);
-      await expect(caption.locator('text')).toHaveAttribute(
-        'font-size',
-        expectedFontSizes[size]
-      );
-    }
+    await commitInputValue(captionFontSizeInput, 22);
+    await expect(caption).toHaveAttribute('data-caption-font-size', '22');
+    await expect(caption.locator('text')).toHaveAttribute('font-size', '22');
 
     await captionStyleSelect.selectOption('dark');
-    await captionSizeSelect.selectOption('large');
+    await frameCards.nth(3).click();
+    await expect(caption.locator('tspan').first()).toContainText(
+      'Inherited caption'
+    );
+    await expect(caption.locator('tspan').last()).toContainText('visibility');
 
     const longCaption =
-      'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas.';
+      'This longer teaching annotation explains why the active frontier expands before the visited set settles, and it should wrap into multiple SVG text lines without leaving the canvas. It keeps going long enough to prove the caption clamps cleanly instead of turning into a large text block that dominates the graph.';
     await frameDescription.fill(longCaption);
-    await expect(caption).toContainText('This longer teaching annotation');
-    await expect
-      .poll(() => caption.locator('tspan').count())
-      .toBeGreaterThan(1);
+    await expect(caption.locator('tspan').first()).toContainText(
+      'This longer teaching'
+    );
+    await expect(caption.locator('tspan').nth(1)).toContainText(
+      'annotation explains why'
+    );
+    await expect(caption).toHaveAttribute('data-caption-line-count', '3');
+    await expect(caption).toHaveAttribute('data-caption-truncated', 'true');
+    await expect(caption).toHaveAttribute('data-caption-font-size', '22');
+    await expect.poll(() => caption.locator('tspan').count()).toBe(3);
+    expect(
+      (await caption.locator('tspan').last().textContent()).trim()
+    ).toMatch(/\.\.\.$/);
+    expect(
+      await caption.evaluate(element => {
+        const captionBounds = element.getBoundingClientRect();
+        const canvasBounds = element.ownerSVGElement.getBoundingClientRect();
+        return (
+          captionBounds.left >= canvasBounds.left - 1 &&
+          captionBounds.top >= canvasBounds.top - 1 &&
+          captionBounds.right <= canvasBounds.right + 1 &&
+          captionBounds.bottom <= canvasBounds.bottom + 1
+        );
+      })
+    ).toBe(true);
+
+    const unbrokenCaption = 'ALGORITHMICFRONTIER'.repeat(24);
+    await frameDescription.fill(unbrokenCaption);
+    await expect(caption).toHaveAttribute('data-caption-line-count', '3');
+    await expect(caption).toHaveAttribute('data-caption-truncated', 'true');
+    await expect.poll(() => caption.locator('tspan').count()).toBe(3);
     expect(
       await caption.evaluate(element => {
         const captionBounds = element.getBoundingClientRect();
@@ -978,11 +1358,18 @@ while (true) {}
     await expect(caption).toHaveAttribute('data-caption-theme', 'light');
 
     await frameDescription.fill('Explain the active frontier');
-    await expect(caption).toContainText('Explain the active frontier');
+    await expect(caption).toContainText('Explain the active');
+    await expect(caption).toContainText('frontier');
 
     const draggedPosition = await dragCaption(page);
     expect(draggedPosition.x).toBeGreaterThan(0);
     expect(draggedPosition.y).toBeLessThan(1);
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      ''
+    );
+    expect(
+      await caption.evaluate(element => getComputedStyle(element).userSelect)
+    ).toBe('none');
 
     await frameCards.nth(1).click();
     await expect(caption).toContainText('Queue B and C');
@@ -1010,7 +1397,9 @@ while (true) {}
     expect(previewSvgText).toContain('data-testid="frame-caption-overlay"');
     expect(previewSvgText).toContain('data-caption-overlay="true"');
     expect(previewSvgText).toContain('data-caption-style="dark"');
-    expect(previewSvgText).toContain('data-caption-size="large"');
+    expect(previewSvgText).toContain('data-caption-size="medium"');
+    expect(previewSvgText).toContain('data-caption-font-size="22"');
+    expect(previewSvgText).toContain('font-size="22"');
 
     const svgDownload = await expectDownloadFrom({
       page,
@@ -1023,7 +1412,9 @@ while (true) {}
     expect(svgText).toContain('data-testid="frame-caption-overlay"');
     expect(svgText).toContain('data-caption-overlay="true"');
     expect(svgText).toContain('data-caption-style="dark"');
-    expect(svgText).toContain('data-caption-size="large"');
+    expect(svgText).toContain('data-caption-size="medium"');
+    expect(svgText).toContain('data-caption-font-size="22"');
+    expect(svgText).toContain('font-size="22"');
     expect(svgText).toContain('Queue B and C');
 
     const projectDownload = await expectDownloadFrom({
@@ -1034,9 +1425,14 @@ while (true) {}
     const projectPath = await projectDownload.path();
     expect(projectPath).not.toBeNull();
     const project = await readJsonDownload(projectDownload);
-    expect(project.settings.captionOverlay.enabled).toBe(true);
+    expect(project.settings.captionOverlay.enabled).toBe(false);
     expect(project.settings.captionOverlay.style).toBe('dark');
-    expect(project.settings.captionOverlay.size).toBe('large');
+    expect(project.settings.captionOverlay.size).toBe('medium');
+    expect(project.settings.captionOverlay.fontSize).toBe(22);
+    expect(project.timeline.steps[0].captionVisible).toBe(false);
+    expect(project.timeline.steps[1].captionVisible).toBe(true);
+    expect(project.timeline.steps[2].captionVisible).toBe(true);
+    expect(project.timeline.steps[3].captionVisible).toBe(true);
     expect(project.settings.captionOverlay.position.x).toBeCloseTo(
       draggedPosition.x,
       5
@@ -1059,16 +1455,128 @@ while (true) {}
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(captionToggle).toBeChecked();
     await expect(captionStyleSelect).toHaveValue('dark');
-    await expect(captionSizeSelect).toHaveValue('large');
+    await expect(captionSizeControl).toHaveCount(0);
+    await expect(captionFontSizeInput).toHaveValue('22');
     await expect(caption).toContainText('Queue B and C');
     await expect(caption).toHaveAttribute('data-caption-style', 'dark');
-    await expect(caption).toHaveAttribute('data-caption-size', 'large');
+    await expect(caption).toHaveAttribute('data-caption-size', 'medium');
+    await expect(caption).toHaveAttribute('data-caption-font-size', '22');
     expect(
       Number(await caption.getAttribute('data-caption-position-x'))
     ).toBeCloseTo(draggedPosition.x, 5);
     expect(
       Number(await caption.getAttribute('data-caption-position-y'))
     ).toBeCloseTo(draggedPosition.y, 5);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('updates, exports, and imports explicit graph label font sizes', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'dijkstra');
+
+    const nodeLabelFontSizeInput = page.getByTestId(
+      'node-label-font-size-input'
+    );
+    const edgeLabelFontSizeInput = page.getByTestId(
+      'edge-label-font-size-input'
+    );
+    const firstNodeLabel = graphCanvas(page)
+      .locator('text[data-node-label-id]')
+      .first();
+    const firstEdgeLabel = graphCanvas(page)
+      .locator('[data-edge-label-text]')
+      .first();
+
+    await expect(nodeLabelFontSizeInput).toBeVisible();
+    await expect(edgeLabelFontSizeInput).toBeVisible();
+    await expect(firstNodeLabel).toBeVisible();
+    await expect(firstEdgeLabel).toBeVisible();
+    await expect(nodeLabelFontSizeInput).toHaveValue('12');
+    await expect(edgeLabelFontSizeInput).toHaveValue('16');
+    await expect(
+      propertyPanel(page).getByText('px', { exact: true })
+    ).toHaveCount(0);
+    for (const control of [
+      page.getByLabel('Gravity (force) value'),
+      page.getByLabel('Curve Amount value'),
+      page.getByLabel('Node size value'),
+      nodeLabelFontSizeInput,
+      page.getByLabel('Edge width value'),
+      edgeLabelFontSizeInput,
+    ]) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeLessThanOrEqual(64);
+      expect(box.height).toBeLessThanOrEqual(30);
+    }
+
+    await setRangeValue(page, 'Node size', 40);
+    await expect(nodeLabelFontSizeInput).toHaveValue('22');
+    await expect(firstNodeLabel).toHaveCSS('font-size', '22px');
+    await commitInputValue(nodeLabelFontSizeInput, 24);
+    await expect(firstNodeLabel).toHaveCSS('font-size', '24px');
+    await setRangeValue(page, 'Node size', 28);
+    await expect(nodeLabelFontSizeInput).toHaveValue('24');
+    await expect(firstNodeLabel).toHaveCSS('font-size', '24px');
+
+    await setRangeValue(page, 'Edge width', 6);
+    await expect(edgeLabelFontSizeInput).toHaveValue('22');
+    await expect(firstEdgeLabel).toHaveAttribute('font-size', '22');
+    await commitInputValue(edgeLabelFontSizeInput, 21);
+    await expect(firstEdgeLabel).toHaveAttribute('font-size', '21');
+    await setRangeValue(page, 'Edge width', 3);
+    await expect(edgeLabelFontSizeInput).toHaveValue('21');
+    await expect(firstEdgeLabel).toHaveAttribute('font-size', '21');
+
+    const exportMenu = await openExportMenu(page);
+    const previewSvgText = await getPreviewSvgText(page);
+    expect(previewSvgText).toContain('data-node-label-id=');
+    expect(previewSvgText).toContain('font-size: 24px');
+    expect(previewSvgText).toContain('data-edge-label-text="true"');
+    expect(previewSvgText).toContain('data-edge-label-halo="wide"');
+    expect(previewSvgText).not.toContain('data-edge-label-background');
+    expect(previewSvgText).toContain('font-size="21"');
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const svgText = await fs.readFile(svgPath, 'utf8');
+    expect(svgText).toContain('font-size: 24px');
+    expect(svgText).toContain('font-size="21"');
+    expect(svgText).toContain('data-edge-label-halo="wide"');
+    expect(svgText).not.toContain('data-edge-label-background');
+
+    const projectDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const projectPath = await projectDownload.path();
+    expect(projectPath).not.toBeNull();
+    const project = await readJsonDownload(projectDownload);
+    expect(project.settings.globalSettings.nodeLabelFontSize).toBe(24);
+    expect(project.settings.globalSettings.edgeLabelFontSize).toBe(21);
+    await closeExportMenu(page);
+
+    await commitInputValue(nodeLabelFontSizeInput, 13);
+    await commitInputValue(edgeLabelFontSizeInput, 12);
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles(projectPath);
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(nodeLabelFontSizeInput).toHaveValue('24');
+    await expect(edgeLabelFontSizeInput).toHaveValue('21');
+    await expect(firstNodeLabel).toHaveCSS('font-size', '24px');
+    await expect(firstEdgeLabel).toHaveAttribute('font-size', '21');
 
     expect(errors).toEqual([]);
   });
@@ -1088,22 +1596,43 @@ while (true) {}
     const editor = page.locator('[data-testid="script-modal"] textarea');
 
     await expect(exampleSelect).toBeVisible();
-    await exampleSelect.selectOption('bfs');
-    await expect(editor).toHaveValue(/Breadth-first search/);
+    await expect(exampleSelect.locator('option[value=""]')).toHaveText(
+      'Load script example...'
+    );
+    const scriptExamples = [
+      ['bfs', /Breadth-first search/],
+      ['dfs', /Depth-first search/],
+      ['topological-sort', /Topological sort/],
+      ['dijkstra', /Dijkstra relaxation/],
+      ['kruskal', /Kruskal/],
+      ['edge-coloring', /edge coloring/i],
+    ];
+
+    await exampleSelect.selectOption(scriptExamples[0][0]);
+    await expect(editor).toHaveValue(scriptExamples[0][1]);
     await expect(editor).toHaveValue(/Start BFS/);
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Generate timeline' }).click();
-    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
-    await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
-    await expect(graphCanvas(page)).toBeVisible();
+    for (const [exampleId, expectedText] of scriptExamples) {
+      await exampleSelect.selectOption(exampleId);
+      await expect(editor).toHaveValue(expectedText);
+      await page.getByRole('button', { name: 'Generate timeline' }).click();
+      await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+      await expect(page.getByText(/Script generated \d+ frames/)).toBeVisible();
+      await expect(graphCanvas(page)).toBeVisible();
+      await expect
+        .poll(() => page.getByTestId('timeline-frame-card').count())
+        .toBeGreaterThan(1);
+      await page.getByTestId('timeline-frame-card').nth(1).click();
+      await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Script Mode' }).click();
-    await exampleSelect.selectOption('dfs');
-    await expect(editor).toHaveValue(/Depth-first search/);
-    await expect(editor).not.toHaveValue(/Breadth-first search/);
-    await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
+      if (exampleId !== scriptExamples[scriptExamples.length - 1][0]) {
+        await page.getByRole('button', { name: 'Script Mode' }).click();
+        await expect(
+          page.getByText('Script Mode (Trace Recorder)')
+        ).toBeVisible();
+      }
+    }
 
     expect(errors).toEqual([]);
   });
@@ -1116,6 +1645,10 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText('Presets', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Load graph preset')).toHaveValue('');
+    await expect(
+      page.getByLabel('Load graph preset').locator('option[value=""]')
+    ).toHaveText('Load preset...');
 
     const frameDescription = page.getByPlaceholder(
       'Enter a description for this frame...'
@@ -1198,12 +1731,20 @@ while (true) {}
     await expect(page.getByLabel('Show State Legend')).toBeHidden();
     await expect(legendToggle).toBeVisible();
     await expect(legendEditToggle).toBeVisible();
-    await expect(page.getByTestId('custom-legend-summary')).toContainText(
-      '6 entries'
-    );
-    await expect(page.getByTestId('custom-legend-summary')).toContainText(
-      'Auto'
-    );
+    await expect
+      .poll(async () => {
+        const [toggleBox, editBox] = await Promise.all([
+          legendToggle.boundingBox(),
+          legendEditToggle.boundingBox(),
+        ]);
+        if (!toggleBox || !editBox) return false;
+        const centerDelta = Math.abs(
+          toggleBox.y + toggleBox.height / 2 - (editBox.y + editBox.height / 2)
+        );
+        return editBox.height >= 28 && editBox.width >= 42 && centerDelta <= 4;
+      })
+      .toBe(true);
+    await expect(page.getByTestId('custom-legend-summary')).toHaveCount(0);
     await expect(legendPlacement).toHaveValue('auto');
     await expect(legendEditor).toBeHidden();
     await expect(legendToggle).not.toBeChecked();
@@ -1223,6 +1764,9 @@ while (true) {}
     await legendEditToggle.click();
     await expect(legendModal).toBeVisible();
     await expect(legendEditor).toBeVisible();
+    await expect(
+      page.getByTestId('custom-legend-entries-header')
+    ).not.toHaveClass(/sticky/);
 
     await page.getByLabel('Enable Legend').check();
     await expect(legendPreview).toBeVisible();
@@ -1251,6 +1795,12 @@ while (true) {}
     await expect(
       legendPreview.locator('line[stroke="#F59E0B"]').first()
     ).toHaveAttribute('y1', '0');
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Default node' })
+    ).toHaveAttribute('x', '32');
+    await expect(
+      legendPreview.locator('line[stroke="#F59E0B"]').first()
+    ).toHaveAttribute('x1', '2');
 
     await closeLegendEditor(page);
     await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -1267,14 +1817,44 @@ while (true) {}
     await expandLegendEditor(page);
 
     await legendTitle.fill('Traversal Key');
-    await page.getByTestId('custom-legend-add-entry').click();
+    const addEntryButton = page.getByTestId('custom-legend-add-entry');
+    const addEntryBoxBefore = await addEntryButton.boundingBox();
+    await addEntryButton.click();
+    const addEntryBoxAfter = await addEntryButton.boundingBox();
+    expect(addEntryBoxBefore).not.toBeNull();
+    expect(addEntryBoxAfter).not.toBeNull();
+    expect(addEntryBoxAfter.y).toBeCloseTo(addEntryBoxBefore.y, 0);
+    await expect(page.getByTestId('custom-legend-entry-label-0')).toBeFocused();
+    await expect(page.getByTestId('custom-legend-move-up-0')).toBeDisabled();
+    await expect(page.getByTestId('custom-legend-move-down-0')).toBeEnabled();
+    await expect(
+      page.getByRole('button', { name: 'Delete legend entry 1' })
+    ).toBeVisible();
+    await expect(page.getByTestId('custom-legend-remove-entry-0')).toHaveText(
+      'Delete'
+    );
     await expect(legendPreview.getByText('Nodes', { exact: true })).toHaveCount(
       1
     );
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier edge');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    const addedEntryId = await page
+      .getByTestId('custom-legend-entry-label-0')
+      .evaluate(element =>
+        element
+          .closest('[data-legend-entry-id]')
+          ?.getAttribute('data-legend-entry-id')
+      );
+    expect(addedEntryId).toBeTruthy();
+    const movedEntry = page.locator(`[data-legend-entry-id="${addedEntryId}"]`);
+    const movedEntryMoveUp = movedEntry.locator(
+      '[data-legend-reorder-action="up"]'
+    );
+    const movedEntryMoveDown = movedEntry.locator(
+      '[data-legend-reorder-action="down"]'
+    );
+    await page.getByTestId('custom-legend-entry-group-0').fill('hi');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier edge');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
     await legendPlacement.selectOption('top-left');
 
     await expect(legendPreview).toHaveAttribute(
@@ -1288,10 +1868,67 @@ while (true) {}
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Frontier edge' })
     ).toBeVisible();
+    await expect(legendPreview.getByText('hi', { exact: true })).toBeVisible();
     await expect(
       legendPreview.locator('line[stroke="#f59e0b"]')
     ).toHaveAttribute('stroke', '#f59e0b');
+    let legendTextOrder = await legendPreview
+      .locator('text')
+      .evaluateAll(nodes => nodes.map(node => node.textContent));
+    expect(legendTextOrder.indexOf('hi')).toBeGreaterThan(-1);
+    expect(legendTextOrder.indexOf('Nodes')).toBeGreaterThan(-1);
+    expect(legendTextOrder.indexOf('Edges')).toBeGreaterThan(-1);
+    expect(legendTextOrder.indexOf('hi')).toBeLessThan(
+      legendTextOrder.indexOf('Frontier edge')
+    );
+    expect(legendTextOrder.indexOf('Frontier edge')).toBeLessThan(
+      legendTextOrder.indexOf('Nodes')
+    );
+    expect(legendTextOrder.indexOf('Nodes')).toBeLessThan(
+      legendTextOrder.indexOf('Edges')
+    );
+
+    await movedEntryMoveDown.click();
+    await expect(page.getByTestId('custom-legend-entry-group-1')).toHaveValue(
+      'hi'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-1')).toHaveValue(
+      'Frontier edge'
+    );
+    await expect(movedEntryMoveDown).toBeFocused();
+    await movedEntryMoveDown.click();
+    await expect(page.getByTestId('custom-legend-entry-group-2')).toHaveValue(
+      'hi'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-2')).toHaveValue(
+      'Frontier edge'
+    );
+    await expect(movedEntryMoveDown).toBeFocused();
+    await movedEntryMoveUp.click();
+    await expect(page.getByTestId('custom-legend-entry-group-1')).toHaveValue(
+      'hi'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-1')).toHaveValue(
+      'Frontier edge'
+    );
+    await expect(movedEntryMoveUp).toBeFocused();
+    legendTextOrder = await legendPreview
+      .locator('text')
+      .evaluateAll(nodes => nodes.map(node => node.textContent));
+    expect(legendTextOrder.indexOf('Nodes')).toBeLessThan(
+      legendTextOrder.indexOf('hi')
+    );
+    expect(legendTextOrder.indexOf('hi')).toBeLessThan(
+      legendTextOrder.indexOf('Frontier edge')
+    );
     await expect(graphCanvas(page)).toBeVisible();
+
+    for (let moveCount = 0; moveCount < 10; moveCount += 1) {
+      if (await movedEntryMoveDown.isDisabled()) break;
+      await movedEntryMoveDown.click();
+    }
+    await expect(movedEntryMoveDown).toBeDisabled();
+    await expect(movedEntryMoveUp).toBeFocused();
 
     await page.getByTestId('custom-legend-reset').click();
     await expect(legendToggle).toBeChecked();
@@ -1346,10 +1983,29 @@ while (true) {}
     );
     await expect(page.getByText('Node Properties')).toBeVisible();
     await expect(selectionRing).toBeVisible();
-    await expect(selectionRing).toHaveAttribute('stroke', '#2563EB');
+    await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
+    await expect(selectionRing).toHaveAttribute('r', '25');
+    await expect(selectionRing).toHaveAttribute('stroke-width', '1.5');
+    await expect(page.getByLabel('Node property scope help')).toHaveCount(0);
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(selectionRing).toHaveAttribute('stroke', '#60A5FA');
+    await expect(page.getByTestId('left-sidebar')).toHaveCSS(
+      'background-color',
+      'rgb(17, 24, 39)'
+    );
+    await expect(propertyPanel(page)).toHaveCSS(
+      'background-color',
+      'rgb(17, 24, 39)'
+    );
+    await expect(page.getByTestId('left-sidebar')).toHaveCSS(
+      'overscroll-behavior-y',
+      'contain'
+    );
+    await expect(propertyPanel(page)).toHaveCSS(
+      'overscroll-behavior-y',
+      'contain'
+    );
+    await expect(selectionRing).toHaveAttribute('stroke', '#38BDF8');
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Clear node selection' }).click();
@@ -1372,11 +2028,32 @@ while (true) {}
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
-    await page.getByRole('button', { name: 'Clear edge selection' }).click();
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
+    await expect(page.getByText('Edge Properties')).toHaveCount(0);
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(
+      page.getByText(/Source node .* selected\. Click a target node\./)
+    ).toBeVisible();
+    await expect(drawSourceRing).toBeVisible();
+    await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
+    await expect(drawSourceRing).toHaveAttribute('r', '26');
+    await expect(drawSourceRing).toHaveAttribute('stroke-width', '1.5');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(drawSourceRing).toHaveCount(0);
+    await page.getByTestId('tool-button-select').click();
 
     await firstNode.click();
     await secondNode.click({ modifiers: ['Shift'] });
@@ -1385,6 +2062,20 @@ while (true) {}
       'selection'
     );
     await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id]')
+    ).toHaveCount(0);
+    const colorGreenButton = page.getByRole('button', { name: 'Color green' });
+    await expect(colorGreenButton).toHaveClass(/focus-visible:ring-1/);
+    await expect(colorGreenButton).not.toHaveClass(/focus:ring-2/);
+    await colorGreenButton.click();
+    await expect(colorGreenButton).toBeFocused();
+    expect(
+      await colorGreenButton.evaluate(button => ({
+        focusVisible: button.matches(':focus-visible'),
+        boxShadow: window.getComputedStyle(button).boxShadow,
+      }))
+    ).toEqual({ focusVisible: false, boxShadow: 'none' });
     await page.getByRole('button', { name: 'Clear selection' }).click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1415,6 +2106,24 @@ while (true) {}
       exact: true,
     });
     await nodeLabelInput.fill('Node Alpha');
+    await page.getByTestId('frame-duration-input').click({ clickCount: 3 });
+    await page.getByTestId('frame-duration-input').type('720');
+    await page.getByTestId('frame-duration-input').press('Enter');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await page.getByLabel('Show caption').check();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await page.getByLabel('Show caption').uncheck();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await nodeLabelInput.focus();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1423,11 +2132,43 @@ while (true) {}
     await expect(nodeLabelInput).toHaveValue('Node Alpha');
 
     await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(selectionRing).toHaveCount(0);
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
-    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '5 4');
+    await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
+    const edgeCountBeforeSelfLoop = await graphCanvas(page)
+      .locator('[data-edge-path-id]')
+      .count();
+    await firstNode.click();
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      edgeCountBeforeSelfLoop + 1
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id]').last()
+    ).toHaveAttribute('d', / C /);
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'edge'
+    );
+    await expect(drawSourceRing).toHaveCount(0);
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await firstNode.click();
+    await expect(drawSourceRing).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await page.getByRole('button', { name: 'Draw Edge' }).click();
+    await graphNodes.first().click();
+    await expect(drawSourceRing).toBeVisible();
+    await page.getByTestId('timeline-frame-card').nth(1).click();
+    await expect(drawSourceRing).toHaveCount(0);
+    await expect(
+      page.getByText('Click a source node, then a target node.')
+    ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1440,6 +2181,19 @@ while (true) {}
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toHaveCount(0);
     await expect(drawSourceRing).toHaveCount(0);
+
+    await page.getByTestId('tool-button-select').click();
+    await firstNode.click();
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await choosePreset(page, 'dfs');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(selectionRing).toHaveCount(0);
 
     expect(errors).toEqual([]);
   });
@@ -1485,9 +2239,16 @@ while (true) {}
     await expect(curveAmount).toBeDisabled();
     await expect(curveAmountHelp).toBeVisible();
     await curveAmountHelp.focus();
-    await expect(
-      page.getByText('Only works when Edge Routing is Curved.').last()
-    ).toBeVisible();
+    const straightRoutingTooltip = page
+      .getByRole('tooltip')
+      .filter({ hasText: 'Only affects Curved edge routing' })
+      .last();
+    await expectTooltipInsideViewport(straightRoutingTooltip);
+    const tooltipBox = await straightRoutingTooltip.boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox.width).toBeGreaterThanOrEqual(240);
+    expect(tooltipBox.width).toBeLessThanOrEqual(250);
+    expect(tooltipBox.height).toBeLessThan(44);
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -1498,9 +2259,12 @@ while (true) {}
     await page.getByLabel('Edge routing').selectOption('bezier');
     await expect(curveAmount).toBeEnabled();
     await curveAmountHelp.focus();
-    await expect(
-      page.getByText('Only works when Edge Routing is Curved.').last()
-    ).toBeVisible();
+    await expectTooltipInsideViewport(
+      page
+        .getByRole('tooltip')
+        .filter({ hasText: 'Only affects Curved edge routing' })
+        .last()
+    );
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
       .not.toBe(straightPath);
@@ -1558,6 +2322,30 @@ while (true) {}
         .locator('text')
         .filter({ hasText: 'Nodes' })
     ).toBeVisible();
+    await expect
+      .poll(async () => {
+        const snapshot = await getCanvasViewSnapshot(page);
+        return {
+          x: Number(snapshot.x),
+          y: Number(snapshot.y),
+          zoom: Number(snapshot.zoom),
+        };
+      })
+      .toEqual({ x: 120, y: 80, zoom: 0.9 });
+
+    let exportMenu = await openExportMenu(page);
+    const roundTripDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const roundTripProject = await readJsonDownload(roundTripDownload);
+    expect(roundTripProject.settings.viewState).toEqual({
+      zoom: 0.9,
+      x: 120,
+      y: 80,
+    });
+    await closeExportMenu(page);
 
     await openImportMenu(page);
     await page
@@ -1579,6 +2367,8 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
 
     const importMenu = await openImportMenu(page);
+    await expect(importMenu).toHaveAttribute('data-modal-frame', 'true');
+    await expect(importMenu.locator('[data-modal-shell="true"]')).toBeVisible();
     await expect(
       importMenu.getByRole('heading', { name: 'Import' })
     ).toBeVisible();
@@ -1593,10 +2383,13 @@ while (true) {}
     await expect(
       importMenu.getByRole('button', { name: 'Paste / Import Edge List' })
     ).toBeVisible();
+    await expect(importMenu.getByText(/Strict 0-based format/)).toBeVisible();
     await importMenu.getByRole('button', { name: 'Cancel' }).click();
     await expect(importMenu).toBeHidden();
 
     const exportMenu = await openExportMenu(page);
+    await expect(exportMenu).toHaveAttribute('data-modal-frame', 'true');
+    await expect(exportMenu.locator('[data-modal-shell="true"]')).toBeVisible();
     await expect(
       exportMenu.getByRole('heading', { name: 'Export' })
     ).toBeVisible();
@@ -1610,6 +2403,136 @@ while (true) {}
       await parserModal.getByRole('button', { name: 'Cancel' }).click();
     }
     await closeExportMenu(page);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('validates edge-list imports atomically with strict CP format', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const originalDescription = await page
+      .getByPlaceholder('Enter a description for this frame...')
+      .inputValue();
+    const originalNodeCount = await graphNodeCircles(page).count();
+    const originalEdgeCount = await graphCanvas(page)
+      .locator('[data-edge-path-id]')
+      .count();
+
+    const parserModal = await openEdgeListParser(page);
+    await expect(
+      parserModal.getByText(/Strict 0-based CP format/)
+    ).toBeVisible();
+    const parserEditor = parserModal.locator('textarea');
+    const invalidCases = [
+      {
+        input: 'n m\n0 1\n1 2\n2 3',
+        message: /Header n must be an integer/,
+      },
+      {
+        input: '4 10\n0 1\n1 2\n2 3',
+        message: /Header declares 10 edge rows but found 3/,
+      },
+      {
+        input: '4 2\n0 1\n1 2\n2 3\n3 0',
+        message: /Header declares 2 edge rows but found 4/,
+      },
+      {
+        input: '5 4\n0 1\n1\n2 3\n3 4',
+        message: /Line 3 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0,1\n1-2\n2->3\n3:4',
+        message: /Line 2 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0 1 7 hello\n1 2 weight=3\n2 3 4 5 6\n3 4 banana',
+        message: /Line 2 must be "u v" or "u v weight"/,
+      },
+      {
+        input: '5 4\n0 1\n1 2\n2 99\n-1 3',
+        message: /Line 4 node id 99 is out of range 0\.\.4/,
+      },
+      {
+        input: '5 4',
+        message: /Header declares 4 edge rows but found 0/,
+      },
+    ];
+
+    for (const { input, message } of invalidCases) {
+      await parserEditor.fill(input);
+      await expect(parserModal.getByRole('alert')).toBeHidden();
+      await parserModal.getByRole('button', { name: 'Generate graph' }).click();
+      await expect(parserModal).toBeVisible();
+      await expect(parserModal.getByRole('alert')).toContainText(message);
+      await expect(graphNodeCircles(page)).toHaveCount(originalNodeCount);
+      await expect(
+        graphCanvas(page).locator('[data-edge-path-id]')
+      ).toHaveCount(originalEdgeCount);
+      await expect(
+        page.getByPlaceholder('Enter a description for this frame...')
+      ).toHaveValue(originalDescription);
+    }
+
+    await parserModal.getByRole('button', { name: 'Cancel' }).click();
+    await expect(parserModal).toBeHidden();
+    await expect(graphNodeCircles(page)).toHaveCount(originalNodeCount);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      originalEdgeCount
+    );
+
+    const validParserModal = await openEdgeListParser(page);
+    await validParserModal
+      .locator('textarea')
+      .fill('5 6\n0 1 7\n1 2 -3\n0 1 8\n2 2 4\n3 4\n1 4 0');
+    await validParserModal
+      .getByRole('button', { name: 'Generate graph' })
+      .click();
+    await expect(validParserModal).toBeHidden();
+    const status = page.getByTestId('graph-studio-status');
+    await expect(status).toHaveText('Graph parsed: 5 nodes / 6 edges');
+    await expect(status).toHaveAttribute('data-status-tone', 'success');
+    await expectTooltipInsideViewport(status);
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      6
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e0"]')
+    ).toContainText('7');
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-background]')
+    ).toHaveCount(0);
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-halo="wide"]').first()
+    ).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e1"]')
+    ).toContainText('-3');
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="e3"]')
+    ).toContainText('4');
+    await expect
+      .poll(() =>
+        graphCanvas(page).evaluate((svg, selector) => {
+          const canvasBounds = svg.getBoundingClientRect();
+          return Array.from(svg.querySelectorAll(selector)).every(circle => {
+            const bounds = circle.getBoundingClientRect();
+            return (
+              bounds.left >= canvasBounds.left - 1 &&
+              bounds.top >= canvasBounds.top - 1 &&
+              bounds.right <= canvasBounds.right + 1 &&
+              bounds.bottom <= canvasBounds.bottom + 1
+            );
+          });
+        }, nodeCircleSelector)
+      )
+      .toBe(true);
 
     expect(errors).toEqual([]);
   });
@@ -1665,14 +2588,43 @@ while (true) {}
 
     const exportMenu = await openExportMenu(page);
     const previewImage = await expectExportPreview(page);
-    const viewportPreviewUrl = await previewImage.getAttribute('src');
-    expect(viewportPreviewUrl).toMatch(/^data:image\/svg\+xml/);
+    const fitPreviewUrl = await previewImage.getAttribute('src');
+    expect(fitPreviewUrl).toMatch(/^data:image\/svg\+xml/);
+    await expect(exportMenu.getByLabel('Image Framing')).toHaveValue('fit');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'fit');
+    const fitPreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(getSvgRootAttribute(fitPreviewSvgText, 'data-export-framing')).toBe(
+      'fit'
+    );
+    expectReasonableFittedViewBox(fitPreviewSvgText);
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
       'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
     );
+    await expect(exportMenu.getByTestId('image-export-controls')).toContainText(
+      'Fit graph is the default. Viewport exports the visible editor view; Slide 16:9 composes a presentation frame.'
+    );
 
+    await exportMenu.getByLabel('Image Framing').selectOption('viewport');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-framing', 'viewport');
+    await expectExportPreview(page);
+    await expect
+      .poll(() => previewImage.getAttribute('src'))
+      .not.toBe(fitPreviewUrl);
+    const viewportPreviewUrl = await previewImage.getAttribute('src');
+    const viewportPreviewSvgText = await previewImage.evaluate(async image =>
+      (await fetch(image.src)).text()
+    );
+    expect(
+      getSvgRootAttribute(viewportPreviewSvgText, 'data-export-framing')
+    ).toBe('viewport');
     await exportMenu.getByLabel('Image Framing').selectOption('fit');
     await expect(
       exportMenu.getByTestId('export-preview-panel')
@@ -1722,14 +2674,20 @@ while (true) {}
     ).toBeVisible();
 
     let exportMenu = await openExportMenu(page);
-    let previewState = await getSvgPresentationState(
-      page,
-      await getPreviewSvgText(page)
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-chrome', 'true');
+    let previewSvgText = await getPreviewSvgText(page);
+    expect(getSvgRootAttribute(previewSvgText, 'data-export-framing')).toBe(
+      'fit'
     );
+    const previewViewBox = expectReasonableFittedViewBox(previewSvgText);
+    let previewState = await getSvgPresentationState(page, previewSvgText);
     expect(previewState.firstNode).toMatchObject({
       r: 22,
       strokeWidth: 2,
     });
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
 
     const svgDownload = await expectDownloadFrom({
       page,
@@ -1738,14 +2696,18 @@ while (true) {}
     });
     const svgPath = await svgDownload.path();
     expect(svgPath).not.toBeNull();
-    const exportedState = await getSvgPresentationState(
-      page,
-      await fs.readFile(svgPath, 'utf8')
+    const exportedSvgText = await fs.readFile(svgPath, 'utf8');
+    expect(getSvgRootAttribute(exportedSvgText, 'data-export-framing')).toBe(
+      'fit'
     );
+    expect(exportedSvgText).not.toContain('data-preview-chrome');
+    expect(getSvgViewBox(exportedSvgText)).toEqual(previewViewBox);
+    const exportedState = await getSvgPresentationState(page, exportedSvgText);
     expect(exportedState.firstNode).toMatchObject({
       r: 22,
       strokeWidth: 2,
     });
+    expect(exportedState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1757,6 +2719,18 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
+    const selectedEdgePath = graphCanvas(page).locator(
+      '[data-edge-path-id="e0"]'
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
+    ).toHaveCount(0);
+    await expect(selectedEdgePath).toHaveAttribute('stroke', '#64748B');
+    await expect
+      .poll(async () =>
+        Number(await selectedEdgePath.getAttribute('stroke-width'))
+      )
+      .toBeGreaterThan(2.2);
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
       page,
@@ -1764,6 +2738,7 @@ while (true) {}
     );
     expect(previewState.firstEdge.stroke).toBe('#64748B');
     expect(previewState.firstEdge.strokeWidth).toBeCloseTo(2.2, 3);
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -1784,10 +2759,29 @@ while (true) {}
       r: 22,
       strokeWidth: 2,
     });
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(
       page.getByText(/Source node .* selected\. Click a target node\./)
     ).toBeVisible();
+
+    await page.getByTestId('tool-button-select').click();
+    await firstNode.click();
+    await graphNodes.nth(1).click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'selection'
+    );
+    await expect(
+      graphCanvas(page).locator('[data-edge-selection-underlay-id]')
+    ).toHaveCount(0);
+    exportMenu = await openExportMenu(page);
+    previewState = await getSvgPresentationState(
+      page,
+      await getPreviewSvgText(page)
+    );
+    expect(previewState.edgeSelectionUnderlayCount).toBe(0);
+    await closeExportMenu(page);
 
     expect(errors).toEqual([]);
   });
@@ -1904,7 +2898,10 @@ while (true) {}
       page.getByRole('checkbox', { name: 'Lock View' })
     ).toBeChecked();
     await expect(page.getByLabel('Caption Style')).toHaveValue('subtle');
-    await expect(page.getByLabel('Caption Size')).toHaveValue('medium');
+    await expect(page.getByLabel('Caption Size', { exact: true })).toHaveCount(
+      0
+    );
+    await expect(page.getByLabel('Caption Font Size')).toHaveValue('12');
     await expect(page.getByTestId('frame-caption-overlay')).toContainText(
       'Pasted JSON import test'
     );
@@ -1917,6 +2914,10 @@ while (true) {}
       'medium'
     );
     await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+      'data-caption-font-size',
+      '12'
+    );
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
       'data-caption-position-x',
       '0.2'
     );
@@ -1924,6 +2925,21 @@ while (true) {}
       'data-caption-position-y',
       '0.7'
     );
+
+    const exportMenu = await openExportMenu(page);
+    const projectDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const exportedProject = await readJsonDownload(projectDownload);
+    expect(exportedProject.settings.captionOverlay.enabled).toBe(false);
+    expect(exportedProject.settings.captionOverlay.fontSize).toBe(12);
+    expect(exportedProject.settings.globalSettings.nodeLabelFontSize).toBe(13);
+    expect(exportedProject.settings.globalSettings.edgeLabelFontSize).toBe(16);
+    expect(exportedProject.timeline.steps[0].captionVisible).toBe(true);
+    expect(exportedProject.timeline.steps[0]).not.toHaveProperty('showCaption');
+    await closeExportMenu(page);
 
     expect(errors).toEqual([]);
   });
@@ -2010,22 +3026,32 @@ while (true) {}
 
     await legendTitle.fill('Traversal Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Frontier');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-0').fill('hi');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
+    await page.getByTestId('custom-legend-move-down-0').click();
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
     ).toBeVisible();
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Frontier' })
     ).toBeVisible();
+    await expect(legendPreview.getByText('hi', { exact: true })).toBeVisible();
     await expect(
       legendPreview.locator('line[stroke="#f59e0b"]')
     ).toHaveAttribute('stroke', '#f59e0b');
 
     await closeLegendEditor(page);
     const draggedPosition = await dragLegend(page);
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      ''
+    );
+    expect(
+      await legendPreview.evaluate(
+        element => getComputedStyle(element).userSelect
+      )
+    ).toBe('none');
     expect(draggedPosition.x).toBeGreaterThanOrEqual(0);
     expect(draggedPosition.x).toBeLessThanOrEqual(1);
     expect(draggedPosition.y).toBeGreaterThanOrEqual(0);
@@ -2057,16 +3083,12 @@ while (true) {}
       draggedPosition.y,
       5
     );
-    expect(exportedProject.settings.customLegend.entries).toEqual(
-      expect.arrayContaining([
-        {
-          group: 'Edges',
-          kind: 'edge',
-          label: 'Frontier',
-          color: '#f59e0b',
-        },
-      ])
-    );
+    expect(exportedProject.settings.customLegend.entries[1]).toEqual({
+      group: 'hi',
+      kind: 'edge',
+      label: 'Frontier',
+      color: '#f59e0b',
+    });
     await closeExportMenu(page);
 
     await legendToggle.uncheck();
@@ -2083,16 +3105,16 @@ while (true) {}
     await expect(legendToggle).toBeChecked();
     await expect(legendTitle).toHaveValue('Traversal Key');
     await expect(legendPosition).toHaveValue('custom');
-    await expect(page.getByTestId('custom-legend-entry-group-6')).toHaveValue(
-      'Edges'
+    await expect(page.getByTestId('custom-legend-entry-group-1')).toHaveValue(
+      'hi'
     );
-    await expect(page.getByTestId('custom-legend-entry-label-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-label-1')).toHaveValue(
       'Frontier'
     );
-    await expect(page.getByTestId('custom-legend-entry-kind-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-kind-1')).toHaveValue(
       'edge'
     );
-    await expect(page.getByTestId('custom-legend-entry-color-6')).toHaveValue(
+    await expect(page.getByTestId('custom-legend-entry-color-1')).toHaveValue(
       '#f59e0b'
     );
     await expect(legendPreview).toBeVisible();
@@ -2128,15 +3150,17 @@ while (true) {}
     await expect(page.getByTestId('custom-export-legend')).toBeHidden();
 
     const selfLoopEdge = graphCanvas(page).locator(
-      'path[marker-end^="url(#graphstudio-arrow-"]'
+      '[data-edge-path-id="loop"]'
+    );
+    const selfLoopArrowhead = graphCanvas(page).locator(
+      '[data-edge-arrowhead-id="loop"]'
     );
     await expect(selfLoopEdge).toHaveCount(1);
     await expect(selfLoopEdge.first()).toBeVisible();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#64748b');
-    await expect(selfLoopEdge.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-64748b)'
-    );
+    await expect(selfLoopEdge.first()).not.toHaveAttribute('marker-end', /./);
+    await expect(selfLoopArrowhead).toBeVisible();
+    await expect(selfLoopArrowhead).toHaveAttribute('fill', '#64748b');
     const selfLoopLabel = graphCanvas(page).locator(
       '[data-edge-label-id="loop"]'
     );
@@ -2151,7 +3175,7 @@ while (true) {}
     );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
-    await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
+    await expect(selfLoopLabelText).toHaveAttribute('font-size', '16');
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
     await expect(selfLoopLabelText).toHaveAttribute('stroke', 'none');
     await expect(selfLoopLabelHalo).toBeVisible();
@@ -2160,26 +3184,39 @@ while (true) {}
     await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
     expect(
       Number(await selfLoopLabelHalo.getAttribute('stroke-width'))
-    ).toBeCloseTo(2.64, 2);
+    ).toBeCloseTo(3.2, 2);
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'light'
+    );
     await expect(selfLoopLabel.locator('rect')).toHaveCount(0);
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
     await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
 
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'dark'
+    );
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#F8FAFC');
     await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#121212');
     await expect(canvasBackground).toHaveAttribute('fill', '#121212');
 
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'light'
+    );
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
     await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
     await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
+    await expect(selfLoopArrowhead).toHaveAttribute('fill', '#f59e0b');
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await page.locator('[data-testid="script-modal"] textarea').fill(`
@@ -2207,7 +3244,7 @@ api.edge('loop', '#3b82f6');
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
     expect(exportedSvg).toContain('data-edge-label-halo="true"');
-    expect(exportedSvg).toContain('font-size="12"');
+    expect(exportedSvg).toContain('font-size="16"');
     expect(exportedSvg).toContain('stroke="#FFFFFF"');
     expect(exportedSvg).toContain('>loop</text>');
 
@@ -2271,10 +3308,15 @@ api.edge('loop', '#3b82f6');
         .dispatchEvent('click');
       await expect(page.getByText('Edge Properties')).toBeVisible();
       await expect(
-        graphCanvas(page).locator(`[data-edge-path-id="${edgeId}"]`)
-      ).toHaveAttribute('marker-end', /^url\(#graphstudio-arrow-[^)]+\)$/);
+        graphCanvas(page).locator(`[data-edge-arrowhead-id="${edgeId}"]`)
+      ).toBeVisible();
     }
 
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
     await page.getByText('Frame 2').click();
     await expect.poll(getPathMap).toEqual(straightPaths);
 
@@ -2301,9 +3343,16 @@ api.edge('loop', '#3b82f6');
       .filter(Boolean);
     expect(exportedEdgeTags).toHaveLength(7);
     expect(new Set(exportedPathData).size).toBe(7);
-    expect(
-      exportedEdgeTags.every(tag => tag.includes('marker-end="url(#'))
-    ).toBe(true);
+    const exportedArrowheadTags =
+      exportedSvg.match(
+        /<polygon\b[^>]*data-edge-arrowhead-id="[^"]+"[^>]*>/g
+      ) ?? [];
+    expect(exportedArrowheadTags).toHaveLength(7);
+    expect(exportedEdgeTags.some(tag => tag.includes('marker-end='))).toBe(
+      false
+    );
+    expect(exportedSvg).toContain('data-edge-arrowhead-id="forward-1"');
+    expect(exportedSvg).toContain('data-edge-arrowhead-id="reverse-1"');
     expect(exportedSvg).toContain('data-edge-label-id="forward-1"');
     expect(exportedSvg).toContain('data-edge-label-id="reverse-1"');
 
@@ -2419,28 +3468,65 @@ api.edge('loop', '#3b82f6');
 
     await choosePreset(page, 'dfs');
 
-    const marker = graphCanvas(page).locator('marker#graphstudio-arrow-64748b');
-    await expect(marker).toHaveAttribute('markerWidth', '12');
-    await expect(marker).toHaveAttribute('markerHeight', '12');
-    await expect(marker).toHaveAttribute('refX', '10');
-    await expect(marker).toHaveAttribute('refY', '6');
-    await expect(marker).toHaveAttribute('orient', 'auto');
-    await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
+    const directedEdge = graphCanvas(page).locator('[data-edge-path-id="e0"]');
+    const arrowhead = graphCanvas(page).locator(
+      '[data-edge-arrowhead-id="e0"]'
+    );
+    const edgeHitTarget = graphCanvas(page).locator(
+      '[data-edge-hit-target-id="e0"]'
+    );
+    const getArrowBodyBaseOverlap = async () =>
+      graphCanvas(page).evaluate(() => {
+        const path = document.querySelector('[data-edge-path-id="e0"]');
+        const arrow = document.querySelector('[data-edge-arrowhead-id="e0"]');
+        const values = (
+          path?.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? []
+        )
+          .map(Number)
+          .filter(Number.isFinite);
+        const baseX = Number(arrow?.getAttribute('data-edge-arrow-base-x'));
+        const baseY = Number(arrow?.getAttribute('data-edge-arrow-base-y'));
+        const tipX = Number(arrow?.getAttribute('data-edge-arrow-tip-x'));
+        const tipY = Number(arrow?.getAttribute('data-edge-arrow-tip-y'));
+        if (
+          values.length < 4 ||
+          ![baseX, baseY, tipX, tipY].every(Number.isFinite)
+        ) {
+          return -999;
+        }
+        const endX = values[values.length - 2];
+        const endY = values[values.length - 1];
+        const length = Math.hypot(tipX - baseX, tipY - baseY);
+        if (length <= 0) return -999;
+        return (
+          ((endX - baseX) * (tipX - baseX) + (endY - baseY) * (tipY - baseY)) /
+          length
+        );
+      });
+    const expectBodyOverlapsArrowBase = async () => {
+      await expect.poll(getArrowBodyBaseOverlap).toBeGreaterThan(0.4);
+      await expect.poll(getArrowBodyBaseOverlap).toBeLessThanOrEqual(1.1);
+    };
 
-    const markerTriangle = graphCanvas(page).locator(
-      'marker#graphstudio-arrow-64748b path'
-    );
-    await expect(markerTriangle).toHaveAttribute('fill', '#64748B');
-
-    const directedEdges = graphCanvas(page).locator(
-      'path[marker-end^="url(#graphstudio-arrow-"]'
-    );
-    await expect(directedEdges.first()).toBeVisible();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#64748B');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-64748b)'
-    );
+    await expect(directedEdge).toBeVisible();
+    await expect(directedEdge).toHaveAttribute('stroke', '#64748B');
+    await expect(directedEdge).not.toHaveAttribute('marker-end', /./);
+    await expect(directedEdge).toHaveAttribute('stroke-linecap', 'butt');
+    await expect(arrowhead).toBeVisible();
+    await expect(arrowhead).toHaveAttribute('fill', '#64748B');
+    await expect(arrowhead).toHaveAttribute('stroke', '#64748B');
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
+      )
+      .toBeGreaterThan(14);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
+      )
+      .toBeGreaterThan(13);
+    await expectBodyOverlapsArrowBase();
+    await expectDirectedEdgesAnchored(page);
 
     await openExportMenu(page);
     const defaultSvgDownload = await expectDownloadFrom({
@@ -2451,23 +3537,15 @@ api.edge('loop', '#3b82f6');
     const defaultSvgPath = await defaultSvgDownload.path();
     expect(defaultSvgPath).not.toBeNull();
     const defaultExportedSvg = await fs.readFile(defaultSvgPath, 'utf8');
-    expect(defaultExportedSvg).toContain('id="graphstudio-arrow-64748b"');
-    expect(defaultExportedSvg).toContain('data-edge-color="#64748B"');
+    expect(defaultExportedSvg).toContain('data-edge-arrowhead-id="e0"');
     expect(defaultExportedSvg).toContain('fill="#64748B"');
-    expect(defaultExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-64748b)"'
-    );
+    expect(defaultExportedSvg).not.toContain('marker-end=');
     await closeExportMenu(page);
 
     await page.getByText('Frame 2').click();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#3b82f6');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-3b82f6)'
-    );
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-3b82f6 path')
-    ).toHaveAttribute('fill', '#3b82f6');
+    await expect(directedEdge).toHaveAttribute('stroke', '#3b82f6');
+    await expect(arrowhead).toHaveAttribute('fill', '#3b82f6');
+    await expectBodyOverlapsArrowBase();
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await page.locator('[data-testid="script-modal"] textarea').fill(`
@@ -2476,14 +3554,9 @@ api.edge('e0', '#f59e0b');
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await page.getByText('Frame 2').click();
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#f59e0b');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-f59e0b)'
-    );
-    await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-f59e0b path')
-    ).toHaveAttribute('fill', '#f59e0b');
+    await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
+    await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
+    await expectBodyOverlapsArrowBase();
 
     await openExportMenu(page);
     const overrideSvgDownload = await expectDownloadFrom({
@@ -2494,27 +3567,47 @@ api.edge('e0', '#f59e0b');
     const overrideSvgPath = await overrideSvgDownload.path();
     expect(overrideSvgPath).not.toBeNull();
     const overrideExportedSvg = await fs.readFile(overrideSvgPath, 'utf8');
-    expect(overrideExportedSvg).toContain('id="graphstudio-arrow-f59e0b"');
-    expect(overrideExportedSvg).toContain('data-edge-color="#f59e0b"');
+    expect(overrideExportedSvg).toContain('data-edge-arrowhead-id="e0"');
     expect(overrideExportedSvg).toContain('fill="#f59e0b"');
-    expect(overrideExportedSvg).toContain(
-      'marker-end="url(#graphstudio-arrow-f59e0b)"'
-    );
+    expect(overrideExportedSvg).not.toContain('marker-end=');
     await closeExportMenu(page);
 
-    const firstEdgeHitTarget = directedEdges
-      .first()
-      .locator('xpath=..')
-      .locator('path[stroke="rgba(0,0,0,0)"]');
-    await firstEdgeHitTarget.dispatchEvent('click');
-    await expect(directedEdges.first()).toHaveAttribute('stroke', '#171717');
-    await expect(directedEdges.first()).toHaveAttribute(
-      'marker-end',
-      'url(#graphstudio-arrow-171717)'
+    const arrowLengthBeforeSelection = Number(
+      await arrowhead.getAttribute('data-edge-arrow-length')
     );
+    await edgeHitTarget.dispatchEvent('click');
+    await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
+    await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
     await expect(
-      graphCanvas(page).locator('marker#graphstudio-arrow-171717 path')
-    ).toHaveAttribute('fill', '#171717');
+      graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
+    ).toHaveCount(0);
+    await expect
+      .poll(async () => Number(await directedEdge.getAttribute('stroke-width')))
+      .toBeGreaterThan(2.2);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
+      )
+      .toBeGreaterThan(arrowLengthBeforeSelection);
+    await expectBodyOverlapsArrowBase();
+
+    await page.keyboard.press('Escape');
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await setRangeValue(page, 'Edge width', 5);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-length'))
+      )
+      .toBeGreaterThan(25);
+    await expect
+      .poll(async () =>
+        Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
+      )
+      .toBeGreaterThan(20);
+    await expectBodyOverlapsArrowBase();
 
     expect(errors).toEqual([]);
   });
@@ -2580,7 +3673,8 @@ api.edge('e0', '#f59e0b');
     const pngScaleSelect = page.getByTestId('png-scale-select');
     const imageFramingSelect = page.getByTestId('image-framing-select');
     await expect(pngScaleSelect).toHaveValue('2');
-    await expect(imageFramingSelect).toHaveValue('viewport');
+    await expect(imageFramingSelect).toHaveValue('fit');
+    await expect(imageFramingSelect).toContainText('Viewport');
     await expect(imageFramingSelect).toContainText('Slide 16:9');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
@@ -2589,12 +3683,22 @@ api.edge('e0', '#f59e0b');
     ).not.toBeChecked();
     await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
-    await expectDownloadFrom({
+    const defaultTimelineSvgDownload = await expectDownloadFrom({
       page,
       locator: page.getByTestId('svg-export-button'),
       filenamePattern: /\.svg$/,
     });
     await expect(page.getByText('SVG exported')).toBeVisible();
+    const defaultTimelineSvgPath = await defaultTimelineSvgDownload.path();
+    expect(defaultTimelineSvgPath).not.toBeNull();
+    const defaultTimelineSvgText = await fs.readFile(
+      defaultTimelineSvgPath,
+      'utf8'
+    );
+    expect(
+      getSvgRootAttribute(defaultTimelineSvgText, 'data-export-framing')
+    ).toBe('fit');
+    expectReasonableFittedViewBox(defaultTimelineSvgText);
 
     const twoXDownload = await expectDownloadFrom({
       page,
@@ -2637,10 +3741,10 @@ api.edge('e0', '#f59e0b');
     await expandLegendEditor(page);
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
     await page.getByTestId('custom-legend-add-entry').click();
-    await page.getByTestId('custom-legend-entry-group-6').fill('Edges');
-    await page.getByTestId('custom-legend-entry-label-6').fill('Critical path');
-    await page.getByTestId('custom-legend-entry-kind-6').selectOption('edge');
-    await page.getByTestId('custom-legend-entry-color-6').fill('#f59e0b');
+    await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
+    await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');
+    await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
+    await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
     await expect(page.getByTestId('custom-export-legend')).toBeVisible();
     await closeLegendEditor(page);
     await dragLegend(page, { dx: -180, dy: -120 });
