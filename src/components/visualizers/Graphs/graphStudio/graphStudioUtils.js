@@ -62,19 +62,26 @@ export const normalizeBaseGraph = (payload = DEFAULT_GRAPH) => {
     .filter(Boolean);
   return { nodes, edges };
 };
-const normalizeStep = (step, index) => ({
-  id: String(step?.id ?? `step-${index}`),
-  description: String(step?.description ?? `Step ${index + 1}`),
-  durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
-  nodeOverrides:
-    step?.nodeOverrides && typeof step.nodeOverrides === 'object'
-      ? JSON.parse(JSON.stringify(step.nodeOverrides))
-      : {},
-  edgeOverrides:
-    step?.edgeOverrides && typeof step.edgeOverrides === 'object'
-      ? JSON.parse(JSON.stringify(step.edgeOverrides))
-      : {},
-});
+const normalizeStep = (step, index) => {
+  const captionVisible =
+    typeof step?.captionVisible === 'boolean'
+      ? step.captionVisible
+      : step?.showCaption;
+  return {
+    id: String(step?.id ?? `step-${index}`),
+    description: String(step?.description ?? `Step ${index + 1}`),
+    durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
+    ...(typeof captionVisible === 'boolean' ? { captionVisible } : {}),
+    nodeOverrides:
+      step?.nodeOverrides && typeof step.nodeOverrides === 'object'
+        ? JSON.parse(JSON.stringify(step.nodeOverrides))
+        : {},
+    edgeOverrides:
+      step?.edgeOverrides && typeof step.edgeOverrides === 'object'
+        ? JSON.parse(JSON.stringify(step.edgeOverrides))
+        : {},
+  };
+};
 export const normalizeTimelinePayload = payload => {
   if (payload?.baseGraph && Array.isArray(payload?.steps)) {
     return {
@@ -144,68 +151,93 @@ export const computeStepDiff = (previousGraph, nextGraph) => {
 };
 export const parseEdgeListText = text => {
   const source = String(text ?? '').trim();
-  if (!source)
-    return { graph: normalizeBaseGraph(DEFAULT_GRAPH), meta: 'empty' };
+  if (!source) {
+    throw new Error('Paste an edge list with header "n m" before importing.');
+  }
   const lines = source
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean);
-  if (!lines.length)
-    return { graph: normalizeBaseGraph(DEFAULT_GRAPH), meta: 'empty' };
-  const first = lines[0].split(/\s+/).map(Number);
-  let n = 0;
-  let m = 0;
-  let startIndex = 0;
-  if (
-    first.length >= 2 &&
-    Number.isFinite(first[0]) &&
-    Number.isFinite(first[1])
-  ) {
-    n = first[0];
-    m = first[1];
-    startIndex = 1;
+  if (!lines.length) {
+    throw new Error('Paste an edge list with header "n m" before importing.');
   }
+
+  const parseIntegerToken = (token, label) => {
+    if (!/^-?(0|[1-9]\d*)$/.test(token)) {
+      throw new Error(`${label} must be an integer.`);
+    }
+    const value = Number(token);
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(`${label} is too large.`);
+    }
+    return value;
+  };
+  const parseNodeId = (token, label, n) => {
+    const value = parseIntegerToken(token, label);
+    if (value < 0 || value >= n) {
+      throw new Error(`${label} ${value} is out of range 0..${n - 1}.`);
+    }
+    return value;
+  };
+  const parseWeight = (token, lineNumber) => {
+    if (!/^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token)) {
+      throw new Error(`Line ${lineNumber} weight must be numeric.`);
+    }
+    const value = Number(token);
+    if (!Number.isFinite(value)) {
+      throw new Error(`Line ${lineNumber} weight must be numeric.`);
+    }
+    return token;
+  };
+
+  const header = lines[0].split(/\s+/);
+  if (header.length !== 2) {
+    throw new Error('Header must be exactly two integers: n m.');
+  }
+  const n = parseIntegerToken(header[0], 'Header n');
+  const m = parseIntegerToken(header[1], 'Header m');
+  if (n < 1) {
+    throw new Error('Header n must be at least 1.');
+  }
+  if (m < 0) {
+    throw new Error('Header m must be at least 0.');
+  }
+
+  const edgeLines = lines.slice(1);
+  if (edgeLines.length !== m) {
+    throw new Error(
+      `Header declares ${m} edge rows but found ${edgeLines.length}.`
+    );
+  }
+
   const parsedEdges = [];
-  for (let index = startIndex; index < lines.length; index += 1) {
-    if (m && parsedEdges.length >= m) break;
+  for (let index = 1; index < lines.length; index += 1) {
+    const lineNumber = index + 1;
     const parts = lines[index].split(/\s+/);
-    if (parts.length < 2) continue;
-    const rawU = parts[0];
-    const rawV = parts[1];
-    const rawW = parts[2];
-    const u = Number.isFinite(Number(rawU)) ? Number(rawU) : rawU;
-    const v = Number.isFinite(Number(rawV)) ? Number(rawV) : rawV;
+    if (parts.length < 2 || parts.length > 3) {
+      throw new Error(`Line ${lineNumber} must be "u v" or "u v weight".`);
+    }
+    const u = parseNodeId(parts[0], `Line ${lineNumber} node id`, n);
+    const v = parseNodeId(parts[1], `Line ${lineNumber} node id`, n);
+    const rawW = parts[2] ? parseWeight(parts[2], lineNumber) : '';
     parsedEdges.push({ from: u, to: v, label: rawW ?? '' });
   }
-  const nodeSet = new Set();
-  parsedEdges.forEach(edge => {
-    nodeSet.add(String(edge.from));
-    nodeSet.add(String(edge.to));
-  });
-  if (n > 0) {
-    for (let value = 0; value < n; value += 1) nodeSet.add(String(value));
-  }
-  const orderedIds = Array.from(nodeSet).map(id =>
-    Number.isFinite(Number(id)) ? Number(id) : id
-  );
+
+  const orderedIds = Array.from({ length: n }, (_, id) => id);
   const radius = Math.max(180, Math.min(VIEWBOX_WIDTH, VIEWBOX_HEIGHT) / 2.8);
   const nodes = orderedIds.map((id, index) => {
     const angle = (index / Math.max(orderedIds.length, 1)) * Math.PI * 2;
     const centerX = VIEWBOX_WIDTH / 2;
     const centerY = VIEWBOX_HEIGHT / 2;
+    const x =
+      orderedIds.length === 1 ? centerX : centerX + Math.cos(angle) * radius;
+    const y =
+      orderedIds.length === 1 ? centerY : centerY + Math.sin(angle) * radius;
     return {
       id,
       label: String(id),
-      x: clamp(
-        centerX + Math.cos(angle) * radius,
-        NODE_RADIUS + 8,
-        VIEWBOX_WIDTH - NODE_RADIUS - 8
-      ),
-      y: clamp(
-        centerY + Math.sin(angle) * radius,
-        NODE_RADIUS + 8,
-        VIEWBOX_HEIGHT - NODE_RADIUS - 8
-      ),
+      x: clamp(x, NODE_RADIUS + 8, VIEWBOX_WIDTH - NODE_RADIUS - 8),
+      y: clamp(y, NODE_RADIUS + 8, VIEWBOX_HEIGHT - NODE_RADIUS - 8),
       visible: true,
     };
   });

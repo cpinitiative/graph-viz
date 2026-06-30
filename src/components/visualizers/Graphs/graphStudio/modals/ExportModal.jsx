@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import GraphCanvas from '../GraphCanvas';
+import { resolveStepCaptionEnabled } from '../lib/captionOverlay';
 import {
   clampExportFrameRange,
   resolveExportFrameIndexes,
@@ -12,7 +13,7 @@ import {
   waitForFrameRender,
 } from '../lib/timelineFrameCapture';
 import NativeSelect from '../NativeSelect';
-import ModalCloseButton from './ModalCloseButton';
+import ModalFrame from './ModalFrame';
 
 const PREVIEW_SVG_ELEMENT_ID = 'graph-studio-export-preview-svg';
 const EMPTY_DIFF = {
@@ -67,6 +68,8 @@ const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
         edgeCurvature={canvas?.edgeCurvature}
         nodeRadius={canvas?.nodeRadius}
         edgeWidth={canvas?.edgeWidth}
+        nodeLabelFontSize={canvas?.nodeLabelFontSize}
+        edgeLabelFontSize={canvas?.edgeLabelFontSize}
         svgElementId={PREVIEW_SVG_ELEMENT_ID}
         svgTestId="export-preview-renderer-svg"
         svgResourcePrefix="export-preview"
@@ -95,7 +98,7 @@ const ExportModal = ({
   onExportPng,
   pngScale = 2,
   onPngScaleChange,
-  imageFraming = 'viewport',
+  imageFraming = IMAGE_FRAMING.fit,
   onImageFramingChange,
   onExportVideo,
   onExportSlideshow,
@@ -152,6 +155,15 @@ const ExportModal = ({
   );
   const selectedStep = steps[previewFrameIndex];
   const previewCaptionText = selectedStep?.description ?? '';
+  const baseCaptionOverlay =
+    previewCanvas?.baseCaptionOverlay ?? previewCanvas?.captionOverlay;
+  const previewCaptionOverlay = useMemo(
+    () => ({
+      ...(baseCaptionOverlay ?? {}),
+      enabled: resolveStepCaptionEnabled(selectedStep, baseCaptionOverlay),
+    }),
+    [baseCaptionOverlay, selectedStep]
+  );
   const previewRenderKey = useMemo(
     () =>
       JSON.stringify({
@@ -159,24 +171,28 @@ const ExportModal = ({
         graph: previewGraph,
         viewState: previewCanvas?.viewState,
         showGrid: Boolean(previewCanvas?.showGrid),
-        captionOverlay: previewCanvas?.captionOverlay,
+        captionOverlay: previewCaptionOverlay,
         captionText: previewCaptionText,
         customLegend: previewCanvas?.customLegend,
         edgeRouting: previewCanvas?.edgeRouting,
         edgeCurvature: previewCanvas?.edgeCurvature,
         nodeRadius: previewCanvas?.nodeRadius,
+        nodeLabelFontSize: previewCanvas?.nodeLabelFontSize,
         edgeWidth: previewCanvas?.edgeWidth,
+        edgeLabelFontSize: previewCanvas?.edgeLabelFontSize,
       }),
     [
-      previewCanvas?.captionOverlay,
       previewCanvas?.customLegend,
       previewCanvas?.edgeCurvature,
       previewCanvas?.edgeRouting,
+      previewCanvas?.edgeLabelFontSize,
       previewCanvas?.edgeWidth,
+      previewCanvas?.nodeLabelFontSize,
       previewCanvas?.nodeRadius,
       previewCanvas?.showGrid,
       previewCanvas?.viewState,
       previewFrameIndex,
+      previewCaptionOverlay,
       previewCaptionText,
       previewGraph,
     ]
@@ -352,367 +368,349 @@ const ExportModal = ({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/75 p-2 sm:p-4"
-      data-testid="export-menu-modal"
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose?.();
-      }}
+    <ModalFrame
+      open={open}
+      testId="export-menu-modal"
+      titleId="export-menu-title"
+      title="Export"
+      maxWidthClass="max-w-[1400px]"
+      maxHeightClass="max-h-[96vh]"
+      overlayClassName="p-2 sm:p-4"
+      bodyClassName="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_390px] lg:overflow-hidden"
+      bodyPadding={false}
+      onClose={onClose}
+      closeOnBackdrop
     >
-      <div
-        className="flex max-h-[96vh] min-h-0 w-full max-w-[1400px] flex-col overflow-hidden border border-[#94A3B8] bg-[#F8F9FA] shadow-2xl dark:border-[#475569] dark:bg-[#0F172A]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="export-menu-title"
+      <section
+        className="flex min-h-[440px] min-w-0 flex-col border-b border-[#CBD5E1] bg-[#E9EDF2] p-4 dark:border-[#334155] dark:bg-[#0B1220] sm:p-6 lg:min-h-0 lg:border-b-0 lg:border-r"
+        data-testid="export-preview-section"
       >
-        <header className="flex flex-none items-start justify-between border-b border-[#CBD5E1] bg-[#FFFFFF] px-5 py-4 dark:border-[#334155] dark:bg-[#111827] sm:px-6">
-          <div>
-            <h2
-              id="export-menu-title"
-              className="text-lg font-semibold text-[#0F172A] dark:text-[#F8FAFC]"
-            >
-              Export
-            </h2>
-          </div>
-          <ModalCloseButton onClick={onClose} />
-        </header>
-
-        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_390px] lg:overflow-hidden">
-          <section
-            className="flex min-h-[440px] min-w-0 flex-col border-b border-[#CBD5E1] bg-[#E9EDF2] p-4 dark:border-[#334155] dark:bg-[#0B1220] sm:p-6 lg:min-h-0 lg:border-b-0 lg:border-r"
-            data-testid="export-preview-section"
-          >
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#475569] dark:text-[#94A3B8]">
-                  Preview
-                </div>
-                <h3 className="mt-1 truncate text-base font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
-                  Frame {previewFrameIndex + 1}
-                  {selectedStep?.description
-                    ? ` — ${selectedStep.description}`
-                    : ''}
-                </h3>
-              </div>
-              <div className="border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#475569] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]">
-                {IMAGE_FRAMING_LABELS[imageFraming] ??
-                  IMAGE_FRAMING_LABELS[IMAGE_FRAMING.viewport]}
-              </div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#475569] dark:text-[#94A3B8]">
+              Preview
             </div>
+            <h3 className="mt-1 truncate text-base font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+              Frame {previewFrameIndex + 1}
+              {selectedStep?.description
+                ? ` — ${selectedStep.description}`
+                : ''}
+            </h3>
+          </div>
+          <div className="border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#475569] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]">
+            {IMAGE_FRAMING_LABELS[imageFraming] ??
+              IMAGE_FRAMING_LABELS[IMAGE_FRAMING.viewport]}
+          </div>
+        </div>
 
+        <div
+          className="flex min-h-[300px] flex-1 items-center justify-center overflow-hidden border border-[#CBD5E1] bg-[#FFFFFF] p-4 shadow-[0_4px_16px_rgba(15,23,42,0.08)] dark:border-[#253449] dark:shadow-[0_0_0_1px_#FFFFFF0A] sm:p-6"
+          data-preview-framing={imageFraming}
+          data-preview-frame-index={previewFrameIndex}
+          data-testid="export-preview-panel"
+          data-preview-chrome="true"
+        >
+          {previewUrl ? (
             <div
-              className="flex min-h-[300px] flex-1 items-center justify-center overflow-hidden border border-[#94A3B8] bg-[#FFFFFF] p-4 shadow-[0_4px_16px_rgba(15,23,42,0.08)] sm:p-6"
-              data-preview-framing={imageFraming}
-              data-preview-frame-index={previewFrameIndex}
-              data-testid="export-preview-panel"
+              className="relative flex h-full w-full items-center justify-center"
+              data-testid="export-preview-current-frame"
             >
-              {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt={`Export preview for frame ${previewFrameIndex + 1}`}
+                className="block max-h-full max-w-full object-contain"
+                data-testid="export-preview-image"
+              />
+              {previewStatus === 'updating' && showDelayedPreviewStatus && (
                 <div
-                  className="relative flex h-full w-full items-center justify-center"
-                  data-testid="export-preview-current-frame"
-                >
-                  <img
-                    src={previewUrl}
-                    alt={`Export preview for frame ${previewFrameIndex + 1}`}
-                    className="block max-h-full max-w-full object-contain"
-                    data-testid="export-preview-image"
-                  />
-                  {previewStatus === 'updating' && showDelayedPreviewStatus && (
-                    <div
-                      className="absolute bottom-2 right-2 border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B] shadow-sm"
-                      data-testid="export-preview-status"
-                    >
-                      Updating preview…
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div
-                  className="max-w-sm text-center text-sm text-[#64748B]"
+                  className="absolute bottom-2 right-2 border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#64748B] shadow-sm"
                   data-testid="export-preview-status"
                 >
-                  {previewStatus === 'error'
-                    ? 'Preview unavailable. Export actions still work.'
-                    : 'Preparing preview...'}
+                  Updating preview…
                 </div>
               )}
             </div>
-            <p className="mt-3 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-              PNG/SVG use the selected image framing. Slideshow exports render
-              into a 16:9 slide frame.
-            </p>
-
-            <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155] dark:text-[#E2E8F0]">
-                  Frame Review
-                </h4>
-                <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                  {includedFrameIndexes.length}{' '}
-                  {includedFrameIndexes.length === 1 ? 'frame' : 'frames'}
-                </span>
-              </div>
-              <div
-                className="flex gap-2 overflow-x-auto pb-1"
-                data-testid="export-preview-frame-list"
-              >
-                {includedFrameIndexes.map(frameIndex => {
-                  const step = steps[frameIndex];
-                  const isSelected = frameIndex === previewFrameIndex;
-                  return (
-                    <button
-                      key={step?.id ?? frameIndex}
-                      type="button"
-                      aria-current={isSelected ? 'true' : undefined}
-                      className={`min-h-[74px] w-[170px] flex-none border px-3 py-2.5 text-left transition-colors sm:w-[190px] ${
-                        isSelected
-                          ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#60A5FA] dark:bg-[#172554] dark:text-[#DBEAFE]'
-                          : 'border-[#CBD5E1] bg-[#FFFFFF] text-[#334155] hover:border-[#94A3B8] hover:bg-[#F8FAFC] dark:border-[#475569] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#64748B]'
-                      }`}
-                      data-selected={isSelected ? 'true' : 'false'}
-                      data-testid={`export-preview-frame-item-${frameIndex}`}
-                      onClick={() => setPreviewFrameIndex(frameIndex)}
-                    >
-                      <span className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-semibold">
-                          Frame {frameIndex + 1}
-                        </span>
-                        {Number.isFinite(Number(step?.durationMs)) && (
-                          <span className="text-[10px] opacity-70">
-                            {Number(step.durationMs)} ms
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed opacity-80">
-                        {step?.description ||
-                          `Timeline frame ${frameIndex + 1}`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+          ) : (
+            <div
+              className="max-w-sm text-center text-sm text-[#64748B]"
+              data-testid="export-preview-status"
+            >
+              {previewStatus === 'error'
+                ? 'Preview unavailable. Export actions still work.'
+                : 'Preparing preview...'}
             </div>
-          </section>
-
-          <aside className="min-h-0 overflow-y-visible border-[#CBD5E1] dark:border-[#334155] lg:overflow-y-auto">
-            <section className={sectionClass}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                Timeline
-              </h3>
-              <div
-                className="space-y-3"
-                data-testid="export-frame-range-controls"
-              >
-                <div className="text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                  Export Frames
-                </div>
-                <div className="grid grid-cols-3 border border-[#CBD5E1] dark:border-[#475569]">
-                  {[
-                    ['all', 'All'],
-                    ['current', 'Current'],
-                    ['range', 'Range'],
-                  ].map(([value, label]) => (
-                    <label
-                      key={value}
-                      className={`relative flex min-h-[38px] cursor-pointer items-center justify-center border-r border-[#CBD5E1] px-2 py-2 text-center text-[11px] font-semibold last:border-r-0 dark:border-[#475569] ${
-                        frameRange.mode === value
-                          ? 'bg-[#0F2747] text-[#FFFFFF]'
-                          : 'bg-[#FFFFFF] text-[#475569] hover:bg-[#F1F5F9] dark:bg-[#111827] dark:text-[#CBD5E1] dark:hover:bg-[#1E293B]'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="export-frame-range-mode"
-                        value={value}
-                        checked={frameRange.mode === value}
-                        onChange={() =>
-                          onExportFrameRangeChange?.({ mode: value })
-                        }
-                        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                      />
-                      <span>{label}</span>
-                    </label>
-                  ))}
-                </div>
-                {isCustomFrameRange && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <label
-                      className="space-y-1.5"
-                      htmlFor="export-frame-range-start"
-                    >
-                      <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                        Start Frame
-                      </span>
-                      <input
-                        id="export-frame-range-start"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={rangeDraft.startFrame}
-                        aria-label="Export start frame"
-                        data-testid="export-frame-start-input"
-                        onFocus={() => {
-                          activeRangeFieldRef.current = 'startFrame';
-                        }}
-                        onChange={event =>
-                          updateRangeDraft('startFrame', event.target.value)
-                        }
-                        onBlur={normalizeRangeDraft}
-                        className={numberInputClass}
-                      />
-                    </label>
-                    <label
-                      className="space-y-1.5"
-                      htmlFor="export-frame-range-end"
-                    >
-                      <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                        End Frame
-                      </span>
-                      <input
-                        id="export-frame-range-end"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={rangeDraft.endFrame}
-                        aria-label="Export end frame"
-                        data-testid="export-frame-end-input"
-                        onFocus={() => {
-                          activeRangeFieldRef.current = 'endFrame';
-                        }}
-                        onChange={event =>
-                          updateRangeDraft('endFrame', event.target.value)
-                        }
-                        onBlur={normalizeRangeDraft}
-                        className={numberInputClass}
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className={primaryActionClass}
-                  data-testid="slideshow-export-button"
-                  disabled={!totalFrames}
-                  onClick={onExportSlideshow}
-                >
-                  Export Slideshow
-                </button>
-                <button
-                  type="button"
-                  className={actionClass}
-                  onClick={() => {
-                    onClose?.();
-                    onExportVideo?.();
-                  }}
-                >
-                  Export MP4
-                </button>
-              </div>
-            </section>
-
-            <section className={sectionClass}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                Current Frame Image
-              </h3>
-              <div
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1"
-                data-testid="image-export-controls"
-              >
-                <label className="space-y-1.5" htmlFor="png-scale-select">
-                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                    PNG Scale
-                  </span>
-                  <NativeSelect
-                    id="png-scale-select"
-                    value={pngScale}
-                    aria-label="PNG Scale"
-                    data-testid="png-scale-select"
-                    onChange={event =>
-                      onPngScaleChange?.(Number(event.target.value))
-                    }
-                    size="regular"
-                  >
-                    <option value={1}>1x</option>
-                    <option value={2}>2x (recommended)</option>
-                    <option value={3}>3x (high quality)</option>
-                  </NativeSelect>
-                </label>
-                <label className="space-y-1.5" htmlFor="image-framing-select">
-                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
-                    Image Framing
-                  </span>
-                  <NativeSelect
-                    id="image-framing-select"
-                    value={imageFraming}
-                    aria-label="Image Framing"
-                    data-testid="image-framing-select"
-                    onChange={event =>
-                      onImageFramingChange?.(event.target.value)
-                    }
-                    size="regular"
-                  >
-                    <option value={IMAGE_FRAMING.viewport}>Viewport</option>
-                    <option value={IMAGE_FRAMING.fit}>Fit graph</option>
-                    <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
-                  </NativeSelect>
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className={primaryActionClass}
-                  data-testid="png-export-button"
-                  onClick={onExportPng}
-                >
-                  Export PNG
-                </button>
-                <button
-                  type="button"
-                  className={actionClass}
-                  data-testid="svg-export-button"
-                  onClick={onExportSvg}
-                >
-                  Export SVG
-                </button>
-              </div>
-            </section>
-
-            <section className={sectionClass}>
-              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-                Project Data
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className={actionClass}
-                  data-testid="project-export-button"
-                  onClick={onExportProject}
-                >
-                  Export Project
-                </button>
-                <button
-                  type="button"
-                  className={actionClass}
-                  onClick={onExportText}
-                >
-                  Export Edge List
-                </button>
-              </div>
-            </section>
-          </aside>
+          )}
         </div>
-      </div>
+        <p className="mt-3 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+          PNG/SVG use the selected image framing. Slideshow exports render into
+          a 16:9 slide frame.
+        </p>
+
+        <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#334155] dark:text-[#E2E8F0]">
+              Frame Review
+            </h4>
+            <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+              {includedFrameIndexes.length}{' '}
+              {includedFrameIndexes.length === 1 ? 'frame' : 'frames'}
+            </span>
+          </div>
+          <div
+            className="flex gap-2 overflow-x-auto pb-1"
+            data-testid="export-preview-frame-list"
+          >
+            {includedFrameIndexes.map(frameIndex => {
+              const step = steps[frameIndex];
+              const isSelected = frameIndex === previewFrameIndex;
+              return (
+                <button
+                  key={step?.id ?? frameIndex}
+                  type="button"
+                  aria-current={isSelected ? 'true' : undefined}
+                  className={`min-h-[74px] w-[170px] flex-none border px-3 py-2.5 text-left transition-colors sm:w-[190px] ${
+                    isSelected
+                      ? 'border-[#B56A2D] bg-[#FFF7ED] text-[#7C2D12] dark:border-[#60A5FA] dark:bg-[#172554] dark:text-[#DBEAFE]'
+                      : 'border-[#CBD5E1] bg-[#FFFFFF] text-[#334155] hover:border-[#94A3B8] hover:bg-[#F8FAFC] dark:border-[#475569] dark:bg-[#111827] dark:text-[#E2E8F0] dark:hover:border-[#64748B]'
+                  }`}
+                  data-selected={isSelected ? 'true' : 'false'}
+                  data-testid={`export-preview-frame-item-${frameIndex}`}
+                  onClick={() => setPreviewFrameIndex(frameIndex)}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold">
+                      Frame {frameIndex + 1}
+                    </span>
+                    {Number.isFinite(Number(step?.durationMs)) && (
+                      <span className="text-[10px] opacity-70">
+                        {Number(step.durationMs)} ms
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed opacity-80">
+                    {step?.description || `Timeline frame ${frameIndex + 1}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <aside className="min-h-0 overflow-y-visible border-[#CBD5E1] dark:border-[#334155] lg:overflow-y-auto">
+        <section className={sectionClass}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+            Timeline
+          </h3>
+          <div className="space-y-3" data-testid="export-frame-range-controls">
+            <div className="text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+              Export Frames
+            </div>
+            <div className="grid grid-cols-3 border border-[#CBD5E1] dark:border-[#475569]">
+              {[
+                ['all', 'All'],
+                ['current', 'Current'],
+                ['range', 'Range'],
+              ].map(([value, label]) => (
+                <label
+                  key={value}
+                  className={`relative flex min-h-[38px] cursor-pointer items-center justify-center border-r border-[#CBD5E1] px-2 py-2 text-center text-[11px] font-semibold last:border-r-0 dark:border-[#475569] ${
+                    frameRange.mode === value
+                      ? 'bg-[#0F2747] text-[#FFFFFF]'
+                      : 'bg-[#FFFFFF] text-[#475569] hover:bg-[#F1F5F9] dark:bg-[#111827] dark:text-[#CBD5E1] dark:hover:bg-[#1E293B]'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="export-frame-range-mode"
+                    value={value}
+                    checked={frameRange.mode === value}
+                    onChange={() => onExportFrameRangeChange?.({ mode: value })}
+                    className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            {isCustomFrameRange && (
+              <div className="grid grid-cols-2 gap-3">
+                <label
+                  className="space-y-1.5"
+                  htmlFor="export-frame-range-start"
+                >
+                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                    Start Frame
+                  </span>
+                  <input
+                    id="export-frame-range-start"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={rangeDraft.startFrame}
+                    aria-label="Export start frame"
+                    data-testid="export-frame-start-input"
+                    onFocus={() => {
+                      activeRangeFieldRef.current = 'startFrame';
+                    }}
+                    onChange={event =>
+                      updateRangeDraft('startFrame', event.target.value)
+                    }
+                    onBlur={normalizeRangeDraft}
+                    className={numberInputClass}
+                  />
+                </label>
+                <label className="space-y-1.5" htmlFor="export-frame-range-end">
+                  <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                    End Frame
+                  </span>
+                  <input
+                    id="export-frame-range-end"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={rangeDraft.endFrame}
+                    aria-label="Export end frame"
+                    data-testid="export-frame-end-input"
+                    onFocus={() => {
+                      activeRangeFieldRef.current = 'endFrame';
+                    }}
+                    onChange={event =>
+                      updateRangeDraft('endFrame', event.target.value)
+                    }
+                    onBlur={normalizeRangeDraft}
+                    className={numberInputClass}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={primaryActionClass}
+              data-testid="slideshow-export-button"
+              disabled={!totalFrames}
+              onClick={onExportSlideshow}
+            >
+              Export Slideshow
+            </button>
+            <button
+              type="button"
+              className={actionClass}
+              onClick={() => {
+                onClose?.();
+                onExportVideo?.();
+              }}
+            >
+              Export MP4
+            </button>
+          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+            Current Frame Image
+          </h3>
+          <div
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1"
+            data-testid="image-export-controls"
+          >
+            <label className="space-y-1.5" htmlFor="png-scale-select">
+              <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                PNG Scale
+              </span>
+              <NativeSelect
+                id="png-scale-select"
+                value={pngScale}
+                aria-label="PNG Scale"
+                data-testid="png-scale-select"
+                onChange={event =>
+                  onPngScaleChange?.(Number(event.target.value))
+                }
+                size="regular"
+              >
+                <option value={1}>1x</option>
+                <option value={2}>2x (recommended)</option>
+                <option value={3}>3x (high quality)</option>
+              </NativeSelect>
+            </label>
+            <label className="space-y-1.5" htmlFor="image-framing-select">
+              <span className="block text-xs font-semibold text-[#334155] dark:text-[#E2E8F0]">
+                Image Framing
+              </span>
+              <NativeSelect
+                id="image-framing-select"
+                value={imageFraming}
+                aria-label="Image Framing"
+                data-testid="image-framing-select"
+                onChange={event => onImageFramingChange?.(event.target.value)}
+                size="regular"
+              >
+                <option value={IMAGE_FRAMING.fit}>Fit graph</option>
+                <option value={IMAGE_FRAMING.viewport}>Viewport</option>
+                <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
+              </NativeSelect>
+              <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+                Fit graph is the default. Viewport exports the visible editor
+                view; Slide 16:9 composes a presentation frame.
+              </span>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={primaryActionClass}
+              data-testid="png-export-button"
+              onClick={onExportPng}
+            >
+              Export PNG
+            </button>
+            <button
+              type="button"
+              className={actionClass}
+              data-testid="svg-export-button"
+              onClick={onExportSvg}
+            >
+              Export SVG
+            </button>
+          </div>
+        </section>
+
+        <section className={sectionClass}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
+            Project Data
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={actionClass}
+              data-testid="project-export-button"
+              onClick={onExportProject}
+            >
+              Export Project
+            </button>
+            <button
+              type="button"
+              className={actionClass}
+              onClick={onExportText}
+            >
+              Export Edge List
+            </button>
+          </div>
+        </section>
+      </aside>
 
       <ExportPreviewRenderer
         graph={previewGraph}
         captionText={previewCaptionText}
         viewport={editorViewport}
-        canvas={previewCanvas}
+        canvas={{
+          ...previewCanvas,
+          captionOverlay: previewCaptionOverlay,
+        }}
       />
-    </div>
+    </ModalFrame>
   );
 };
 

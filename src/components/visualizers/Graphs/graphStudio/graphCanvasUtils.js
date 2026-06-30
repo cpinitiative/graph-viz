@@ -171,10 +171,10 @@ export const pointToSegmentDistance = (pointX, pointY, x1, y1, x2, y2) => {
   return Math.sqrt(diffX * diffX + diffY * diffY);
 };
 
-export const measureLabelRect = (point, labelText) => {
+export const measureLabelRect = (point, labelText, fontSize = 12) => {
   const text = String(labelText ?? '');
-  const width = Math.max(22, text.length * 6.9 + 10);
-  const height = 15;
+  const width = Math.max(18, text.length * fontSize * 0.56 + fontSize * 0.55);
+  const height = fontSize + 5;
   return {
     left: point.x - width / 2,
     right: point.x + width / 2,
@@ -206,6 +206,7 @@ export const scoreLabelCandidate = ({
   segmentsById,
   placedLabelRects,
   nodeRadius,
+  labelFontSize = 12,
 }) => {
   let score = 0;
   if (labelIndex === 0) score += 5;
@@ -216,7 +217,7 @@ export const scoreLabelCandidate = ({
   if (candidate.y < margin) score -= (margin - candidate.y) * 8;
   if (candidate.y > VIEWBOX_HEIGHT - margin)
     score -= (candidate.y - (VIEWBOX_HEIGHT - margin)) * 8;
-  const rect = measureLabelRect(candidate, labelText);
+  const rect = measureLabelRect(candidate, labelText, labelFontSize);
   placedLabelRects.forEach(placedRect => {
     const overlap = rectOverlapArea(rect, placedRect);
     if (overlap > 0) score -= 900 + overlap * 2.2;
@@ -256,6 +257,7 @@ export const chooseBestLabelPosition = ({
   segmentsById,
   placedLabelRects,
   nodeRadius,
+  labelFontSize = 12,
 }) => {
   if (!Array.isArray(labelOptions) || !labelOptions.length) return null;
   let best = labelOptions[0];
@@ -270,6 +272,7 @@ export const chooseBestLabelPosition = ({
       segmentsById,
       placedLabelRects,
       nodeRadius,
+      labelFontSize,
     });
     if (score > bestScore) {
       bestScore = score;
@@ -366,6 +369,8 @@ const buildCurvedSegment = ({
   const preferredSide = shift >= 0 ? 1 : -1;
   return {
     d: `M ${segment.x1} ${segment.y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${segment.x2} ${segment.y2}`,
+    pathType: 'cubic',
+    pathPoints: points,
     labelOptions: getLabelTValues(edgeIndex, edgeCount).flatMap(t => {
       const point = cubicBezierPoint(...points, t);
       const tangent = cubicBezierTangent(...points, t);
@@ -400,8 +405,19 @@ export const buildEdgePath = ({
     const startY = from.y - nodeRadius * 0.866;
     const endX = from.x + nodeRadius * 0.5;
     const endY = from.y - nodeRadius * 0.866;
+    const points = [
+      { x: startX, y: startY },
+      { x: from.x - loopRadius * 1.5, y: from.y - loopRadius * 2.5 },
+      { x: from.x + loopRadius * 1.5, y: from.y - loopRadius * 2.5 },
+      { x: endX, y: endY },
+    ];
     const d = `M ${startX} ${startY} C ${from.x - loopRadius * 1.5} ${from.y - loopRadius * 2.5}, ${from.x + loopRadius * 1.5} ${from.y - loopRadius * 2.5}, ${endX} ${endY}`;
-    return { d, labelOptions: [{ x: from.x, y: from.y - loopRadius * 2.2 }] };
+    return {
+      d,
+      pathType: 'cubic',
+      pathPoints: points,
+      labelOptions: [{ x: from.x, y: from.y - loopRadius * 2.2 }],
+    };
   }
   const segment = insetSegment(from, to, edge.directed, nodeRadius);
   if (edgeCount > 1) {
@@ -485,6 +501,11 @@ export const buildEdgePath = ({
   };
   return {
     d: `M ${segment.x1} ${segment.y1} L ${segment.x2} ${segment.y2}`,
+    pathType: 'line',
+    pathPoints: [
+      { x: segment.x1, y: segment.y1 },
+      { x: segment.x2, y: segment.y2 },
+    ],
     labelOptions: [
       {
         x: straightMidpoint.x + segment.nx * 14 * side,

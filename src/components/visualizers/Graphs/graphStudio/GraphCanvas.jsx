@@ -11,18 +11,19 @@ import {
   getRectSelection,
   toWorld,
 } from './graphCanvasUtils';
-import { edgeBetweenSelected } from './graphStudioUtils';
 import { normalizeCaptionOverlay } from './lib/captionOverlay';
-import { normalizeCustomLegend } from './lib/customLegend';
+import { getLegendEntryGroup, normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
+import {
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  normalizeEdgeLabelFontSize,
+  normalizeNodeLabelFontSize,
+} from './lib/fontSizing';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
 const EMPTY_SELECTED_NODE_IDS = new Set();
-const SELECTED_EDGE_COLORS = {
-  light: '#171717',
-  dark: '#F5F5F5',
-};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -45,12 +46,14 @@ const LEGEND_PALETTES = {
 };
 const CAPTION_STYLE_PRESETS = {
   subtle: {
-    background: '#F8F9FA',
-    border: '#CBD5E1',
+    background: '#FFFFFF',
+    border: '#FFFFFF',
     text: '#0F172A',
-    fillOpacity: 0.97,
-    showBox: true,
-    shadow: true,
+    textStroke: '#FFFFFF',
+    textStrokeWidth: 2,
+    fillOpacity: 0,
+    showBox: false,
+    shadow: false,
   },
   light: {
     background: '#FFFFFF',
@@ -81,14 +84,14 @@ const CAPTION_STYLE_PRESETS = {
 };
 const CAPTION_SIZE_PRESETS = {
   small: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
     horizontalPadding: 12,
     verticalPadding: 8,
     minWidth: 104,
     maxWidth: 360,
     maxWidthRatio: 0.38,
-    characterWidth: 5.8,
+    characterWidth: 6.2,
   },
   medium: {
     fontSize: 12,
@@ -111,36 +114,14 @@ const CAPTION_SIZE_PRESETS = {
     characterWidth: 7.4,
   },
 };
-const CAPTION_MAX_LINES = 4;
+const CAPTION_MAX_LINES = 3;
 
-const getEffectiveEdgeColor = ({ edge, selected, multiSelected, theme }) => {
-  if (selected || multiSelected) {
-    return SELECTED_EDGE_COLORS[theme] ?? SELECTED_EDGE_COLORS.light;
-  }
-  return edge.color ?? DEFAULT_EDGE_COLOR;
-};
+const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
 
-const hashMarkerColor = color => {
-  let hash = 2166136261;
-  for (let index = 0; index < color.length; index += 1) {
-    hash ^= color.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
-};
+const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 
-const getArrowMarkerId = color => {
-  const normalizedColor = String(color).trim().toLowerCase();
-  const hexMatch = normalizedColor.match(/^#([0-9a-f]{3,8})$/);
-  if (hexMatch) return `graphstudio-arrow-${hexMatch[1]}`;
-
-  const safeColor =
-    normalizedColor
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24) || 'color';
-  return `graphstudio-arrow-${safeColor}-${hashMarkerColor(normalizedColor)}`;
-};
+const getSelectedEdgeStrokeWidth = edgeWidth =>
+  Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
 
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
@@ -154,41 +135,42 @@ const buildLegendRows = (
 ) => {
   const groupedEntries = new Map();
   entries.forEach((entry, index) => {
-    const group = String(entry.group ?? '').trim();
-    const groupKey = group.toLowerCase();
-    if (!groupedEntries.has(groupKey)) {
-      groupedEntries.set(groupKey, {
-        label: group,
+    const groupLabel = getLegendEntryGroup(entry);
+    if (!groupedEntries.has(groupLabel)) {
+      groupedEntries.set(groupLabel, {
+        label: groupLabel,
         entries: [],
       });
     }
-    groupedEntries.get(groupKey).entries.push({ entry, index });
+    groupedEntries.get(groupLabel).entries.push({ entry, index });
   });
 
   const rows = [];
-  Array.from(groupedEntries.values()).forEach((group, groupIndex) => {
-    if (group.label) {
-      rows.push({
-        type: 'group',
-        key: `group-${groupIndex}-${group.label}`,
-        label: truncateLegendText(group.label, groupMaxLength),
-        separated: groupIndex > 0,
-      });
-    }
-    group.entries.forEach(({ entry, index }) => {
-      rows.push({
-        type: 'entry',
-        key: `entry-${index}-${entry.label}`,
-        entry,
-        label: truncateLegendText(entry.label, entryMaxLength),
+  Array.from(groupedEntries.values())
+    .filter(group => group.entries.length > 0)
+    .forEach((group, groupIndex) => {
+      if (group.label) {
+        rows.push({
+          type: 'group',
+          key: `group-${groupIndex}-${group.label}`,
+          label: truncateLegendText(group.label, groupMaxLength),
+          separated: groupIndex > 0,
+        });
+      }
+      group.entries.forEach(({ entry, index }) => {
+        rows.push({
+          type: 'entry',
+          key: `entry-${index}-${entry.label}`,
+          entry,
+          label: truncateLegendText(entry.label, entryMaxLength),
+        });
       });
     });
-  });
   return rows;
 };
 
 const getLegendRowHeight = row =>
-  row.type === 'group' ? (row.separated ? 24 : 18) : 22;
+  row.type === 'group' ? (row.separated ? 22 : 16) : 22;
 
 const resolveLegendPosition = position =>
   position === 'auto' ? 'bottom-right' : position;
@@ -226,9 +208,9 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
   if (entry.kind === 'edge') {
     return (
       <line
-        x1="0"
+        x1="2"
         y1="0"
-        x2="18"
+        x2="22"
         y2="0"
         stroke={entry.color}
         strokeWidth="3"
@@ -239,7 +221,7 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
 
   return (
     <circle
-      cx="7"
+      cx="12"
       cy="0"
       r="6"
       fill={entry.color}
@@ -282,10 +264,10 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
   const boxWidth = Math.min(
     maxBoxWidth,
     300,
-    Math.max(168, 48 + maxTextLength * 7)
+    Math.max(176, 56 + maxTextLength * 7)
   );
   const titleMaxLength = Math.max(4, Math.floor((boxWidth - 24) / 7));
-  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 48) / 7));
+  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 44) / 7));
   const fittedTitle = truncateLegendText(title, titleMaxLength);
   const fittedEntries = legend.entries.map(entry => ({
     ...entry,
@@ -393,6 +375,8 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
       style={{
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       <rect
@@ -464,7 +448,7 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
           <g key={row.key} transform={`translate(12 ${rowY + 3})`}>
             <LegendSwatch entry={row.entry} nodeStroke={palette.nodeStroke} />
             <text
-              x="22"
+              x="32"
               y="4"
               fill={palette.text}
               fontFamily="Arial, sans-serif"
@@ -550,10 +534,29 @@ const FrameCaption = ({
 }) => {
   const { theme } = useTheme();
   const caption = normalizeCaptionOverlay(captionOverlay);
-  const stylePreset =
+  const baseStylePreset =
     CAPTION_STYLE_PRESETS[caption.style] ?? CAPTION_STYLE_PRESETS.subtle;
+  const stylePreset =
+    caption.style === 'subtle' && theme === 'dark'
+      ? {
+          ...baseStylePreset,
+          text: '#F8FAFC',
+          textStroke: '#0F172A',
+        }
+      : baseStylePreset;
   const sizePreset =
     CAPTION_SIZE_PRESETS[caption.size] ?? CAPTION_SIZE_PRESETS.medium;
+  const fontSize = Number(caption.fontSize) || sizePreset.fontSize;
+  const fontScale = fontSize / sizePreset.fontSize;
+  const paddingScale = clampNumber(fontScale, 0.9, 1.6);
+  const horizontalPadding = Math.round(
+    clampNumber(sizePreset.horizontalPadding * paddingScale, 10, 28)
+  );
+  const verticalPadding = Math.round(
+    clampNumber(sizePreset.verticalPadding * paddingScale, 7, 22)
+  );
+  const lineHeight = Math.round(Math.max(fontSize + 4, fontSize * 1.35));
+  const characterWidth = Math.max(5.8, fontSize * 0.56);
   const text = String(captionText ?? '').trim();
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -575,30 +578,45 @@ const FrameCaption = ({
     )
   );
   const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
+  const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
   const presetMaxWidth = Math.min(
     sizePreset.maxWidth,
     canvasSize.width * sizePreset.maxWidthRatio
   );
   const contentMaxWidth = Math.max(
     1,
-    Math.min(presetMaxWidth, maxBoxWidth) - sizePreset.horizontalPadding * 2
+    Math.min(presetMaxWidth, maxBoxWidth) - horizontalPadding * 2
   );
   const maxCharacters = Math.max(
     8,
-    Math.floor(contentMaxWidth / sizePreset.characterWidth)
+    Math.floor(contentMaxWidth / characterWidth)
   );
-  const lines = wrapCaptionText(text, maxCharacters, CAPTION_MAX_LINES);
-  const estimatedTextWidth =
-    Math.max(...lines.map(line => line.length), 1) * sizePreset.characterWidth;
-  const boxWidth = Math.min(
-    maxBoxWidth,
-    Math.max(
-      sizePreset.minWidth,
-      estimatedTextWidth + sizePreset.horizontalPadding * 2
+  const maxVisibleLines = Math.max(
+    1,
+    Math.min(
+      CAPTION_MAX_LINES,
+      Math.floor((maxBoxHeight - verticalPadding * 2) / lineHeight)
     )
   );
-  const boxHeight =
-    sizePreset.verticalPadding * 2 + lines.length * sizePreset.lineHeight;
+  const lines = wrapCaptionText(text, maxCharacters, maxVisibleLines);
+  const unclampedLineCount = wrapCaptionText(
+    text,
+    maxCharacters,
+    Number.MAX_SAFE_INTEGER
+  ).length;
+  const isTruncated =
+    unclampedLineCount > lines.length ||
+    lines.some(line => line.endsWith('...'));
+  const estimatedTextWidth =
+    Math.max(...lines.map(line => line.length), 1) * characterWidth;
+  const boxWidth = Math.min(
+    maxBoxWidth,
+    Math.max(sizePreset.minWidth, estimatedTextWidth + horizontalPadding * 2)
+  );
+  const boxHeight = Math.min(
+    maxBoxHeight,
+    verticalPadding * 2 + lines.length * lineHeight
+  );
   const maxX = Math.max(0, canvasSize.width - boxWidth);
   const maxY = Math.max(0, canvasSize.height - boxHeight);
   const leftX = Math.min(margin, maxX);
@@ -655,8 +673,12 @@ const FrameCaption = ({
       data-caption-position-y={caption.position.y}
       data-caption-size={caption.size}
       data-caption-style={caption.style}
+      data-caption-font-size={fontSize}
+      data-caption-box-width={Math.round(boxWidth)}
+      data-caption-box-height={Math.round(boxHeight)}
       data-caption-theme={theme}
       data-caption-line-count={lines.length}
+      data-caption-truncated={isTruncated}
       data-testid="frame-caption-overlay"
       pointerEvents="all"
       transform={`translate(${x} ${y})`}
@@ -679,6 +701,8 @@ const FrameCaption = ({
       style={{
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       <rect
@@ -697,11 +721,11 @@ const FrameCaption = ({
         }
       />
       <text
-        x={sizePreset.horizontalPadding}
-        y={sizePreset.verticalPadding + sizePreset.fontSize}
+        x={horizontalPadding}
+        y={verticalPadding + fontSize}
         fill={stylePreset.text}
         fontFamily="Arial, sans-serif"
-        fontSize={sizePreset.fontSize}
+        fontSize={fontSize}
         fontWeight="600"
         letterSpacing="0"
         paintOrder={stylePreset.textStroke ? 'stroke' : undefined}
@@ -712,8 +736,8 @@ const FrameCaption = ({
         {lines.map((line, index) => (
           <tspan
             key={`${line}-${index}`}
-            x={sizePreset.horizontalPadding}
-            dy={index === 0 ? 0 : sizePreset.lineHeight}
+            x={horizontalPadding}
+            dy={index === 0 ? 0 : lineHeight}
           >
             {line}
           </tspan>
@@ -744,6 +768,8 @@ const GraphCanvas = ({
   edgeCurvature,
   nodeRadius = NODE_RADIUS,
   edgeWidth = 2.2,
+  nodeLabelFontSize,
+  edgeLabelFontSize,
   resetViewTrigger = 0,
   svgElementId = 'graph-studio-canvas-svg',
   svgTestId = 'graph-canvas-svg',
@@ -758,19 +784,34 @@ const GraphCanvas = ({
   onNodePointerUp,
   onNodeClickForDraw,
   onCanvasAddNode,
+  onViewportSizeChange,
   isExporting = false,
 }) => {
-  const { theme } = useTheme();
   const svgRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
+  const previousResetTriggerRef = useRef(resetViewTrigger);
   const nodeMap = useMemo(() => {
     const map = new Map();
     graph.nodes.forEach(node => map.set(String(node.id), node));
     return map;
   }, [graph.nodes]);
+  const edgeLabelSize = useMemo(
+    () =>
+      Number.isFinite(Number(edgeLabelFontSize))
+        ? normalizeEdgeLabelFontSize(edgeLabelFontSize)
+        : getDefaultEdgeLabelFontSize(edgeWidth),
+    [edgeLabelFontSize, edgeWidth]
+  );
+  const nodeLabelSize = useMemo(
+    () =>
+      Number.isFinite(Number(nodeLabelFontSize))
+        ? normalizeNodeLabelFontSize(nodeLabelFontSize)
+        : getDefaultNodeLabelFontSize(nodeRadius),
+    [nodeLabelFontSize, nodeRadius]
+  );
   const edgeRenderData = useMemo(() => {
     return getEdgeRenderData({
       edges: graph.edges,
@@ -779,6 +820,7 @@ const GraphCanvas = ({
       edgeRouting,
       edgeCurvature,
       nodeRadius,
+      edgeLabelSize,
     });
   }, [
     graph.edges,
@@ -787,6 +829,7 @@ const GraphCanvas = ({
     edgeRouting,
     edgeCurvature,
     nodeRadius,
+    edgeLabelSize,
   ]);
   const effectiveSelectedObject = isExporting ? null : selectedObject;
   const effectiveSelectedNodeIds = isExporting
@@ -800,50 +843,32 @@ const GraphCanvas = ({
         const selected =
           effectiveSelectedObject?.type === 'edge' &&
           String(effectiveSelectedObject.id) === String(edge.id);
-        const multiSelected = edgeBetweenSelected(
-          edge,
-          effectiveSelectedNodeIds
-        );
-        const strokeColor = getEffectiveEdgeColor({
-          edge,
-          selected,
-          multiSelected,
-          theme,
-        });
+        const strokeColor = getEffectiveEdgeColor(edge);
+        const strokeWidth = selected
+          ? getSelectedEdgeStrokeWidth(edgeWidth)
+          : edgeWidth;
         return {
           ...renderData,
           selected,
-          multiSelected,
+          multiSelected: false,
           strokeColor,
-          markerId: `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}${getArrowMarkerId(strokeColor)}`,
+          strokeWidth,
         };
       }),
-    [
-      edgeRenderData,
-      effectiveSelectedNodeIds,
-      effectiveSelectedObject,
-      svgResourcePrefix,
-      theme,
-    ]
+    [edgeRenderData, effectiveSelectedObject, edgeWidth]
   );
-  const arrowMarkers = useMemo(() => {
-    const markers = new Map();
-    edgeVisualData.forEach(({ edge, markerId, strokeColor }) => {
-      if (edge.directed) markers.set(markerId, strokeColor);
-    });
-    return Array.from(markers, ([id, color]) => ({ id, color }));
-  }, [edgeVisualData]);
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
     const updateCanvasSize = () => {
       const bounds = el.getBoundingClientRect();
+      const next = {
+        width: Math.max(0, Math.round(bounds.width)),
+        height: Math.max(0, Math.round(bounds.height)),
+      };
+      onViewportSizeChange?.(next);
       setCanvasSize(prev => {
-        const next = {
-          width: Math.max(0, Math.round(bounds.width)),
-          height: Math.max(0, Math.round(bounds.height)),
-        };
         return prev.width === next.width && prev.height === next.height
           ? prev
           : next;
@@ -857,11 +882,14 @@ const GraphCanvas = ({
       ro.disconnect();
       window.removeEventListener('resize', updateCanvasSize);
     };
-  }, []);
+  }, [onViewportSizeChange]);
   useEffect(() => {
-    hasInitializedViewRef.current = false;
+    const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
+    previousResetTriggerRef.current = resetViewTrigger;
+    if (hasInitializedViewRef.current && !resetChanged) return undefined;
+
     const el = svgRef.current;
-    if (!el) return;
+    if (!el) return undefined;
     const doInit = () => {
       const bounds = el.getBoundingClientRect();
       if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
@@ -925,11 +953,8 @@ const GraphCanvas = ({
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
     setViewState(prev => {
-      const clamped = clampViewStateToPlayspace(
-        prev,
-        bounds.width,
-        bounds.height
-      );
+      const zoom = clampZoom(prev.zoom, bounds.width, bounds.height);
+      const clamped = zoom === prev.zoom ? prev : { ...prev, zoom };
       const unchanged =
         Math.abs(clamped.x - prev.x) < EPSILON &&
         Math.abs(clamped.y - prev.y) < EPSILON &&
@@ -1148,16 +1173,6 @@ const GraphCanvas = ({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
-        onDoubleClick={event => {
-          const bounds = svgRef.current?.getBoundingClientRect();
-          if (!bounds) return;
-          const local = {
-            x: event.clientX - bounds.left,
-            y: event.clientY - bounds.top,
-          };
-          const world = toWorld(local, viewState);
-          if (mode === 'select') onCanvasAddNode(world);
-        }}
         style={{
           touchAction: 'none',
           cursor:
@@ -1177,21 +1192,6 @@ const GraphCanvas = ({
           >
             <circle cx="1.2" cy="1.2" r="1.2" fill="#e2e2e2" />
           </pattern>
-          {arrowMarkers.map(({ id, color }) => (
-            <marker
-              key={id}
-              id={id}
-              data-edge-color={color}
-              markerWidth="12"
-              markerHeight="12"
-              refX="10"
-              refY="6"
-              orient="auto"
-              markerUnits="userSpaceOnUse"
-            >
-              <path d="M0,0 L0,12 L10,6 z" fill={color} />
-            </marker>
-          ))}
           <filter
             id={captionShadowFilterId}
             x="-12%"
@@ -1215,6 +1215,7 @@ const GraphCanvas = ({
           className="dark:fill-[#121212]"
         />
         <g
+          data-graph-view-transform="true"
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
         >
           {showGrid && (
@@ -1231,26 +1232,29 @@ const GraphCanvas = ({
               ({
                 edge,
                 pathD,
+                pathType,
+                pathPoints,
                 labelPosition,
                 selected,
                 multiSelected,
                 strokeColor,
-                markerId,
+                strokeWidth,
               }) => {
                 const endpointMoved =
                   diff.changedNodes.has(String(edge.from)) ||
                   diff.changedNodes.has(String(edge.to));
-                const strokeWidth = edgeWidth;
                 return (
                   <GraphEdge
                     key={edge.id}
                     edge={edge}
                     pathD={pathD}
+                    pathType={pathType}
+                    pathPoints={pathPoints}
                     strokeColor={strokeColor}
                     selected={selected}
                     multiSelected={multiSelected}
-                    markerId={markerId}
                     labelPosition={labelPosition}
+                    labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}
                     layoutIdPrefix={layoutIdPrefix}
                     shouldAnimate={
@@ -1282,6 +1286,7 @@ const GraphCanvas = ({
                     key={node.id}
                     node={node}
                     nodeRadius={nodeRadius}
+                    labelFontSize={nodeLabelSize}
                     selected={selected}
                     multiSelected={multiSelected}
                     drawAnchor={String(effectiveDrawFrom) === String(node.id)}

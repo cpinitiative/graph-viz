@@ -30,7 +30,6 @@ export const useGraphStudioPlayback = ({
     const tick = () => {
       if (cursor >= frameCount) {
         setIsPlaying(false);
-        setStatus('Playback complete');
         return;
       }
       setCurrentFrame(cursor);

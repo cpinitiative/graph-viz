@@ -1,21 +1,40 @@
 import { motion } from 'framer-motion';
 import { useTheme } from '../../../../context/useTheme';
 import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
+import {
+  getDefaultNodeLabelFontSize,
+  normalizeNodeLabelFontSize,
+} from './lib/fontSizing';
 
 const EDITOR_RING_COLORS = {
   light: {
-    selected: '#2563EB',
+    selected: '#2F6FD6',
     multiSelected: '#64748B',
-    drawAnchor: '#B45309',
+    drawAnchor: '#0F766E',
   },
   dark: {
-    selected: '#60A5FA',
+    selected: '#38BDF8',
     multiSelected: '#93C5FD',
-    drawAnchor: '#F59E0B',
+    drawAnchor: '#5EEAD4',
   },
 };
 
-const getNodePalette = node => {
+const getNodePalette = (node, theme) => {
+  if (theme === 'dark') {
+    if (node?.color) {
+      return { fill: node.color, stroke: '#E2E8F0', text: '#0F172A' };
+    }
+    const status = String(node?.status ?? 'default').toLowerCase();
+    const darkPalettes = {
+      default: { fill: '#FFFFFF', stroke: '#CBD5E1', text: '#0F172A' },
+      active: { fill: '#000000', stroke: '#E2E8F0', text: '#FFFFFF' },
+      queued: { fill: '#EEEEEE', stroke: '#CBD5E1', text: '#0F172A' },
+      visited: { fill: '#E2E8F0', stroke: '#CBD5E1', text: '#0F172A' },
+      discarded: { fill: '#FFFFFF', stroke: '#94A3B8', text: '#64748B' },
+    };
+    return darkPalettes[status] ?? darkPalettes.default;
+  }
+
   if (node?.color) {
     return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
   }
@@ -36,13 +55,17 @@ const GraphNode = ({
   onClick,
   mode,
   nodeRadius = NODE_RADIUS,
+  labelFontSize,
 }) => {
   const { theme } = useTheme();
-  const palette = getNodePalette(node);
+  const palette = getNodePalette(node, theme);
   const ringColors = EDITOR_RING_COLORS[theme] ?? EDITOR_RING_COLORS.light;
   const selectionRingColor = selected
     ? ringColors.selected
     : ringColors.multiSelected;
+  const effectiveLabelFontSize = Number.isFinite(Number(labelFontSize))
+    ? normalizeNodeLabelFontSize(labelFontSize)
+    : getDefaultNodeLabelFontSize(nodeRadius);
 
   return (
     <g
@@ -64,22 +87,17 @@ const GraphNode = ({
             ? { duration: 0.32, ease: 'easeInOut' }
             : { duration: 0 }
         }
-        style={{
-          filter:
-            selected || multiSelected
-              ? 'drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))'
-              : 'none',
-        }}
       />
       {(selected || multiSelected) && (
         <motion.circle
           data-node-selection-ring-id={node.id}
+          data-node-selection-ring-kind={selected ? 'primary' : 'multi'}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 6}
+          r={nodeRadius + 3}
           fill="none"
           stroke={selectionRingColor}
-          strokeWidth={selected ? 3 : 2}
+          strokeWidth={selected ? 1.5 : 1.25}
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={
@@ -94,11 +112,11 @@ const GraphNode = ({
           data-node-draw-source-ring-id={node.id}
           cx={node.x}
           cy={node.y}
-          r={nodeRadius + 10}
+          r={nodeRadius + 4}
           fill="none"
           stroke={ringColors.drawAnchor}
-          strokeWidth="3"
-          strokeDasharray="5 4"
+          strokeWidth="1.5"
+          strokeDasharray="2.5 4"
           pointerEvents="none"
           animate={{ cx: node.x, cy: node.y }}
           transition={
@@ -109,12 +127,13 @@ const GraphNode = ({
         />
       )}
       <text
+        data-node-label-id={node.id}
         x={node.x}
-        y={node.y + 4}
+        y={node.y + effectiveLabelFontSize * 0.35}
         textAnchor="middle"
         fill={palette.text}
         style={{
-          fontSize: '12px',
+          fontSize: `${effectiveLabelFontSize}px`,
           fontWeight: 600,
           userSelect: 'none',
           pointerEvents: 'none',

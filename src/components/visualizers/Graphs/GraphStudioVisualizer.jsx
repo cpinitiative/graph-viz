@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE_ROUTING } from './graphStudio/constants';
 import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
 import GraphStudioLayout from './graphStudio/GraphStudioLayout';
@@ -20,12 +20,20 @@ import { useGraphStudioUndo } from './graphStudio/hooks/useGraphStudioUndo';
 import { useGraphStudioView } from './graphStudio/hooks/useGraphStudioView';
 import {
   DEFAULT_CAPTION_OVERLAY,
+  getCaptionPresetFontSize,
   normalizeCaptionOverlay,
+  resolveStepCaptionEnabled,
 } from './graphStudio/lib/captionOverlay';
 import {
   DEFAULT_CUSTOM_LEGEND,
   normalizeCustomLegend,
 } from './graphStudio/lib/customLegend';
+import {
+  DEFAULT_EDGE_WIDTH,
+  DEFAULT_NODE_SIZE,
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+} from './graphStudio/lib/fontSizing';
 import {
   hasOpenModal,
   isEditableKeyboardTarget,
@@ -47,6 +55,11 @@ const PRESET_STATUS_LABELS = {
 
 const STATUS_AUTO_DISMISS_MS = 4000;
 const ERROR_STATUS_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
+const isOwnPatchKey = (patch, key) =>
+  Object.prototype.hasOwnProperty.call(patch, key);
+
+const isAutoFontSize = (value, autoValue) =>
+  !Number.isFinite(Number(value)) || Math.abs(Number(value) - autoValue) < 0.01;
 
 const GraphStudioVisualizer = ({ snapshot }) => {
   const seedTimeline = useMemo(
@@ -78,6 +91,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [showGrid, setShowGrid] = useState(false);
   const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
   const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
+  const currentCaptionOverlay = {
+    ...normalizedCaptionOverlay,
+    enabled: resolveStepCaptionEnabled(
+      steps[currentFrame],
+      normalizedCaptionOverlay
+    ),
+  };
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -88,10 +108,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     lockCanvas,
     setLockCanvas,
     setViewFromNodes,
+    setZoomViewportSize,
     bumpViewReset,
     centerViewOnContent,
     zoomIn,
     zoomOut,
+    setZoomPercent,
     zoomPercent,
   } = useGraphStudioView({
     initialNodes: seedTimeline.baseGraph.nodes,
@@ -103,9 +125,46 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
     edgeCurvature: 46,
-    nodeSize: 22,
-    edgeWidth: 2.2,
+    nodeSize: DEFAULT_NODE_SIZE,
+    nodeLabelFontSize: getDefaultNodeLabelFontSize(DEFAULT_NODE_SIZE),
+    edgeWidth: DEFAULT_EDGE_WIDTH,
+    edgeLabelFontSize: getDefaultEdgeLabelFontSize(DEFAULT_EDGE_WIDTH),
   });
+  const updateGlobalSettings = useCallback(patch => {
+    setGlobalSettings(prev => {
+      const previousNodeSize = Number.isFinite(Number(prev.nodeSize))
+        ? Number(prev.nodeSize)
+        : DEFAULT_NODE_SIZE;
+      const previousEdgeWidth = Number.isFinite(Number(prev.edgeWidth))
+        ? Number(prev.edgeWidth)
+        : DEFAULT_EDGE_WIDTH;
+      const next = { ...prev, ...patch };
+
+      if (
+        isOwnPatchKey(patch, 'nodeSize') &&
+        !isOwnPatchKey(patch, 'nodeLabelFontSize') &&
+        isAutoFontSize(
+          prev.nodeLabelFontSize,
+          getDefaultNodeLabelFontSize(previousNodeSize)
+        )
+      ) {
+        next.nodeLabelFontSize = getDefaultNodeLabelFontSize(next.nodeSize);
+      }
+
+      if (
+        isOwnPatchKey(patch, 'edgeWidth') &&
+        !isOwnPatchKey(patch, 'edgeLabelFontSize') &&
+        isAutoFontSize(
+          prev.edgeLabelFontSize,
+          getDefaultEdgeLabelFontSize(previousEdgeWidth)
+        )
+      ) {
+        next.edgeLabelFontSize = getDefaultEdgeLabelFontSize(next.edgeWidth);
+      }
+
+      return next;
+    });
+  }, []);
   const { resetUndoHistory } = useGraphStudioUndo({
     baseGraph,
     steps,
@@ -192,10 +251,17 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedNodeIds,
     clearSelection,
   });
+  const previousFrameRef = useRef(currentFrame);
+  useEffect(() => {
+    if (previousFrameRef.current === currentFrame) return;
+    previousFrameRef.current = currentFrame;
+    clearDrawState();
+  }, [clearDrawState, currentFrame]);
   const {
     isParserOpen,
     setIsParserOpen,
     parserText,
+    parserError,
     setParserText,
     applyParserText,
     isProjectJsonPasteOpen,
@@ -210,6 +276,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     scriptText,
     setScriptText,
     scriptError,
+    isScriptRunning,
     runScript,
     isExportVideoOpen,
     exportText,
@@ -248,6 +315,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setLockCanvas,
     viewState,
     setViewState,
+    setViewFromNodes,
+    bumpViewReset,
     globalSettings,
     setGlobalSettings,
     mode,
@@ -364,6 +433,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
     setViewFromNodes(nextGraph.nodes);
+    bumpViewReset();
+    setMode('select');
+    clearSelection();
+    clearDrawState();
     setCustomLegend(prev =>
       normalizeCustomLegend({
         ...DEFAULT_CUSTOM_LEGEND,
@@ -418,6 +491,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       zoomPercent,
       onZoomIn: zoomIn,
       onZoomOut: zoomOut,
+      onZoomCommit: setZoomPercent,
     },
     canvas: {
       graph: computedGraph,
@@ -437,6 +511,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       edgeCurvature: globalSettings.edgeCurvature,
       nodeRadius: globalSettings.nodeSize,
       edgeWidth: globalSettings.edgeWidth,
+      nodeLabelFontSize: globalSettings.nodeLabelFontSize,
+      edgeLabelFontSize: globalSettings.edgeLabelFontSize,
       resetViewTrigger: viewResetCounter,
       onSelectNode,
       onSelectEdge,
@@ -447,7 +523,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodePointerUp,
       onNodeClickForDraw,
       onCanvasAddNode: addNodeAt,
-      captionOverlay,
+      onViewportSizeChange: setZoomViewportSize,
+      captionOverlay: currentCaptionOverlay,
+      baseCaptionOverlay: normalizedCaptionOverlay,
       setCaptionOverlay,
       captionText: steps[currentFrame]?.description ?? '',
       isExporting,
@@ -467,8 +545,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onApplyToSelection: applyPatchToSelectedNodes,
       onDeleteSelection: deleteSelection,
       onClearSelection: clearSelection,
-      onUpdateGlobal: patch =>
-        setGlobalSettings(prev => ({ ...prev, ...patch })),
+      onUpdateGlobal: updateGlobalSettings,
     },
     timeline: {
       steps,
@@ -478,23 +555,34 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
         updateStep(index, 'description', value),
-      captionEnabled: normalizedCaptionOverlay.enabled,
+      captionEnabled: currentCaptionOverlay.enabled,
       captionStyle: normalizedCaptionOverlay.style,
       captionSize: normalizedCaptionOverlay.size,
+      captionFontSize: normalizedCaptionOverlay.fontSize,
       onCaptionEnabledChange: enabled =>
-        setCaptionOverlay(prev => ({
-          ...normalizeCaptionOverlay(prev),
-          enabled,
-        })),
+        updateStep(currentFrame, 'captionVisible', enabled),
       onCaptionStyleChange: style =>
         setCaptionOverlay(prev => ({
           ...normalizeCaptionOverlay(prev),
           style,
         })),
       onCaptionSizeChange: size =>
+        setCaptionOverlay(prev => {
+          const normalized = normalizeCaptionOverlay(prev);
+          const isPresetFontSize =
+            normalized.fontSize === getCaptionPresetFontSize(normalized.size);
+          return {
+            ...normalized,
+            size,
+            fontSize: isPresetFontSize
+              ? getCaptionPresetFontSize(size)
+              : normalized.fontSize,
+          };
+        }),
+      onCaptionFontSizeChange: fontSize =>
         setCaptionOverlay(prev => ({
           ...normalizeCaptionOverlay(prev),
-          size,
+          fontSize,
         })),
       onAddStep: () => {
         addStep(currentFrame);
@@ -520,6 +608,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       parser: {
         open: isParserOpen,
         text: parserText,
+        error: parserError,
         onTextChange: setParserText,
         onClose: () => setIsParserOpen(false),
         onSubmit: applyParserText,
@@ -539,6 +628,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         onClose: () => setIsScriptOpen(false),
         onSubmit: runScript,
         error: scriptError,
+        isRunning: isScriptRunning,
       },
       exportVideo: {
         open: isExportVideoOpen,

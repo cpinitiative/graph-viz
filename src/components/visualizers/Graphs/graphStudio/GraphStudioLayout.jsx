@@ -24,6 +24,26 @@ const PANEL_TOGGLE_CLASS =
   'rounded-md bg-surface-container p-2 transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high';
 const RESIZE_HANDLE_CLASS =
   'graphstudio-resize w-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50';
+const SIDE_PANEL_CLASS =
+  'graphstudio-side-panel min-h-0 bg-[#F8F9FA] dark:bg-[#111827]';
+const STATUS_ERROR_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
+const STATUS_SUCCESS_PATTERN =
+  /\b(parsed|imported|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
+
+const getStatusClassName = status => {
+  const tone = STATUS_ERROR_PATTERN.test(status)
+    ? 'error'
+    : STATUS_SUCCESS_PATTERN.test(status)
+      ? 'success'
+      : 'neutral';
+  const toneClass =
+    tone === 'error'
+      ? 'border-[#FCA5A5] bg-[#FEE2E2] text-[#7F1D1D] dark:border-[#F87171] dark:bg-[#450A0A] dark:text-[#FEE2E2]'
+      : tone === 'success'
+        ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46] dark:border-[#34D399] dark:bg-[#052E16] dark:text-[#D1FAE5]'
+        : 'border-[#D7DEE8] bg-[#F8F9FA] text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]';
+  return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
+};
 
 const MenuIcon = () => (
   <svg
@@ -87,7 +107,7 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   return (
     <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}>
       <div
-        className={`absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-surface-container-low ${sideClass}`}
+        className={`graphstudio-side-panel absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-[#F8F9FA] dark:bg-[#111827] ${sideClass}`}
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -109,8 +129,15 @@ const CanvasStage = ({ canvas, status }) => (
     <GraphCanvas {...canvas} />
     {status && (
       <div
-        className="absolute bottom-3 left-3 z-20 rounded-sm border border-[#D7DEE8] bg-[#F8F9FA] px-2 py-1 text-[11px] text-[#334155] shadow-sm dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]"
+        className={getStatusClassName(status)}
         data-testid="graph-studio-status"
+        data-status-tone={
+          STATUS_ERROR_PATTERN.test(status)
+            ? 'error'
+            : STATUS_SUCCESS_PATTERN.test(status)
+              ? 'success'
+              : 'neutral'
+        }
         role="status"
         aria-live="polite"
       >
@@ -161,6 +188,7 @@ const ModalStack = ({
     <ParserModal
       open={modals.parser.open}
       text={modals.parser.text}
+      error={modals.parser.error}
       onTextChange={modals.parser.onTextChange}
       onClose={modals.parser.onClose}
       onSubmit={modals.parser.onSubmit}
@@ -181,6 +209,7 @@ const ModalStack = ({
       onSubmit={modals.script.onSubmit}
       defaultScript={DEFAULT_SCRIPT}
       error={modals.script.error}
+      isRunning={modals.script.isRunning}
     />
     <ExportVideoModal
       open={modals.exportVideo.open}
@@ -300,7 +329,7 @@ const GraphStudioLayout = ({
       <PanelGroup orientation="vertical" className="h-full min-h-0">
         <Panel minSize="360px" className="min-h-0">
           <PanelGroup orientation="horizontal" className="h-full min-h-0">
-            <Panel defaultSize="18%" minSize="14%">
+            <Panel defaultSize="18%" minSize="14%" className={SIDE_PANEL_CLASS}>
               <LeftSidebar {...sidebarProps} />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
@@ -308,7 +337,7 @@ const GraphStudioLayout = ({
               <CanvasStage canvas={canvas} status={status} />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
-            <Panel defaultSize="22%" minSize="16%">
+            <Panel defaultSize="22%" minSize="16%" className={SIDE_PANEL_CLASS}>
               <PropertyPanel {...property} />
             </Panel>
           </PanelGroup>

@@ -1,6 +1,12 @@
-import { useId } from 'react';
+import { useId, useRef, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
+import {
+  EDGE_LABEL_FONT_SIZE_RANGE,
+  getDefaultEdgeLabelFontSize,
+  getDefaultNodeLabelFontSize,
+  NODE_LABEL_FONT_SIZE_RANGE,
+} from './lib/fontSizing';
 
 const NODE_STATUS_OPTIONS = [
   ['default', 'Default'],
@@ -11,26 +17,32 @@ const NODE_STATUS_OPTIONS = [
 ];
 
 const panelClass =
-  'h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
+  'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
 const sectionTitleClass =
   'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+const compactNumberInputClass =
+  'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const inputClass =
   'h-10 w-full rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-medium text-[#1E293B] transition-colors focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const actionButtonClass =
-  'min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2';
+const inspectorButtonFocusClass =
+  'focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:focus-visible:ring-[#60A5FA]';
+const actionButtonClass = `min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2 ${inspectorButtonFocusClass}`;
 const headerActionButtonClass =
-  '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#111827]';
+  '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
 const deleteButtonClass =
-  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:border-[#B91C1C] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-2 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:border-[#DC2626] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
-const listButtonClass =
-  'min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5';
+  'mt-1 min-h-[44px] w-full rounded-sm border border-[#B91C1C] bg-transparent px-3 py-2.5 text-left text-xs font-bold text-[#B91C1C] transition-colors hover:border-[#B91C1C] hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:border-[#B91C1C] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#B91C1C] active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:bg-transparent dark:text-[#FCA5A5] dark:hover:border-[#DC2626] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:border-[#F87171] dark:focus-visible:ring-[#F87171] dark:active:bg-[#B91C1C] md:min-h-9 md:py-2';
+const listButtonClass = `min-h-[44px] w-full whitespace-normal break-words rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 text-left text-xs leading-relaxed text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-1.5 ${inspectorButtonFocusClass}`;
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
+const TOOLTIP_WIDTH = 244;
+const TOOLTIP_ESTIMATED_HEIGHT = 40;
+const TOOLTIP_GUTTER = 12;
+const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -66,27 +78,86 @@ const ClearSelectionButton = ({ label, onClick }) => {
 
 const InfoHelp = ({ label, text }) => {
   const tooltipId = useId();
+  const buttonRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const showTooltip = () => {
+    const bounds = buttonRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const panelBounds = buttonRef.current
+      ?.closest('[data-testid="property-panel"]')
+      ?.getBoundingClientRect();
+    const viewportMinLeft = TOOLTIP_GUTTER;
+    const viewportMaxLeft = Math.max(
+      TOOLTIP_GUTTER,
+      window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_GUTTER
+    );
+    const panelMinLeft = panelBounds
+      ? Math.max(viewportMinLeft, panelBounds.left + TOOLTIP_GUTTER)
+      : viewportMinLeft;
+    const panelMaxLeft = panelBounds
+      ? Math.min(
+          viewportMaxLeft,
+          panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
+        )
+      : viewportMaxLeft;
+    const preferredLeft = bounds.left - TOOLTIP_WIDTH + bounds.width;
+    const fallbackLeft = panelBounds
+      ? panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
+      : viewportMaxLeft;
+    const left = Math.min(
+      viewportMaxLeft,
+      Math.max(
+        viewportMinLeft,
+        panelMaxLeft >= panelMinLeft
+          ? Math.min(panelMaxLeft, Math.max(panelMinLeft, preferredLeft))
+          : Math.min(fallbackLeft, viewportMaxLeft)
+      )
+    );
+    const belowTop = bounds.bottom + TOOLTIP_OFFSET;
+    const aboveTop = bounds.top - TOOLTIP_ESTIMATED_HEIGHT - TOOLTIP_OFFSET;
+    const top =
+      belowTop + TOOLTIP_ESTIMATED_HEIGHT <= window.innerHeight - TOOLTIP_GUTTER
+        ? belowTop
+        : Math.max(TOOLTIP_GUTTER, aboveTop);
+
+    setTooltipPosition({ left, top });
+  };
+
+  const hideTooltip = () => setTooltipPosition(null);
 
   return (
-    <span className="group relative inline-flex items-center">
+    <span className="inline-flex items-center">
       <button
+        ref={buttonRef}
         type="button"
-        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus:ring-[#60A5FA]"
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
         aria-label={label}
         aria-describedby={tooltipId}
+        onBlur={hideTooltip}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
       >
         ?
       </button>
       <span id={tooltipId} className="sr-only">
         {text}
       </span>
-      <span
-        role="tooltip"
-        aria-hidden="true"
-        className="pointer-events-none invisible absolute right-0 top-5 z-30 w-44 max-w-[12rem] whitespace-normal break-words border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] opacity-0 shadow-[0_8px_24px_rgba(15,23,42,0.12)] transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
-      >
-        {text}
-      </span>
+      {tooltipPosition && (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-50 w-[244px] whitespace-nowrap border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          data-testid="inspector-info-tooltip"
+          style={{
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+          }}
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 };
@@ -184,19 +255,78 @@ const RangeControl = ({
   help,
 }) => {
   const labelId = useId();
+  const [draftValue, setDraftValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : String(value);
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const numericStep = Number(step);
+  const decimalPlaces = String(step).includes('.')
+    ? String(step).split('.')[1].length
+    : 0;
+
+  const normalizeValue = rawValue => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
+    if (!Number.isFinite(numericStep) || numericStep <= 0) {
+      return Number(clamped.toFixed(decimalPlaces));
+    }
+    const stepped =
+      numericMin +
+      Math.round((clamped - numericMin) / numericStep) * numericStep;
+    return Number(
+      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
+    );
+  };
+
+  const commitDraftValue = () => {
+    const nextValue = normalizeValue(displayValue);
+    if (nextValue === null) {
+      setDraftValue('');
+      setIsEditing(false);
+      return;
+    }
+    setDraftValue('');
+    setIsEditing(false);
+    onChange(nextValue);
+  };
 
   return (
-    <div className="block space-y-1.5">
-      <div className="flex justify-between">
-        <span className="flex items-center gap-2">
-          <span id={labelId} className={fieldLabelClass}>
+    <div className="space-y-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span id={labelId} className={`${fieldLabelClass} truncate`}>
             {label}
           </span>
           {help}
         </span>
-        <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
-          {value}
-        </span>
+        <input
+          aria-label={`${label} value`}
+          className={compactNumberInputClass}
+          disabled={disabled}
+          inputMode="decimal"
+          onBlur={commitDraftValue}
+          onChange={event => {
+            setIsEditing(true);
+            setDraftValue(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraftValue(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              setDraftValue('');
+              setIsEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
       </div>
       <input
         type="range"
@@ -208,11 +338,101 @@ const RangeControl = ({
         aria-labelledby={labelId}
         onChange={event => onChange(Number(event.target.value))}
         className={joinClasses(
-          'h-2 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
+          'h-1.5 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
           disabled &&
             'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
         )}
       />
+    </div>
+  );
+};
+
+const NumberControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  suffix,
+  testId,
+}) => {
+  const labelId = useId();
+  const [draftValue, setDraftValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : String(value);
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const numericStep = Number(step);
+  const decimalPlaces = String(step).includes('.')
+    ? String(step).split('.')[1].length
+    : 0;
+
+  const normalizeValue = rawValue => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
+    if (!Number.isFinite(numericStep) || numericStep <= 0) {
+      return Number(clamped.toFixed(decimalPlaces));
+    }
+    const stepped =
+      numericMin +
+      Math.round((clamped - numericMin) / numericStep) * numericStep;
+    return Number(
+      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
+    );
+  };
+
+  const commitDraftValue = () => {
+    const nextValue = normalizeValue(displayValue);
+    if (nextValue === null) {
+      setDraftValue('');
+      setIsEditing(false);
+      return;
+    }
+    setDraftValue('');
+    setIsEditing(false);
+    onChange(nextValue);
+  };
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+      <span id={labelId} className={`${fieldLabelClass} truncate`}>
+        {label}
+      </span>
+      <span className="flex items-center gap-1">
+        <input
+          aria-labelledby={labelId}
+          className={compactNumberInputClass}
+          data-testid={testId}
+          inputMode="decimal"
+          onBlur={commitDraftValue}
+          onChange={event => {
+            setIsEditing(true);
+            setDraftValue(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraftValue(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              setDraftValue('');
+              setIsEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
+        {suffix && (
+          <span className="w-4 text-left text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
+            {suffix}
+          </span>
+        )}
+      </span>
     </div>
   );
 };
@@ -297,15 +517,7 @@ const NodeInspector = ({
         />
       }
     >
-      <Section
-        title="Node Details"
-        help={
-          <InfoHelp
-            label="Node property scope help"
-            text="Label applies to all frames. Status and color apply to this frame."
-          />
-        }
-      >
+      <Section title="Node Details">
         <div className="space-y-4">
           <Field label="Label">
             <TextInput
@@ -431,7 +643,7 @@ const GlobalSettingsPanel = ({
   return (
     <PanelShell title="Canvas Inspector" inspectorType="canvas">
       <Section title="Canvas Settings">
-        <div className="space-y-4">
+        <div className="space-y-3">
           <RangeControl
             label="Gravity (force)"
             value={globalSettings.forceStrength}
@@ -450,7 +662,7 @@ const GlobalSettingsPanel = ({
             help={
               <InfoHelp
                 label="Curve Amount help"
-                text="Only works when Edge Routing is Curved."
+                text="Only affects Curved edge routing"
               />
             }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
@@ -463,6 +675,20 @@ const GlobalSettingsPanel = ({
             step="1"
             onChange={nodeSize => onUpdateGlobal({ nodeSize })}
           />
+          <NumberControl
+            label="Node Label Size"
+            value={
+              globalSettings.nodeLabelFontSize ??
+              getDefaultNodeLabelFontSize(globalSettings.nodeSize)
+            }
+            min={NODE_LABEL_FONT_SIZE_RANGE.min}
+            max={NODE_LABEL_FONT_SIZE_RANGE.max}
+            step="1"
+            testId="node-label-font-size-input"
+            onChange={nodeLabelFontSize =>
+              onUpdateGlobal({ nodeLabelFontSize })
+            }
+          />
           <RangeControl
             label="Edge width"
             value={globalSettings.edgeWidth ?? 2.2}
@@ -470,6 +696,20 @@ const GlobalSettingsPanel = ({
             max="8"
             step="0.2"
             onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
+          />
+          <NumberControl
+            label="Edge Label Size"
+            value={
+              globalSettings.edgeLabelFontSize ??
+              getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
+            }
+            min={EDGE_LABEL_FONT_SIZE_RANGE.min}
+            max={EDGE_LABEL_FONT_SIZE_RANGE.max}
+            step="1"
+            testId="edge-label-font-size-input"
+            onChange={edgeLabelFontSize =>
+              onUpdateGlobal({ edgeLabelFontSize })
+            }
           />
         </div>
       </Section>

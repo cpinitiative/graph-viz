@@ -70,33 +70,33 @@ export const useGraphStudioCanvasHandlers = ({
   const onNodeClickForDraw = useCallback(
     nodeId => {
       if (drawFrom === null || drawFrom === undefined) {
+        clearSelection();
         setDrawFrom(nodeId);
         setStatus(`Draw Edge: source node ${nodeId} selected`);
-        return;
-      }
-      if (String(drawFrom) === String(nodeId)) {
-        setStatus('Pick a different target node');
         return;
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
       setStatus(`Edge ${drawFrom} → ${nodeId} added`);
     },
-    [addEdge, drawFrom, setStatus]
+    [addEdge, clearSelection, drawFrom, setStatus]
   );
 
   const handleSetMode = useCallback(
     nextMode => {
       if (nextMode !== 'draw') setDrawFrom(null);
-      else if (drawFrom === null || drawFrom === undefined) {
-        setStatus('Draw Edge: click a source node, then a target node');
+      else {
+        clearSelection();
+        if (drawFrom === null || drawFrom === undefined) {
+          setStatus('Draw Edge: click a source node, then a target node');
+        }
       }
       if (nextMode === 'add') {
         setStatus('Add Node: click the canvas to add a node');
       }
       setMode(nextMode);
     },
-    [drawFrom, setMode, setStatus]
+    [clearSelection, drawFrom, setMode, setStatus]
   );
 
   const startDrawEdge = useCallback(() => {
@@ -109,15 +109,17 @@ export const useGraphStudioCanvasHandlers = ({
     }
     if (selectedNodeIds.length === 1) {
       const sourceId = selectedNodeIds[0];
+      clearSelection();
       setDrawFrom(sourceId);
       setMode('draw');
       setStatus(`Draw Edge: source node ${sourceId} selected`);
       return;
     }
+    clearSelection();
     setDrawFrom(null);
     setMode('draw');
     setStatus('Draw Edge: click a source node, then a target node');
-  }, [addEdge, selectedNodeIds, setMode, setStatus]);
+  }, [addEdge, clearSelection, selectedNodeIds, setMode, setStatus]);
 
   const onNodePointerDown = useCallback(
     ({ nodeId, worldX, worldY }) => {

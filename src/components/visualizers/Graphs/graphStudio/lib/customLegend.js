@@ -84,6 +84,15 @@ const clampNormalizedCoordinate = value => {
 export const isValidLegendColor = value =>
   typeof value === 'string' && HEX_COLOR_PATTERN.test(value);
 
+export const getLegendEntryFallbackGroup = kind =>
+  kind === 'edge' ? 'Edges' : 'Nodes';
+
+export const getLegendEntryGroup = entry => {
+  const kind = entry?.kind === 'edge' ? 'edge' : 'node';
+  const group = String(entry?.group ?? '').trim();
+  return group || getLegendEntryFallbackGroup(kind);
+};
+
 const normalizeLegendEntry = entry => {
   if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
     return null;

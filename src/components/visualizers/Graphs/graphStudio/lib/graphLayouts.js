@@ -86,11 +86,20 @@ export const treeLayout = (graph, rootId) => {
   };
 };
 
-export const forceDirectedLayout = (graph, iterations = 120) => {
+export const forceDirectedLayout = (graph, iterations = 120, strength = 1) => {
   const nodes = (graph.nodes ?? []).map(node => ({ ...node }));
   const edges = graph.edges ?? [];
   if (nodes.length <= 1) return graph;
-  const k = Math.sqrt((VIEWBOX_WIDTH * VIEWBOX_HEIGHT) / nodes.length) * 0.45;
+  const normalizedStrength = Math.max(
+    0.2,
+    Math.min(2, Number.isFinite(Number(strength)) ? Number(strength) : 1)
+  );
+  const k =
+    Math.sqrt((VIEWBOX_WIDTH * VIEWBOX_HEIGHT) / nodes.length) *
+    (0.32 + normalizedStrength * 0.16);
+  const repulsionScale = 0.72 + normalizedStrength * 0.28;
+  const attractionScale = 0.01 + normalizedStrength * 0.007;
+  const velocityScale = 0.028 + normalizedStrength * 0.012;
   const damping = 0.78;
   const velocities = new Map(
     nodes.map(node => [String(node.id), { x: 0, y: 0 }])
@@ -106,7 +115,7 @@ export const forceDirectedLayout = (graph, iterations = 120) => {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const distance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-        const repulsion = (k * k) / distance;
+        const repulsion = ((k * k) / distance) * repulsionScale;
         const ux = dx / distance;
         const uy = dy / distance;
         forces.get(String(a.id)).x -= ux * repulsion;
@@ -125,16 +134,16 @@ export const forceDirectedLayout = (graph, iterations = 120) => {
       const attraction = (distance * distance) / Math.max(k, 1);
       const ux = dx / distance;
       const uy = dy / distance;
-      forces.get(String(from.id)).x += ux * attraction * 0.015;
-      forces.get(String(from.id)).y += uy * attraction * 0.015;
-      forces.get(String(to.id)).x -= ux * attraction * 0.015;
-      forces.get(String(to.id)).y -= uy * attraction * 0.015;
+      forces.get(String(from.id)).x += ux * attraction * attractionScale;
+      forces.get(String(from.id)).y += uy * attraction * attractionScale;
+      forces.get(String(to.id)).x -= ux * attraction * attractionScale;
+      forces.get(String(to.id)).y -= uy * attraction * attractionScale;
     });
     nodes.forEach(node => {
       const force = forces.get(String(node.id));
       const velocity = velocities.get(String(node.id));
-      velocity.x = (velocity.x + force.x * 0.04) * damping;
-      velocity.y = (velocity.y + force.y * 0.04) * damping;
+      velocity.x = (velocity.x + force.x * velocityScale) * damping;
+      velocity.y = (velocity.y + force.y * velocityScale) * damping;
       node.x += velocity.x;
       node.y += velocity.y;
       const bounded = clampNodePosition({ x: node.x, y: node.y });
