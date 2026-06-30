@@ -1989,6 +1989,22 @@ while (true) {}
     await expect(page.getByLabel('Node property scope help')).toHaveCount(0);
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(page.getByTestId('left-sidebar')).toHaveCSS(
+      'background-color',
+      'rgb(17, 24, 39)'
+    );
+    await expect(propertyPanel(page)).toHaveCSS(
+      'background-color',
+      'rgb(17, 24, 39)'
+    );
+    await expect(page.getByTestId('left-sidebar')).toHaveCSS(
+      'overscroll-behavior-y',
+      'contain'
+    );
+    await expect(propertyPanel(page)).toHaveCSS(
+      'overscroll-behavior-y',
+      'contain'
+    );
     await expect(selectionRing).toHaveAttribute('stroke', '#38BDF8');
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);

@@ -109,13 +109,25 @@ body {
 }
 
 .graphstudio-scroll-panel {
+  background-color: #f8f9fa;
+  min-height: 100%;
+  overscroll-behavior: contain;
   scrollbar-color: #94a3b8 transparent;
   scrollbar-gutter: auto;
   scrollbar-width: thin;
 }
 
+.graphstudio-side-panel {
+  background-color: #f8f9fa;
+}
+
 .dark .graphstudio-scroll-panel {
+  background-color: #111827;
   scrollbar-color: #475569 transparent;
+}
+
+.dark .graphstudio-side-panel {
+  background-color: #111827;
 }
 
 ::selection {

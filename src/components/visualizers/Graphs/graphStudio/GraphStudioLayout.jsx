@@ -24,6 +24,8 @@ const PANEL_TOGGLE_CLASS =
   'rounded-md bg-surface-container p-2 transition-colors hover:bg-surface-container-high dark:bg-dark-surface-container dark:hover:bg-dark-surface-container-high';
 const RESIZE_HANDLE_CLASS =
   'graphstudio-resize w-1 bg-outline-variant/30 transition-colors hover:bg-primary/50 dark:bg-slate-800 dark:hover:bg-primary/50';
+const SIDE_PANEL_CLASS =
+  'graphstudio-side-panel min-h-0 bg-[#F8F9FA] dark:bg-[#111827]';
 const STATUS_ERROR_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 const STATUS_SUCCESS_PATTERN =
   /\b(parsed|imported|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
@@ -105,7 +107,7 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   return (
     <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}>
       <div
-        className={`absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-surface-container-low ${sideClass}`}
+        className={`graphstudio-side-panel absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-[#F8F9FA] dark:bg-[#111827] ${sideClass}`}
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -327,7 +329,7 @@ const GraphStudioLayout = ({
       <PanelGroup orientation="vertical" className="h-full min-h-0">
         <Panel minSize="360px" className="min-h-0">
           <PanelGroup orientation="horizontal" className="h-full min-h-0">
-            <Panel defaultSize="18%" minSize="14%">
+            <Panel defaultSize="18%" minSize="14%" className={SIDE_PANEL_CLASS}>
               <LeftSidebar {...sidebarProps} />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
@@ -335,7 +337,7 @@ const GraphStudioLayout = ({
               <CanvasStage canvas={canvas} status={status} />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
-            <Panel defaultSize="22%" minSize="16%">
+            <Panel defaultSize="22%" minSize="16%" className={SIDE_PANEL_CLASS}>
               <PropertyPanel {...property} />
             </Panel>
           </PanelGroup>
