@@ -905,6 +905,11 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
+    await expect(page.getByTestId('left-sidebar')).toHaveClass(
+      /graphstudio-scroll-panel/
+    );
+    await expect(propertyPanel(page)).toHaveClass(/graphstudio-scroll-panel/);
+
     const cards = page.getByTestId('timeline-frame-card');
     const frameCounter = page.getByTestId('timeline-frame-counter');
     const timelinePanel = page.getByTestId('timeline-panel');
@@ -912,7 +917,9 @@ while (true) {}
     const durationInput = page.getByTestId('frame-duration-input');
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
-    const captionSizeSelect = page.getByLabel('Caption Size');
+    const captionSizeControl = page.getByLabel('Caption Size', {
+      exact: true,
+    });
     const captionFontSizeInput = page.getByLabel('Caption Font Size');
     const initialFrameCount = await cards.count();
     expect(initialFrameCount).toBeGreaterThan(1);
@@ -921,6 +928,10 @@ while (true) {}
     const frameOneLabel = cards.first().getByText('Frame 1');
     const selectedFrameOneCardBox = await cards.first().boundingBox();
     const selectedFrameOneLabelBox = await frameOneLabel.boundingBox();
+    await expect(
+      cards.first().getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
+    await expect(cards.first()).toHaveCSS('border-left-width', '1px');
     await cards.nth(1).click();
     const deselectedFrameOneCardBox = await cards.first().boundingBox();
     const deselectedFrameOneLabelBox = await frameOneLabel.boundingBox();
@@ -942,6 +953,12 @@ while (true) {}
     expect(
       Math.abs(selectedFrameOneLabelBox.x - deselectedFrameOneLabelBox.x)
     ).toBeLessThanOrEqual(0.5);
+    await expect(
+      cards.first().getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(0);
+    await expect(
+      cards.nth(1).getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
 
     await cards.nth(1).click();
     await cards.nth(1).press('ArrowRight');
@@ -951,6 +968,15 @@ while (true) {}
     await expect(
       page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
     ).toHaveCount(1);
+    await expect(
+      page.getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(1);
+    await expect(
+      cards.nth(1).getByTestId('timeline-frame-selected-accent')
+    ).toHaveCount(0);
+    await expect(
+      cards.nth(2).getByTestId('timeline-frame-selected-accent')
+    ).toBeVisible();
 
     await cards.last().click();
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
@@ -1049,7 +1075,7 @@ while (true) {}
     await expect(durationInput).toBeVisible();
     await expect(captionToggle).toBeVisible();
     await expect(captionStyleSelect).toBeVisible();
-    await expect(captionSizeSelect).toBeVisible();
+    await expect(captionSizeControl).toHaveCount(0);
     await expect(captionFontSizeInput).toBeVisible();
     await expect(captionFontSizeInput).toHaveAttribute('inputmode', 'numeric');
     await expect(durationInput).toHaveClass(/text-center/);
@@ -1057,11 +1083,7 @@ while (true) {}
     await expect(captionStyleSelect.locator('xpath=..')).toHaveClass(
       /w-\[108px\]/
     );
-    await expect(captionSizeSelect.locator('xpath=..')).toHaveClass(
-      /w-\[100px\]/
-    );
     expect((await captionStyleSelect.boundingBox())?.width).toBeLessThan(120);
-    expect((await captionSizeSelect.boundingBox())?.width).toBeLessThan(112);
     expect((await captionFontSizeInput.boundingBox())?.width).toBeLessThan(68);
     await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
     await expect(frameCounter).toHaveText(
@@ -1097,7 +1119,6 @@ while (true) {}
       durationInput.boundingBox(),
       captionToggle.boundingBox(),
       captionStyleSelect.boundingBox(),
-      captionSizeSelect.boundingBox(),
       captionFontSizeInput.boundingBox(),
     ])) {
       expectBoxInsideTimeline(controlBox);
@@ -1187,7 +1208,9 @@ while (true) {}
 
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
-    const captionSizeSelect = page.getByLabel('Caption Size');
+    const captionSizeControl = page.getByLabel('Caption Size', {
+      exact: true,
+    });
     const captionFontSizeInput = page.getByLabel('Caption Font Size');
     const caption = page.getByTestId('frame-caption-overlay');
     const frameDescription = page.getByLabel('Frame Description');
@@ -1195,7 +1218,7 @@ while (true) {}
 
     await expect(captionToggle).not.toBeChecked();
     await expect(captionStyleSelect).toHaveValue('subtle');
-    await expect(captionSizeSelect).toHaveValue('medium');
+    await expect(captionSizeControl).toHaveCount(0);
     await expect(captionFontSizeInput).toHaveValue('12');
     await expect(caption).toHaveCount(0);
 
@@ -1271,32 +1294,11 @@ while (true) {}
       await expect(caption).toHaveAttribute('data-caption-style', style);
     }
 
-    const expectedFontSizes = {
-      small: '12',
-      medium: '12',
-      large: '14',
-    };
-    for (const size of ['small', 'medium', 'large']) {
-      await captionSizeSelect.selectOption(size);
-      await expect(caption).toBeVisible();
-      await expect(caption).toHaveAttribute('data-caption-size', size);
-      await expect(caption.locator('text')).toHaveAttribute(
-        'font-size',
-        expectedFontSizes[size]
-      );
-      await expect(captionFontSizeInput).toHaveValue(expectedFontSizes[size]);
-    }
-
     await commitInputValue(captionFontSizeInput, 22);
     await expect(caption).toHaveAttribute('data-caption-font-size', '22');
     await expect(caption.locator('text')).toHaveAttribute('font-size', '22');
-    await captionSizeSelect.selectOption('small');
-    await expect(captionSizeSelect).toHaveValue('small');
-    await expect(captionFontSizeInput).toHaveValue('22');
-    await expect(caption).toHaveAttribute('data-caption-font-size', '22');
 
     await captionStyleSelect.selectOption('dark');
-    await captionSizeSelect.selectOption('large');
     await frameCards.nth(3).click();
     await expect(caption.locator('tspan').first()).toContainText(
       'Inherited caption'
@@ -1310,7 +1312,7 @@ while (true) {}
       'This longer teaching'
     );
     await expect(caption.locator('tspan').nth(1)).toContainText(
-      'annotation explains why the'
+      'annotation explains why'
     );
     await expect(caption).toHaveAttribute('data-caption-line-count', '3');
     await expect(caption).toHaveAttribute('data-caption-truncated', 'true');
@@ -1356,7 +1358,8 @@ while (true) {}
     await expect(caption).toHaveAttribute('data-caption-theme', 'light');
 
     await frameDescription.fill('Explain the active frontier');
-    await expect(caption).toContainText('Explain the active frontier');
+    await expect(caption).toContainText('Explain the active');
+    await expect(caption).toContainText('frontier');
 
     const draggedPosition = await dragCaption(page);
     expect(draggedPosition.x).toBeGreaterThan(0);
@@ -1394,7 +1397,7 @@ while (true) {}
     expect(previewSvgText).toContain('data-testid="frame-caption-overlay"');
     expect(previewSvgText).toContain('data-caption-overlay="true"');
     expect(previewSvgText).toContain('data-caption-style="dark"');
-    expect(previewSvgText).toContain('data-caption-size="large"');
+    expect(previewSvgText).toContain('data-caption-size="medium"');
     expect(previewSvgText).toContain('data-caption-font-size="22"');
     expect(previewSvgText).toContain('font-size="22"');
 
@@ -1409,7 +1412,7 @@ while (true) {}
     expect(svgText).toContain('data-testid="frame-caption-overlay"');
     expect(svgText).toContain('data-caption-overlay="true"');
     expect(svgText).toContain('data-caption-style="dark"');
-    expect(svgText).toContain('data-caption-size="large"');
+    expect(svgText).toContain('data-caption-size="medium"');
     expect(svgText).toContain('data-caption-font-size="22"');
     expect(svgText).toContain('font-size="22"');
     expect(svgText).toContain('Queue B and C');
@@ -1424,7 +1427,7 @@ while (true) {}
     const project = await readJsonDownload(projectDownload);
     expect(project.settings.captionOverlay.enabled).toBe(false);
     expect(project.settings.captionOverlay.style).toBe('dark');
-    expect(project.settings.captionOverlay.size).toBe('large');
+    expect(project.settings.captionOverlay.size).toBe('medium');
     expect(project.settings.captionOverlay.fontSize).toBe(22);
     expect(project.timeline.steps[0].captionVisible).toBe(false);
     expect(project.timeline.steps[1].captionVisible).toBe(true);
@@ -1452,11 +1455,11 @@ while (true) {}
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(captionToggle).toBeChecked();
     await expect(captionStyleSelect).toHaveValue('dark');
-    await expect(captionSizeSelect).toHaveValue('large');
+    await expect(captionSizeControl).toHaveCount(0);
     await expect(captionFontSizeInput).toHaveValue('22');
     await expect(caption).toContainText('Queue B and C');
     await expect(caption).toHaveAttribute('data-caption-style', 'dark');
-    await expect(caption).toHaveAttribute('data-caption-size', 'large');
+    await expect(caption).toHaveAttribute('data-caption-size', 'medium');
     await expect(caption).toHaveAttribute('data-caption-font-size', '22');
     expect(
       Number(await caption.getAttribute('data-caption-position-x'))
@@ -1761,6 +1764,9 @@ while (true) {}
     await legendEditToggle.click();
     await expect(legendModal).toBeVisible();
     await expect(legendEditor).toBeVisible();
+    await expect(
+      page.getByTestId('custom-legend-entries-header')
+    ).not.toHaveClass(/sticky/);
 
     await page.getByLabel('Enable Legend').check();
     await expect(legendPreview).toBeVisible();
@@ -2613,6 +2619,9 @@ while (true) {}
     ).toBeVisible();
 
     let exportMenu = await openExportMenu(page);
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-chrome', 'true');
     let previewSvgText = await getPreviewSvgText(page);
     expect(getSvgRootAttribute(previewSvgText, 'data-export-framing')).toBe(
       'fit'
@@ -2636,6 +2645,7 @@ while (true) {}
     expect(getSvgRootAttribute(exportedSvgText, 'data-export-framing')).toBe(
       'fit'
     );
+    expect(exportedSvgText).not.toContain('data-preview-chrome');
     expect(getSvgViewBox(exportedSvgText)).toEqual(previewViewBox);
     const exportedState = await getSvgPresentationState(page, exportedSvgText);
     expect(exportedState.firstNode).toMatchObject({
@@ -2833,7 +2843,9 @@ while (true) {}
       page.getByRole('checkbox', { name: 'Lock View' })
     ).toBeChecked();
     await expect(page.getByLabel('Caption Style')).toHaveValue('subtle');
-    await expect(page.getByLabel('Caption Size')).toHaveValue('medium');
+    await expect(page.getByLabel('Caption Size', { exact: true })).toHaveCount(
+      0
+    );
     await expect(page.getByLabel('Caption Font Size')).toHaveValue('12');
     await expect(page.getByTestId('frame-caption-overlay')).toContainText(
       'Pasted JSON import test'
@@ -3362,28 +3374,37 @@ api.edge('loop', '#3b82f6');
     const edgeHitTarget = graphCanvas(page).locator(
       '[data-edge-hit-target-id="e0"]'
     );
-    const expectBodyEndsAtArrowBase = async () => {
-      await expect
-        .poll(async () =>
-          graphCanvas(page).evaluate(() => {
-            const path = document.querySelector('[data-edge-path-id="e0"]');
-            const arrow = document.querySelector(
-              '[data-edge-arrowhead-id="e0"]'
-            );
-            const values = (
-              path?.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? []
-            )
-              .map(Number)
-              .filter(Number.isFinite);
-            const baseX = Number(arrow?.getAttribute('data-edge-arrow-base-x'));
-            const baseY = Number(arrow?.getAttribute('data-edge-arrow-base-y'));
-            if (values.length < 4 || !Number.isFinite(baseX)) return 999;
-            const endX = values[values.length - 2];
-            const endY = values[values.length - 1];
-            return Math.hypot(endX - baseX, endY - baseY);
-          })
+    const getArrowBodyBaseOverlap = async () =>
+      graphCanvas(page).evaluate(() => {
+        const path = document.querySelector('[data-edge-path-id="e0"]');
+        const arrow = document.querySelector('[data-edge-arrowhead-id="e0"]');
+        const values = (
+          path?.getAttribute('d')?.match(/-?\d+(?:\.\d+)?/g) ?? []
         )
-        .toBeLessThanOrEqual(0.75);
+          .map(Number)
+          .filter(Number.isFinite);
+        const baseX = Number(arrow?.getAttribute('data-edge-arrow-base-x'));
+        const baseY = Number(arrow?.getAttribute('data-edge-arrow-base-y'));
+        const tipX = Number(arrow?.getAttribute('data-edge-arrow-tip-x'));
+        const tipY = Number(arrow?.getAttribute('data-edge-arrow-tip-y'));
+        if (
+          values.length < 4 ||
+          ![baseX, baseY, tipX, tipY].every(Number.isFinite)
+        ) {
+          return -999;
+        }
+        const endX = values[values.length - 2];
+        const endY = values[values.length - 1];
+        const length = Math.hypot(tipX - baseX, tipY - baseY);
+        if (length <= 0) return -999;
+        return (
+          ((endX - baseX) * (tipX - baseX) + (endY - baseY) * (tipY - baseY)) /
+          length
+        );
+      });
+    const expectBodyOverlapsArrowBase = async () => {
+      await expect.poll(getArrowBodyBaseOverlap).toBeGreaterThan(0.4);
+      await expect.poll(getArrowBodyBaseOverlap).toBeLessThanOrEqual(1.1);
     };
 
     await expect(directedEdge).toBeVisible();
@@ -3403,7 +3424,7 @@ api.edge('loop', '#3b82f6');
         Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
       )
       .toBeGreaterThan(13);
-    await expectBodyEndsAtArrowBase();
+    await expectBodyOverlapsArrowBase();
     await expectDirectedEdgesAnchored(page);
 
     await openExportMenu(page);
@@ -3423,7 +3444,7 @@ api.edge('loop', '#3b82f6');
     await page.getByText('Frame 2').click();
     await expect(directedEdge).toHaveAttribute('stroke', '#3b82f6');
     await expect(arrowhead).toHaveAttribute('fill', '#3b82f6');
-    await expectBodyEndsAtArrowBase();
+    await expectBodyOverlapsArrowBase();
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
     await page.locator('[data-testid="script-modal"] textarea').fill(`
@@ -3434,7 +3455,7 @@ api.edge('e0', '#f59e0b');
     await page.getByText('Frame 2').click();
     await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
     await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
-    await expectBodyEndsAtArrowBase();
+    await expectBodyOverlapsArrowBase();
 
     await openExportMenu(page);
     const overrideSvgDownload = await expectDownloadFrom({
@@ -3467,7 +3488,7 @@ api.edge('e0', '#f59e0b');
         Number(await arrowhead.getAttribute('data-edge-arrow-length'))
       )
       .toBeGreaterThan(arrowLengthBeforeSelection);
-    await expectBodyEndsAtArrowBase();
+    await expectBodyOverlapsArrowBase();
 
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -3485,7 +3506,7 @@ api.edge('e0', '#f59e0b');
         Number(await arrowhead.getAttribute('data-edge-arrow-base-width'))
       )
       .toBeGreaterThan(20);
-    await expectBodyEndsAtArrowBase();
+    await expectBodyOverlapsArrowBase();
 
     expect(errors).toEqual([]);
   });

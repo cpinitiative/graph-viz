@@ -241,7 +241,7 @@ const LeftSidebar = ({
 
   return (
     <div
-      className="flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
+      className="graphstudio-scroll-panel flex h-full flex-col overflow-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]"
       data-testid="left-sidebar"
     >
       <SidebarSection>

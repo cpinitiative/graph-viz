@@ -76,6 +76,46 @@ body {
   ::-webkit-scrollbar-thumb:hover {
     background-color: var(--on-surface);
   }
+
+  .graphstudio-scroll-panel::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background-color: transparent;
+  }
+
+  .graphstudio-scroll-panel::-webkit-scrollbar-track {
+    background-color: transparent;
+    border-radius: 2px;
+  }
+
+  .graphstudio-scroll-panel::-webkit-scrollbar-thumb {
+    background-clip: padding-box;
+    background-color: #94a3b8;
+    border: 1px solid transparent;
+    border-radius: 4px;
+  }
+
+  .dark .graphstudio-scroll-panel::-webkit-scrollbar-thumb {
+    background-color: #475569;
+  }
+
+  .graphstudio-scroll-panel::-webkit-scrollbar-thumb:hover {
+    background-color: #64748b;
+  }
+
+  .dark .graphstudio-scroll-panel::-webkit-scrollbar-thumb:hover {
+    background-color: #64748b;
+  }
+}
+
+.graphstudio-scroll-panel {
+  scrollbar-color: #94a3b8 transparent;
+  scrollbar-gutter: auto;
+  scrollbar-width: thin;
+}
+
+.dark .graphstudio-scroll-panel {
+  scrollbar-color: #475569 transparent;
 }
 
 ::selection {

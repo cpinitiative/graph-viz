@@ -404,10 +404,11 @@ const ExportModal = ({
         </div>
 
         <div
-          className="flex min-h-[300px] flex-1 items-center justify-center overflow-hidden border border-[#94A3B8] bg-[#FFFFFF] p-4 shadow-[0_4px_16px_rgba(15,23,42,0.08)] sm:p-6"
+          className="flex min-h-[300px] flex-1 items-center justify-center overflow-hidden border border-[#CBD5E1] bg-[#FFFFFF] p-4 shadow-[0_4px_16px_rgba(15,23,42,0.08)] dark:border-[#253449] dark:shadow-[0_0_0_1px_#FFFFFF0A] sm:p-6"
           data-preview-framing={imageFraming}
           data-preview-frame-index={previewFrameIndex}
           data-testid="export-preview-panel"
+          data-preview-chrome="true"
         >
           {previewUrl ? (
             <div

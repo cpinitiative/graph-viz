@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import {
   CAPTION_FONT_SIZE_RANGE,
-  CAPTION_SIZE_OPTIONS,
   CAPTION_STYLE_OPTIONS,
 } from './lib/captionOverlay';
 import NativeSelect from './NativeSelect';
@@ -173,11 +172,9 @@ const TimelinePanel = ({
   onDescriptionChange,
   captionEnabled,
   captionStyle,
-  captionSize,
   captionFontSize,
   onCaptionEnabledChange,
   onCaptionStyleChange,
-  onCaptionSizeChange,
   onCaptionFontSizeChange,
   onAddStep,
   onDuplicateStep,
@@ -300,10 +297,10 @@ const TimelinePanel = ({
               }}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`flex min-h-[46px] min-w-[116px] cursor-pointer flex-col rounded-sm border border-l-4 bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#94A3B8] dark:bg-[#1E293B] dark:focus-visible:ring-[#64748B] md:min-w-[128px] ${
+              className={`relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#CBD5E1] dark:bg-[#1E293B] dark:focus-visible:ring-[#94A3B8] md:min-w-[128px] ${
                 index === currentFrame
-                  ? 'border-[#0F2747] border-l-[#B45309] shadow-sm dark:border-[#60A5FA] dark:border-l-[#60A5FA]'
-                  : 'border-[#D7DEE8] border-l-transparent hover:border-[#94A3B8] hover:border-l-transparent hover:bg-[#F8F9FA] dark:border-[#334155] dark:border-l-transparent dark:hover:border-[#64748B] dark:hover:border-l-transparent dark:hover:bg-[#233044]'
+                  ? 'border-[#0F2747] shadow-sm dark:border-[#60A5FA]'
+                  : 'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044]'
               }`}
               data-current={index === currentFrame}
               data-frame-navigation-surface="true"
@@ -328,6 +325,13 @@ const TimelinePanel = ({
               role="option"
               tabIndex="0"
             >
+              {index === currentFrame && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-1 bg-[#B45309] dark:bg-[#60A5FA]"
+                  data-testid="timeline-frame-selected-accent"
+                />
+              )}
               <div className="px-2 py-1">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
                   <div
@@ -427,28 +431,9 @@ const TimelinePanel = ({
                   </NativeSelect>
                 </label>
                 <label className={detailControlLabelClass}>
-                  <span>Size</span>
-                  <NativeSelect
-                    aria-label="Caption Size"
-                    data-testid="caption-size-select"
-                    onChange={event =>
-                      onCaptionSizeChange?.(event.target.value)
-                    }
-                    size="dense"
-                    value={captionSize}
-                    wrapperClassName="w-[100px]"
-                  >
-                    {CAPTION_SIZE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </label>
-                <label className={detailControlLabelClass}>
                   <span>Caption Font Size</span>
                   <CaptionFontSizeInput
-                    key={`${captionSize}-${captionFontSize}`}
+                    key={captionFontSize}
                     value={captionFontSize}
                     onCommit={onCaptionFontSizeChange}
                   />

@@ -22,6 +22,8 @@ const formatNumber = value => Number(value.toFixed(3));
 const formatPathPoint = point =>
   `${formatNumber(point.x)} ${formatNumber(point.y)}`;
 
+const ARROW_BODY_OVERLAP = 0.85;
+
 const getArrowMetrics = strokeWidth => {
   const width = Math.max(1, Number(strokeWidth) || 2.2);
   return {
@@ -61,6 +63,18 @@ const getArrowPolygon = ({ tip, baseCenter, baseWidth }) => {
   };
 };
 
+const getArrowBodyEnd = ({ tip, baseCenter, arrowLength }) => {
+  const direction = normalizeVector({
+    x: tip.x - baseCenter.x,
+    y: tip.y - baseCenter.y,
+  });
+  const overlap = Math.min(ARROW_BODY_OVERLAP, Math.max(0, arrowLength * 0.35));
+  return {
+    x: baseCenter.x + direction.x * overlap,
+    y: baseCenter.y + direction.y * overlap,
+  };
+};
+
 const getLineArrowGeometry = ({ pathPoints, pathD, strokeWidth }) => {
   const [start, tip] = pathPoints;
   const lineLength = Math.hypot(tip.x - start.x, tip.y - start.y);
@@ -75,9 +89,10 @@ const getLineArrowGeometry = ({ pathPoints, pathD, strokeWidth }) => {
     x: tip.x - direction.x * arrowLength,
     y: tip.y - direction.y * arrowLength,
   };
+  const bodyEnd = getArrowBodyEnd({ tip, baseCenter, arrowLength });
 
   return {
-    bodyPathD: `M ${formatPathPoint(start)} L ${formatPathPoint(baseCenter)}`,
+    bodyPathD: `M ${formatPathPoint(start)} L ${formatPathPoint(bodyEnd)}`,
     arrow: {
       ...getArrowPolygon({
         tip,
@@ -157,9 +172,10 @@ const getCubicArrowGeometry = ({ pathPoints, pathD, strokeWidth }) => {
   const trimmed = splitCubicAt(pathPoints, trimT);
   const baseCenter = trimmed[3];
   const tip = pathPoints[3];
+  const bodyEnd = getArrowBodyEnd({ tip, baseCenter, arrowLength });
 
   return {
-    bodyPathD: `M ${formatPathPoint(trimmed[0])} C ${formatPathPoint(trimmed[1])}, ${formatPathPoint(trimmed[2])}, ${formatPathPoint(trimmed[3])}`,
+    bodyPathD: `M ${formatPathPoint(trimmed[0])} C ${formatPathPoint(trimmed[1])}, ${formatPathPoint(trimmed[2])}, ${formatPathPoint(trimmed[3])} L ${formatPathPoint(bodyEnd)}`,
     arrow: {
       ...getArrowPolygon({
         tip,

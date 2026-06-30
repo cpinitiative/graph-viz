@@ -206,7 +206,7 @@ const LegendModal = ({
       description="Control legend entries, section groups, swatches, and placement."
       maxWidthClass="max-w-4xl"
       onClose={onClose}
-      bodyClassName="space-y-4"
+      bodyClassName="graphstudio-scroll-panel space-y-4"
       footer={
         <>
           <button
@@ -287,7 +287,10 @@ const LegendModal = ({
         )}
 
         <div className="space-y-2">
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-y border-[#CBD5E1] bg-[#F8F9FA] py-2 dark:border-[#334155] dark:bg-[#0F172A]">
+          <div
+            className="flex items-center justify-between gap-3 border-y border-[#CBD5E1] bg-[#F8F9FA] py-2 dark:border-[#334155] dark:bg-[#0F172A]"
+            data-testid="custom-legend-entries-header"
+          >
             <div className={fieldLabelClass}>Entries</div>
             <button
               type="button"

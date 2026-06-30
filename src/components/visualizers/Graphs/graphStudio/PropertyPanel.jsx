@@ -17,7 +17,7 @@ const NODE_STATUS_OPTIONS = [
 ];
 
 const panelClass =
-  'h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
+  'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
 const sectionTitleClass =
   'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
