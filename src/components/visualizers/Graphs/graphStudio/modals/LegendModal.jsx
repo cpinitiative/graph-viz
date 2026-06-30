@@ -30,6 +30,42 @@ const dangerButtonClass =
 const reorderButtonClass =
   'flex h-8 w-8 items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] text-xs font-bold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-35 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
 
+const LEGEND_ENTRY_ID_FIELD = '__legendEntryEditorId';
+const legendEntryIdCache = new WeakMap();
+let legendEntryIdCounter = 0;
+
+const createLegendEntryId = index => `legend-entry-${index.toString(36)}`;
+
+const getNextLegendEntryId = () => {
+  legendEntryIdCounter += 1;
+  return createLegendEntryId(legendEntryIdCounter);
+};
+
+const getLegendEntryId = entry => {
+  if (entry && typeof entry === 'object') {
+    if (typeof entry[LEGEND_ENTRY_ID_FIELD] === 'string') {
+      return entry[LEGEND_ENTRY_ID_FIELD];
+    }
+    const cachedId = legendEntryIdCache.get(entry);
+    if (cachedId) return cachedId;
+    const nextId = getNextLegendEntryId();
+    legendEntryIdCache.set(entry, nextId);
+    return nextId;
+  }
+  return getNextLegendEntryId();
+};
+
+const withLegendEntryId = (entry, entryId = getLegendEntryId(entry)) => ({
+  ...(entry ?? {}),
+  [LEGEND_ENTRY_ID_FIELD]: entryId,
+});
+
+const getLegendEntriesWithIds = entries =>
+  Array.isArray(entries) ? entries.map(entry => withLegendEntryId(entry)) : [];
+
+const findLegendEntryIndexById = (entries, entryId) =>
+  entries.findIndex(entry => getLegendEntryId(entry) === entryId);
+
 const MoveUpIcon = () => (
   <svg
     aria-hidden="true"
@@ -71,6 +107,13 @@ const LegendModal = ({
   onClose,
 }) => {
   const pendingNewEntryFocusRef = useRef(false);
+  const pendingReorderFocusRef = useRef(null);
+
+  const legend = {
+    ...DEFAULT_CUSTOM_LEGEND,
+    ...(customLegend ?? {}),
+  };
+  const legendEntries = Array.isArray(legend.entries) ? legend.entries : [];
 
   useEffect(() => {
     if (!open) return undefined;
@@ -94,13 +137,38 @@ const LegendModal = ({
     return () => window.cancelAnimationFrame(frame);
   }, [customLegend, open]);
 
+  useEffect(() => {
+    if (!open || !pendingReorderFocusRef.current) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const pendingFocus = pendingReorderFocusRef.current;
+      pendingReorderFocusRef.current = null;
+      if (!pendingFocus) return;
+
+      const entryElement = document.querySelector(
+        `[data-legend-entry-id="${pendingFocus.entryId}"]`
+      );
+      const preferredButton = entryElement?.querySelector(
+        `[data-legend-reorder-action="${pendingFocus.action}"]:not(:disabled)`
+      );
+      const fallbackAction = pendingFocus.action === 'down' ? 'up' : 'down';
+      const fallbackButton = entryElement?.querySelector(
+        `[data-legend-reorder-action="${fallbackAction}"]:not(:disabled)`
+      );
+      const fallbackInput = entryElement?.querySelector(
+        'input:not(:disabled), select:not(:disabled), button:not(:disabled)'
+      );
+      (preferredButton ?? fallbackButton ?? fallbackInput)?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [customLegend, open]);
+
   if (!open) return null;
 
-  const legend = {
-    ...DEFAULT_CUSTOM_LEGEND,
-    ...(customLegend ?? {}),
-  };
-  const legendEntries = Array.isArray(legend.entries) ? legend.entries : [];
+  const legendEntryRows = legendEntries.map((entry, index) => ({
+    entry,
+    index,
+    entryId: getLegendEntryId(entry),
+  }));
 
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
@@ -110,15 +178,15 @@ const LegendModal = ({
     }));
   };
 
-  const updateLegendEntry = (index, patch) => {
+  const updateLegendEntry = (entryId, patch) => {
     setCustomLegend?.(prev => {
       const current = {
         ...DEFAULT_CUSTOM_LEGEND,
         ...(prev ?? {}),
       };
-      const entries = Array.isArray(current.entries)
-        ? [...current.entries]
-        : [];
+      const entries = getLegendEntriesWithIds(current.entries);
+      const index = findLegendEntryIndexById(entries, entryId);
+      if (index < 0) return current;
       entries[index] = {
         group: '',
         kind: 'node',
@@ -141,51 +209,64 @@ const LegendModal = ({
       return {
         ...current,
         entries: [
-          {
+          withLegendEntryId({
             group: 'Nodes',
             kind: 'node',
             label: 'New entry',
             color: CUSTOM_LEGEND_FALLBACK_COLOR,
-          },
+          }),
           ...(Array.isArray(current.entries) ? current.entries : []),
         ],
       };
     });
   };
 
-  const removeLegendEntry = index => {
+  const removeLegendEntry = entryId => {
     setCustomLegend?.(prev => {
       const current = {
         ...DEFAULT_CUSTOM_LEGEND,
         ...(prev ?? {}),
       };
-      const entries = Array.isArray(current.entries)
-        ? current.entries.filter((_, entryIndex) => entryIndex !== index)
-        : [];
+      const entries = getLegendEntriesWithIds(current.entries).filter(
+        entry => getLegendEntryId(entry) !== entryId
+      );
       return { ...current, entries };
     });
   };
 
-  const moveLegendEntry = (fromIndex, toIndex) => {
+  const moveLegendEntry = (entryId, delta, action) => {
+    const fromIndex = findLegendEntryIndexById(legendEntries, entryId);
+    const toIndex = fromIndex + delta;
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      toIndex >= legendEntries.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+
+    pendingReorderFocusRef.current = { entryId, action };
+
     setCustomLegend?.(prev => {
       const current = {
         ...DEFAULT_CUSTOM_LEGEND,
         ...(prev ?? {}),
       };
-      const entries = Array.isArray(current.entries)
-        ? [...current.entries]
-        : [];
+      const entries = getLegendEntriesWithIds(current.entries);
+      const currentFromIndex = findLegendEntryIndexById(entries, entryId);
+      const currentToIndex = currentFromIndex + delta;
       if (
-        fromIndex < 0 ||
-        fromIndex >= entries.length ||
-        toIndex < 0 ||
-        toIndex >= entries.length ||
-        fromIndex === toIndex
+        currentFromIndex < 0 ||
+        currentFromIndex >= entries.length ||
+        currentToIndex < 0 ||
+        currentToIndex >= entries.length ||
+        currentFromIndex === currentToIndex
       ) {
         return current;
       }
-      const [entry] = entries.splice(fromIndex, 1);
-      entries.splice(toIndex, 0, entry);
+      const [entry] = entries.splice(currentFromIndex, 1);
+      entries.splice(currentToIndex, 0, entry);
       return { ...current, entries };
     });
   };
@@ -194,6 +275,9 @@ const LegendModal = ({
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
       enabled: Boolean(prev?.enabled),
+      entries: DEFAULT_CUSTOM_LEGEND.entries.map(entry =>
+        withLegendEntryId(entry, getNextLegendEntryId())
+      ),
     }));
   };
 
@@ -303,10 +387,11 @@ const LegendModal = ({
           </div>
 
           <div className="space-y-2">
-            {legendEntries.map((entry, index) => (
+            {legendEntryRows.map(({ entry, index, entryId }) => (
               <div
-                key={`custom-legend-entry-${index}`}
+                key={entryId}
                 className="grid gap-2 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 dark:border-[#334155] dark:bg-[#111827]"
+                data-legend-entry-id={entryId}
               >
                 <div className="grid gap-2 md:grid-cols-[72px_minmax(108px,0.75fr)_minmax(160px,1fr)_104px_64px_72px] md:items-end">
                   <div className="space-y-1">
@@ -317,8 +402,9 @@ const LegendModal = ({
                         title={`Move legend entry ${index + 1} up`}
                         aria-label={`Move legend entry ${index + 1} up`}
                         data-testid={`custom-legend-move-up-${index}`}
+                        data-legend-reorder-action="up"
                         disabled={index === 0}
-                        onClick={() => moveLegendEntry(index, index - 1)}
+                        onClick={() => moveLegendEntry(entryId, -1, 'up')}
                         className={reorderButtonClass}
                       >
                         <MoveUpIcon />
@@ -328,8 +414,9 @@ const LegendModal = ({
                         title={`Move legend entry ${index + 1} down`}
                         aria-label={`Move legend entry ${index + 1} down`}
                         data-testid={`custom-legend-move-down-${index}`}
-                        disabled={index === legendEntries.length - 1}
-                        onClick={() => moveLegendEntry(index, index + 1)}
+                        data-legend-reorder-action="down"
+                        disabled={index === legendEntryRows.length - 1}
+                        onClick={() => moveLegendEntry(entryId, 1, 'down')}
                         className={reorderButtonClass}
                       >
                         <MoveDownIcon />
@@ -348,7 +435,7 @@ const LegendModal = ({
                       aria-label={`Legend Entry ${index + 1} Group`}
                       data-testid={`custom-legend-entry-group-${index}`}
                       onChange={event =>
-                        updateLegendEntry(index, {
+                        updateLegendEntry(entryId, {
                           group: event.target.value,
                         })
                       }
@@ -367,7 +454,7 @@ const LegendModal = ({
                       aria-label={`Legend Entry ${index + 1} Label`}
                       data-testid={`custom-legend-entry-label-${index}`}
                       onChange={event =>
-                        updateLegendEntry(index, {
+                        updateLegendEntry(entryId, {
                           label: event.target.value,
                         })
                       }
@@ -385,7 +472,7 @@ const LegendModal = ({
                       aria-label={`Legend Entry ${index + 1} Kind`}
                       data-testid={`custom-legend-entry-kind-${index}`}
                       onChange={event =>
-                        updateLegendEntry(index, {
+                        updateLegendEntry(entryId, {
                           kind: event.target.value,
                         })
                       }
@@ -410,7 +497,7 @@ const LegendModal = ({
                       aria-label={`Legend Entry ${index + 1} Color`}
                       data-testid={`custom-legend-entry-color-${index}`}
                       onChange={event =>
-                        updateLegendEntry(index, {
+                        updateLegendEntry(entryId, {
                           color: event.target.value,
                         })
                       }
@@ -422,7 +509,7 @@ const LegendModal = ({
                     title={`Delete legend entry ${index + 1}`}
                     aria-label={`Delete legend entry ${index + 1}`}
                     data-testid={`custom-legend-remove-entry-${index}`}
-                    onClick={() => removeLegendEntry(index)}
+                    onClick={() => removeLegendEntry(entryId)}
                     className={dangerButtonClass}
                   >
                     Delete

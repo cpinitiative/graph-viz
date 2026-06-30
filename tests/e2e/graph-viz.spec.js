@@ -1836,6 +1836,21 @@ while (true) {}
     await expect(legendPreview.getByText('Nodes', { exact: true })).toHaveCount(
       1
     );
+    const addedEntryId = await page
+      .getByTestId('custom-legend-entry-label-0')
+      .evaluate(element =>
+        element
+          .closest('[data-legend-entry-id]')
+          ?.getAttribute('data-legend-entry-id')
+      );
+    expect(addedEntryId).toBeTruthy();
+    const movedEntry = page.locator(`[data-legend-entry-id="${addedEntryId}"]`);
+    const movedEntryMoveUp = movedEntry.locator(
+      '[data-legend-reorder-action="up"]'
+    );
+    const movedEntryMoveDown = movedEntry.locator(
+      '[data-legend-reorder-action="down"]'
+    );
     await page.getByTestId('custom-legend-entry-group-0').fill('hi');
     await page.getByTestId('custom-legend-entry-label-0').fill('Frontier edge');
     await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
@@ -1873,13 +1888,30 @@ while (true) {}
       legendTextOrder.indexOf('Edges')
     );
 
-    await page.getByTestId('custom-legend-move-down-0').click();
+    await movedEntryMoveDown.click();
     await expect(page.getByTestId('custom-legend-entry-group-1')).toHaveValue(
       'hi'
     );
     await expect(page.getByTestId('custom-legend-entry-label-1')).toHaveValue(
       'Frontier edge'
     );
+    await expect(movedEntryMoveDown).toBeFocused();
+    await movedEntryMoveDown.click();
+    await expect(page.getByTestId('custom-legend-entry-group-2')).toHaveValue(
+      'hi'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-2')).toHaveValue(
+      'Frontier edge'
+    );
+    await expect(movedEntryMoveDown).toBeFocused();
+    await movedEntryMoveUp.click();
+    await expect(page.getByTestId('custom-legend-entry-group-1')).toHaveValue(
+      'hi'
+    );
+    await expect(page.getByTestId('custom-legend-entry-label-1')).toHaveValue(
+      'Frontier edge'
+    );
+    await expect(movedEntryMoveUp).toBeFocused();
     legendTextOrder = await legendPreview
       .locator('text')
       .evaluateAll(nodes => nodes.map(node => node.textContent));
@@ -1890,6 +1922,13 @@ while (true) {}
       legendTextOrder.indexOf('Frontier edge')
     );
     await expect(graphCanvas(page)).toBeVisible();
+
+    for (let moveCount = 0; moveCount < 10; moveCount += 1) {
+      if (await movedEntryMoveDown.isDisabled()) break;
+      await movedEntryMoveDown.click();
+    }
+    await expect(movedEntryMoveDown).toBeDisabled();
+    await expect(movedEntryMoveUp).toBeFocused();
 
     await page.getByTestId('custom-legend-reset').click();
     await expect(legendToggle).toBeChecked();
