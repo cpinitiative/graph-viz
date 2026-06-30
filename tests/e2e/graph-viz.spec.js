@@ -1539,7 +1539,7 @@ while (true) {}
     expect(previewSvgText).toContain('data-node-label-id=');
     expect(previewSvgText).toContain('font-size: 24px');
     expect(previewSvgText).toContain('data-edge-label-text="true"');
-    expect(previewSvgText).toContain('data-edge-label-halo="wide"');
+    expect(previewSvgText).toContain('data-edge-label-halo="true"');
     expect(previewSvgText).not.toContain('data-edge-label-background');
     expect(previewSvgText).toContain('font-size="21"');
 
@@ -1553,7 +1553,7 @@ while (true) {}
     const svgText = await fs.readFile(svgPath, 'utf8');
     expect(svgText).toContain('font-size: 24px');
     expect(svgText).toContain('font-size="21"');
-    expect(svgText).toContain('data-edge-label-halo="wide"');
+    expect(svgText).toContain('data-edge-label-halo="true"');
     expect(svgText).not.toContain('data-edge-label-background');
 
     const projectDownload = await expectDownloadFrom({
@@ -2509,7 +2509,7 @@ while (true) {}
       graphCanvas(page).locator('[data-edge-label-background]')
     ).toHaveCount(0);
     await expect(
-      graphCanvas(page).locator('[data-edge-label-halo="wide"]').first()
+      graphCanvas(page).locator('[data-edge-label-halo="true"]').first()
     ).toBeVisible();
     await expect(
       graphCanvas(page).locator('[data-edge-label-id="e1"]')
