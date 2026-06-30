@@ -1,6 +1,21 @@
 import { motion } from 'framer-motion';
+import { useTheme } from '../../../../context/useTheme';
 
 const EDGE_LABEL_FONT_SIZE = 12;
+const EDGE_LABEL_HALO_WIDTH_RATIO = 0.22;
+const EDGE_LABEL_COLORS = {
+  light: {
+    fill: '#0F172A',
+    halo: '#FFFFFF',
+  },
+  dark: {
+    fill: '#F8FAFC',
+    halo: '#121212',
+  },
+};
+
+const getLabelHaloWidth = fontSize =>
+  Math.max(2.2, Math.min(3.2, fontSize * EDGE_LABEL_HALO_WIDTH_RATIO));
 
 const GraphEdge = ({
   edge,
@@ -15,7 +30,23 @@ const GraphEdge = ({
   onPointerDown,
   onClick,
   strokeWidth,
+  labelFontSize = EDGE_LABEL_FONT_SIZE,
 }) => {
+  const { theme } = useTheme();
+  const labelColors = EDGE_LABEL_COLORS[theme] ?? EDGE_LABEL_COLORS.light;
+  const labelText = String(edge.label ?? '');
+  const labelY = labelPosition ? labelPosition.y + 4 : 0;
+  const labelTextProps = labelPosition
+    ? {
+        x: labelPosition.x,
+        y: labelY,
+        textAnchor: 'middle',
+        fontSize: labelFontSize,
+        fontWeight: '700',
+        fontFamily: 'Arial, sans-serif',
+      }
+    : null;
+
   return (
     <g data-edge-id={edge.id} style={{ cursor: 'pointer' }}>
       <path
@@ -62,7 +93,7 @@ const GraphEdge = ({
               : 'none',
         }}
       />
-      {edge.label && labelPosition && (
+      {labelText && labelPosition && labelTextProps && (
         <g
           pointerEvents="none"
           data-edge-label-id={edge.id}
@@ -70,19 +101,25 @@ const GraphEdge = ({
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         >
           <text
-            data-edge-label-text="true"
-            x={labelPosition.x}
-            y={labelPosition.y + 4}
-            textAnchor="middle"
-            fill="#262626"
-            fontSize={EDGE_LABEL_FONT_SIZE}
-            fontWeight="700"
-            fontFamily="Arial, sans-serif"
+            data-edge-label-halo="true"
+            {...labelTextProps}
+            fill="none"
+            stroke={labelColors.halo}
+            strokeWidth={getLabelHaloWidth(labelFontSize)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-            // Handles light mode (neutral-800) and dark mode (neutral-200)
-            className="fill-neutral-800 font-bold transition-colors duration-200 dark:fill-neutral-200"
           >
-            {edge.label}
+            {labelText}
+          </text>
+          <text
+            data-edge-label-text="true"
+            {...labelTextProps}
+            fill={labelColors.fill}
+            stroke="none"
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          >
+            {labelText}
           </text>
         </g>
       )}

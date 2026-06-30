@@ -2110,6 +2110,9 @@ while (true) {}
   test('imports and renders a directed self-loop edge', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
@@ -2140,11 +2143,40 @@ while (true) {}
     const selfLoopLabelText = selfLoopLabel.locator(
       '[data-edge-label-text="true"]'
     );
+    const selfLoopLabelHalo = selfLoopLabel.locator(
+      '[data-edge-label-halo="true"]'
+    );
+    const canvasBackground = graphCanvas(page).locator(
+      '[data-graph-canvas-background="true"]'
+    );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
     await expect(selfLoopLabelText).toHaveAttribute('font-size', '12');
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
+    await expect(selfLoopLabelText).toHaveAttribute('stroke', 'none');
+    await expect(selfLoopLabelHalo).toBeVisible();
+    await expect(selfLoopLabelHalo).toHaveText('loop');
+    await expect(selfLoopLabelHalo).toHaveAttribute('fill', 'none');
+    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
+    expect(
+      Number(await selfLoopLabelHalo.getAttribute('stroke-width'))
+    ).toBeCloseTo(2.64, 2);
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
+    await expect(selfLoopLabel.locator('rect')).toHaveCount(0);
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
+    await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#F8FAFC');
+    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#121212');
+    await expect(canvasBackground).toHaveAttribute('fill', '#121212');
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
+    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
+    await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
@@ -2174,7 +2206,9 @@ api.edge('loop', '#3b82f6');
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
+    expect(exportedSvg).toContain('data-edge-label-halo="true"');
     expect(exportedSvg).toContain('font-size="12"');
+    expect(exportedSvg).toContain('stroke="#FFFFFF"');
     expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');

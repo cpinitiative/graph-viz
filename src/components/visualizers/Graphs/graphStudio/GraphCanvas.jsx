@@ -23,6 +23,10 @@ const SELECTED_EDGE_COLORS = {
   light: '#171717',
   dark: '#F5F5F5',
 };
+const CANVAS_BACKGROUND_COLORS = {
+  light: '#FFFFFF',
+  dark: '#121212',
+};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -1209,10 +1213,12 @@ const GraphCanvas = ({
           </filter>
         </defs>
         <rect
+          data-graph-canvas-background="true"
           width="100%"
           height="100%"
-          fill="white"
-          className="dark:fill-[#121212]"
+          fill={
+            CANVAS_BACKGROUND_COLORS[theme] ?? CANVAS_BACKGROUND_COLORS.light
+          }
         />
         <g
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
