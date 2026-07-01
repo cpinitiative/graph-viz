@@ -1539,7 +1539,7 @@ while (true) {}
     expect(previewSvgText).toContain('data-node-label-id=');
     expect(previewSvgText).toContain('font-size: 24px');
     expect(previewSvgText).toContain('data-edge-label-text="true"');
-    expect(previewSvgText).toContain('data-edge-label-halo="true"');
+    expect(previewSvgText).not.toContain('data-edge-label-halo');
     expect(previewSvgText).not.toContain('data-edge-label-background');
     expect(previewSvgText).toContain('font-size="21"');
 
@@ -1553,7 +1553,7 @@ while (true) {}
     const svgText = await fs.readFile(svgPath, 'utf8');
     expect(svgText).toContain('font-size: 24px');
     expect(svgText).toContain('font-size="21"');
-    expect(svgText).toContain('data-edge-label-halo="true"');
+    expect(svgText).not.toContain('data-edge-label-halo');
     expect(svgText).not.toContain('data-edge-label-background');
 
     const projectDownload = await expectDownloadFrom({
@@ -2509,8 +2509,8 @@ while (true) {}
       graphCanvas(page).locator('[data-edge-label-background]')
     ).toHaveCount(0);
     await expect(
-      graphCanvas(page).locator('[data-edge-label-halo="true"]').first()
-    ).toBeVisible();
+      graphCanvas(page).locator('[data-edge-label-halo]')
+    ).toHaveCount(0);
     await expect(
       graphCanvas(page).locator('[data-edge-label-id="e1"]')
     ).toContainText('-3');
@@ -3167,9 +3167,6 @@ while (true) {}
     const selfLoopLabelText = selfLoopLabel.locator(
       '[data-edge-label-text="true"]'
     );
-    const selfLoopLabelHalo = selfLoopLabel.locator(
-      '[data-edge-label-halo="true"]'
-    );
     const canvasBackground = graphCanvas(page).locator(
       '[data-graph-canvas-background="true"]'
     );
@@ -3178,17 +3175,13 @@ while (true) {}
     await expect(selfLoopLabelText).toHaveAttribute('font-size', '16');
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
     await expect(selfLoopLabelText).toHaveAttribute('stroke', 'none');
-    await expect(selfLoopLabelHalo).toBeVisible();
-    await expect(selfLoopLabelHalo).toHaveText('loop');
-    await expect(selfLoopLabelHalo).toHaveAttribute('fill', 'none');
-    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
-    expect(
-      Number(await selfLoopLabelHalo.getAttribute('stroke-width'))
-    ).toBeCloseTo(3.2, 2);
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
     await expect(selfLoopLabel).toHaveAttribute(
       'data-edge-label-theme',
       'light'
+    );
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
     );
     await expect(selfLoopLabel.locator('rect')).toHaveCount(0);
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
@@ -3201,7 +3194,9 @@ while (true) {}
       'dark'
     );
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#F8FAFC');
-    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#121212');
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
+    );
     await expect(canvasBackground).toHaveAttribute('fill', '#121212');
 
     await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -3211,7 +3206,9 @@ while (true) {}
       'light'
     );
     await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
-    await expect(selfLoopLabelHalo).toHaveAttribute('stroke', '#FFFFFF');
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
+    );
     await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
 
     await page.getByText('Frame 2').click();
@@ -3243,9 +3240,8 @@ api.edge('loop', '#3b82f6');
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
-    expect(exportedSvg).toContain('data-edge-label-halo="true"');
+    expect(exportedSvg).not.toContain('data-edge-label-halo');
     expect(exportedSvg).toContain('font-size="16"');
-    expect(exportedSvg).toContain('stroke="#FFFFFF"');
     expect(exportedSvg).toContain('>loop</text>');
 
     const downloadPromise = page.waitForEvent('download');

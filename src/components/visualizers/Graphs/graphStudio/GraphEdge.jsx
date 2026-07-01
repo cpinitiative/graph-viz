@@ -2,23 +2,17 @@ import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { useTheme } from '../../../../context/useTheme';
 
-const EDGE_LABEL_HALO_WIDTH_RATIO = 0.22;
 const EDGE_LABEL_TONES = {
   light: {
     text: '#0F172A',
-    halo: '#FFFFFF',
   },
   dark: {
     text: '#F8FAFC',
-    halo: '#121212',
   },
 };
 
 const getEdgeLabelTone = theme =>
   EDGE_LABEL_TONES[theme] ?? EDGE_LABEL_TONES.light;
-
-const getLabelHaloWidth = fontSize =>
-  Math.max(2.2, Math.min(3.2, fontSize * EDGE_LABEL_HALO_WIDTH_RATIO));
 
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -326,18 +320,6 @@ const GraphEdge = ({
           aria-hidden="true"
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         >
-          <text
-            data-edge-label-halo="true"
-            {...labelTextProps}
-            fill="none"
-            stroke={labelTone.halo}
-            strokeWidth={getLabelHaloWidth(labelFontSize)}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-          >
-            {labelText}
-          </text>
           <text
             data-edge-label-text="true"
             {...labelTextProps}
