@@ -24,6 +24,10 @@ import {
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
 const EMPTY_SELECTED_NODE_IDS = new Set();
+const CANVAS_BACKGROUND_COLORS = {
+  light: '#FFFFFF',
+  dark: '#121212',
+};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -787,6 +791,7 @@ const GraphCanvas = ({
   onViewportSizeChange,
   isExporting = false,
 }) => {
+  const { theme } = useTheme();
   const svgRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [dragRect, setDragRect] = useState(null);
@@ -1209,10 +1214,12 @@ const GraphCanvas = ({
           </filter>
         </defs>
         <rect
+          data-graph-canvas-background="true"
           width="100%"
           height="100%"
-          fill="white"
-          className="dark:fill-[#121212]"
+          fill={
+            CANVAS_BACKGROUND_COLORS[theme] ?? CANVAS_BACKGROUND_COLORS.light
+          }
         />
         <g
           data-graph-view-transform="true"

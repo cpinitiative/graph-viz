@@ -67,6 +67,32 @@ const choosePreset = async (page, value) => {
   await expect(graphCanvas(page)).toBeVisible();
 };
 
+const getRequiredBox = async locator => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box;
+};
+
+const expectSelectedTimelineFrameCardVisual = async card => {
+  await expect(card).toHaveAttribute('data-current', 'true');
+  await expect(card).toHaveCSS('box-shadow', 'none');
+  await expect(card).not.toHaveClass(/shadow-/);
+  await expect(card).not.toHaveClass(/focus-visible:ring-inset/);
+
+  const accent = card.getByTestId('timeline-frame-selected-accent');
+  const title = card.getByText(/^Frame \d+$/);
+  await expect(accent).toBeVisible();
+  await expect(title).toBeVisible();
+
+  const accentBox = await getRequiredBox(accent);
+  const titleBox = await getRequiredBox(title);
+  expect(accentBox.width).toBeGreaterThanOrEqual(1.5);
+  expect(accentBox.width).toBeLessThanOrEqual(2.5);
+  expect(titleBox.x - (accentBox.x + accentBox.width)).toBeGreaterThanOrEqual(
+    8
+  );
+};
+
 const getDirectedEdgeEndpointOffsets = async page =>
   graphCanvas(page).evaluate((svg, selector) => {
     const arrowheads = Array.from(
@@ -901,7 +927,11 @@ while (true) {}
   }) => {
     const errors = watchForUnexpectedErrors(page);
 
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
     await page.goto('/');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
@@ -931,6 +961,9 @@ while (true) {}
     await expect(
       cards.first().getByTestId('timeline-frame-selected-accent')
     ).toBeVisible();
+    await expectSelectedTimelineFrameCardVisual(cards.first());
+    await expect(cards.nth(1)).toHaveClass(/focus-visible:ring-1/);
+    await expect(cards.nth(1)).not.toHaveClass(/focus-visible:ring-inset/);
     await expect(cards.first()).toHaveCSS('border-left-width', '1px');
     await cards.nth(1).click();
     const deselectedFrameOneCardBox = await cards.first().boundingBox();
@@ -977,6 +1010,13 @@ while (true) {}
     await expect(
       cards.nth(2).getByTestId('timeline-frame-selected-accent')
     ).toBeVisible();
+    await expectSelectedTimelineFrameCardVisual(cards.nth(2));
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expectSelectedTimelineFrameCardVisual(cards.nth(2));
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
 
     await cards.last().click();
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
@@ -1141,8 +1181,8 @@ while (true) {}
     await graphCanvas(page).focus();
     await graphCanvas(page).press('ArrowLeft');
     await expect(cards.first()).toHaveAttribute('data-current', 'true');
-    await expect(cards.first()).toHaveClass(/focus-visible:ring-1/);
-    await expect(cards.first()).toHaveClass(/focus-visible:ring-inset/);
+    await expectSelectedTimelineFrameCardVisual(cards.first());
+    await expect(cards.first()).not.toHaveClass(/focus-visible:ring-1/);
     await expect(cards.first()).not.toHaveClass(/focus-visible:ring-2/);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
@@ -1539,7 +1579,7 @@ while (true) {}
     expect(previewSvgText).toContain('data-node-label-id=');
     expect(previewSvgText).toContain('font-size: 24px');
     expect(previewSvgText).toContain('data-edge-label-text="true"');
-    expect(previewSvgText).toContain('data-edge-label-halo="wide"');
+    expect(previewSvgText).not.toContain('data-edge-label-halo');
     expect(previewSvgText).not.toContain('data-edge-label-background');
     expect(previewSvgText).toContain('font-size="21"');
 
@@ -1553,7 +1593,7 @@ while (true) {}
     const svgText = await fs.readFile(svgPath, 'utf8');
     expect(svgText).toContain('font-size: 24px');
     expect(svgText).toContain('font-size="21"');
-    expect(svgText).toContain('data-edge-label-halo="wide"');
+    expect(svgText).not.toContain('data-edge-label-halo');
     expect(svgText).not.toContain('data-edge-label-background');
 
     const projectDownload = await expectDownloadFrom({
@@ -2509,8 +2549,8 @@ while (true) {}
       graphCanvas(page).locator('[data-edge-label-background]')
     ).toHaveCount(0);
     await expect(
-      graphCanvas(page).locator('[data-edge-label-halo="wide"]').first()
-    ).toBeVisible();
+      graphCanvas(page).locator('[data-edge-label-halo]')
+    ).toHaveCount(0);
     await expect(
       graphCanvas(page).locator('[data-edge-label-id="e1"]')
     ).toContainText('-3');
@@ -3132,6 +3172,9 @@ while (true) {}
   test('imports and renders a directed self-loop edge', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
@@ -3164,11 +3207,49 @@ while (true) {}
     const selfLoopLabelText = selfLoopLabel.locator(
       '[data-edge-label-text="true"]'
     );
+    const canvasBackground = graphCanvas(page).locator(
+      '[data-graph-canvas-background="true"]'
+    );
     await expect(selfLoopLabelText).toBeVisible();
     await expect(selfLoopLabelText).toHaveText('loop');
     await expect(selfLoopLabelText).toHaveAttribute('font-size', '16');
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
+    await expect(selfLoopLabelText).toHaveAttribute('stroke', 'none');
     await expect(selfLoopLabel).toHaveAttribute('pointer-events', 'none');
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'light'
+    );
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
+    );
+    await expect(selfLoopLabel.locator('rect')).toHaveCount(0);
     await expect(selfLoopLabelText).toHaveCSS('user-select', 'none');
+    await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'dark'
+    );
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#F8FAFC');
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
+    );
+    await expect(canvasBackground).toHaveAttribute('fill', '#121212');
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    await expect(selfLoopLabel).toHaveAttribute(
+      'data-edge-label-theme',
+      'light'
+    );
+    await expect(selfLoopLabelText).toHaveAttribute('fill', '#0F172A');
+    await expect(selfLoopLabel.locator('[data-edge-label-halo]')).toHaveCount(
+      0
+    );
+    await expect(canvasBackground).toHaveAttribute('fill', '#FFFFFF');
 
     await page.getByText('Frame 2').click();
     await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#f59e0b');
@@ -3199,6 +3280,7 @@ api.edge('loop', '#3b82f6');
     expect(svgPath).not.toBeNull();
     const exportedSvg = await fs.readFile(svgPath, 'utf8');
     expect(exportedSvg).toContain('data-edge-label-text="true"');
+    expect(exportedSvg).not.toContain('data-edge-label-halo');
     expect(exportedSvg).toContain('font-size="16"');
     expect(exportedSvg).toContain('>loop</text>');
 

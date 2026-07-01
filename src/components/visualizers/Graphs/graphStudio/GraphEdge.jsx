@@ -2,18 +2,17 @@ import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { useTheme } from '../../../../context/useTheme';
 
+const EDGE_LABEL_TONES = {
+  light: {
+    text: '#0F172A',
+  },
+  dark: {
+    text: '#F8FAFC',
+  },
+};
+
 const getEdgeLabelTone = theme =>
-  theme === 'dark'
-    ? {
-        text: '#F8FAFC',
-        wideHalo: '#0F172A',
-        fineHalo: '#111827',
-      }
-    : {
-        text: '#1E293B',
-        wideHalo: '#FFFFFF',
-        fineHalo: '#F8FAFC',
-      };
+  EDGE_LABEL_TONES[theme] ?? EDGE_LABEL_TONES.light;
 
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -226,9 +225,18 @@ const GraphEdge = ({
   const { theme } = useTheme();
   const isHighlighted = selected || multiSelected;
   const labelTone = getEdgeLabelTone(theme);
+  const labelText = String(edge.label ?? '');
   const labelY = labelPosition ? labelPosition.y + labelFontSize * 0.35 : 0;
-  const wideHaloWidth = Math.max(2.8, labelFontSize * 0.28);
-  const fineHaloWidth = Math.max(1.2, labelFontSize * 0.12);
+  const labelTextProps = labelPosition
+    ? {
+        x: labelPosition.x,
+        y: labelY,
+        textAnchor: 'middle',
+        fontSize: labelFontSize,
+        fontWeight: '650',
+        fontFamily: 'Arial, sans-serif',
+      }
+    : null;
   const { bodyPathD, arrow } = useMemo(
     () =>
       getDirectedEdgeGeometry({
@@ -304,7 +312,7 @@ const GraphEdge = ({
           }
         />
       )}
-      {edge.label && labelPosition && (
+      {labelText && labelPosition && labelTextProps && (
         <g
           pointerEvents="none"
           data-edge-label-id={edge.id}
@@ -313,55 +321,13 @@ const GraphEdge = ({
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         >
           <text
-            data-edge-label-halo="wide"
-            x={labelPosition.x}
-            y={labelY}
-            textAnchor="middle"
-            fill="none"
-            stroke={labelTone.wideHalo}
-            strokeWidth={wideHaloWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fontSize={labelFontSize}
-            fontWeight="650"
-            fontFamily="Arial, sans-serif"
-            opacity="0.92"
-            paintOrder="stroke"
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-          >
-            {edge.label}
-          </text>
-          <text
-            data-edge-label-halo="fine"
-            x={labelPosition.x}
-            y={labelY}
-            textAnchor="middle"
-            fill="none"
-            stroke={labelTone.fineHalo}
-            strokeWidth={fineHaloWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fontSize={labelFontSize}
-            fontWeight="650"
-            fontFamily="Arial, sans-serif"
-            opacity="0.78"
-            paintOrder="stroke"
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-          >
-            {edge.label}
-          </text>
-          <text
             data-edge-label-text="true"
-            x={labelPosition.x}
-            y={labelY}
-            textAnchor="middle"
+            {...labelTextProps}
             fill={labelTone.text}
-            fontSize={labelFontSize}
-            fontWeight="650"
-            fontFamily="Arial, sans-serif"
+            stroke="none"
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           >
-            {edge.label}
+            {labelText}
           </text>
         </g>
       )}
