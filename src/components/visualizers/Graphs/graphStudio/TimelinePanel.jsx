@@ -22,6 +22,11 @@ const detailLabelClass =
   'shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const detailControlLabelClass =
   'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
+const frameCardBaseClass =
+  'relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none dark:bg-[#1E293B] md:min-w-[128px]';
+const selectedFrameCardClass = 'border-[#0F2747] dark:border-[#60A5FA]';
+const unselectedFrameCardClass =
+  'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -297,10 +302,10 @@ const TimelinePanel = ({
               }}
               aria-current={index === currentFrame ? 'step' : undefined}
               aria-selected={index === currentFrame}
-              className={`relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#CBD5E1] dark:bg-[#1E293B] dark:focus-visible:ring-[#94A3B8] md:min-w-[128px] ${
+              className={`${frameCardBaseClass} ${
                 index === currentFrame
-                  ? 'border-[#0F2747] shadow-sm dark:border-[#60A5FA]'
-                  : 'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044]'
+                  ? selectedFrameCardClass
+                  : unselectedFrameCardClass
               }`}
               data-current={index === currentFrame}
               data-frame-navigation-surface="true"
@@ -328,11 +333,11 @@ const TimelinePanel = ({
               {index === currentFrame && (
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-1 bg-[#B45309] dark:bg-[#60A5FA]"
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[2px] bg-[#B45309] dark:bg-[#60A5FA]"
                   data-testid="timeline-frame-selected-accent"
                 />
               )}
-              <div className="px-2 py-1">
+              <div className="py-1 pl-3 pr-2">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
                   <div
                     className={`text-xs font-bold ${

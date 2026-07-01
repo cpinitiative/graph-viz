@@ -67,6 +67,32 @@ const choosePreset = async (page, value) => {
   await expect(graphCanvas(page)).toBeVisible();
 };
 
+const getRequiredBox = async locator => {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box;
+};
+
+const expectSelectedTimelineFrameCardVisual = async card => {
+  await expect(card).toHaveAttribute('data-current', 'true');
+  await expect(card).toHaveCSS('box-shadow', 'none');
+  await expect(card).not.toHaveClass(/shadow-/);
+  await expect(card).not.toHaveClass(/focus-visible:ring-inset/);
+
+  const accent = card.getByTestId('timeline-frame-selected-accent');
+  const title = card.getByText(/^Frame \d+$/);
+  await expect(accent).toBeVisible();
+  await expect(title).toBeVisible();
+
+  const accentBox = await getRequiredBox(accent);
+  const titleBox = await getRequiredBox(title);
+  expect(accentBox.width).toBeGreaterThanOrEqual(1.5);
+  expect(accentBox.width).toBeLessThanOrEqual(2.5);
+  expect(titleBox.x - (accentBox.x + accentBox.width)).toBeGreaterThanOrEqual(
+    8
+  );
+};
+
 const getDirectedEdgeEndpointOffsets = async page =>
   graphCanvas(page).evaluate((svg, selector) => {
     const arrowheads = Array.from(
@@ -901,7 +927,11 @@ while (true) {}
   }) => {
     const errors = watchForUnexpectedErrors(page);
 
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
     await page.goto('/');
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
@@ -931,6 +961,9 @@ while (true) {}
     await expect(
       cards.first().getByTestId('timeline-frame-selected-accent')
     ).toBeVisible();
+    await expectSelectedTimelineFrameCardVisual(cards.first());
+    await expect(cards.nth(1)).toHaveClass(/focus-visible:ring-1/);
+    await expect(cards.nth(1)).not.toHaveClass(/focus-visible:ring-inset/);
     await expect(cards.first()).toHaveCSS('border-left-width', '1px');
     await cards.nth(1).click();
     const deselectedFrameOneCardBox = await cards.first().boundingBox();
@@ -977,6 +1010,13 @@ while (true) {}
     await expect(
       cards.nth(2).getByTestId('timeline-frame-selected-accent')
     ).toBeVisible();
+    await expectSelectedTimelineFrameCardVisual(cards.nth(2));
+
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expectSelectedTimelineFrameCardVisual(cards.nth(2));
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
 
     await cards.last().click();
     await expect(cards.last()).toHaveAttribute('data-current', 'true');
@@ -1141,8 +1181,8 @@ while (true) {}
     await graphCanvas(page).focus();
     await graphCanvas(page).press('ArrowLeft');
     await expect(cards.first()).toHaveAttribute('data-current', 'true');
-    await expect(cards.first()).toHaveClass(/focus-visible:ring-1/);
-    await expect(cards.first()).toHaveClass(/focus-visible:ring-inset/);
+    await expectSelectedTimelineFrameCardVisual(cards.first());
+    await expect(cards.first()).not.toHaveClass(/focus-visible:ring-1/);
     await expect(cards.first()).not.toHaveClass(/focus-visible:ring-2/);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
