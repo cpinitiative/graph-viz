@@ -31,6 +31,7 @@ const nodeCircleSelector =
 const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
+const leftSidebar = page => page.getByTestId('left-sidebar');
 
 const getCanvasViewSnapshot = async page => ({
   x: await graphCanvas(page).getAttribute('data-view-x'),
@@ -613,7 +614,9 @@ test.describe('Graph Studio desktop smoke', () => {
       'true'
     );
     await expect(
-      page.getByText('Click the canvas to add a node.')
+      leftSidebar(page).getByText(
+        'Click canvas to add a node from Frame 1 onward.'
+      )
     ).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
@@ -630,8 +633,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    const drawEdgeHelper = page.getByText(
-      /Click a source node, then a target node\.|Source node .* selected\. Click a target node\./
+    const drawEdgeHelper = leftSidebar(page).getByText(
+      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
     );
     await expect(drawEdgeHelper).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
@@ -1109,7 +1112,10 @@ while (true) {}
     const detailControls = page.getByTestId('frame-detail-controls');
     await expect(page.getByText('Description', { exact: true })).toBeVisible();
     await expect(
-      page.getByText('Timing & Caption', { exact: true })
+      detailControls.getByText('Timing', { exact: true })
+    ).toBeVisible();
+    await expect(
+      detailControls.getByText('Caption', { exact: true })
     ).toBeVisible();
     await expect(frameDescription).toBeVisible();
     await expect(durationInput).toBeVisible();
@@ -2080,7 +2086,9 @@ while (true) {}
       'canvas'
     );
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2178,7 +2186,9 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2207,7 +2217,9 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2215,10 +2227,14 @@ while (true) {}
       'canvas'
     );
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toHaveCount(0);
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2788,7 +2804,9 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
@@ -2802,7 +2820,9 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
 
     await page.getByTestId('tool-button-select').click();

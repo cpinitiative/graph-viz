@@ -264,6 +264,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedObject,
     setSelectedNodeIds,
     clearSelection,
+    currentFrame,
   });
   const previousFrameRef = useRef(currentFrame);
   useEffect(() => {
