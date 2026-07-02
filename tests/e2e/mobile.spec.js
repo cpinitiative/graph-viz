@@ -33,9 +33,6 @@ test.describe('Graph Studio mobile smoke', () => {
       propertyPanel(page).getByText('INSPECTOR', { exact: true })
     ).toBeVisible();
     await expect(
-      propertyPanel(page).getByText('Canvas', { exact: true })
-    ).toBeVisible();
-    await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await expect(page.getByText('Gravity (force)')).toBeVisible();

@@ -563,11 +563,9 @@ test.describe('Graph Studio desktop smoke', () => {
       propertyPanel(page).getByText('INSPECTOR', { exact: true })
     ).toBeVisible();
     await expect(
-      propertyPanel(page).getByText('Canvas', { exact: true })
-    ).toBeVisible();
-    await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Project-wide')).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -790,7 +788,7 @@ test.describe('Graph Studio desktop smoke', () => {
     }
 
     await expect(
-      propertyPanel(page).getByText('Canvas', { exact: true })
+      propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await graphNodes.first().click();
     await expect(
@@ -807,7 +805,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(
-      propertyPanel(page).getByText('Canvas', { exact: true })
+      propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
 
     await choosePreset(page, 'bfs');

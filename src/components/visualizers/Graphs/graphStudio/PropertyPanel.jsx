@@ -218,7 +218,8 @@ const InfoHelp = ({ label, text }) => {
 };
 
 const PanelShell = ({
-  contextTitle,
+  title,
+  scope,
   inspectorType,
   headerAction,
   children,
@@ -228,12 +229,15 @@ const PanelShell = ({
     data-testid="property-panel"
     data-inspector-type={inspectorType}
   >
-    <div className="flex items-start justify-between gap-3 border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
-      <div className="min-w-0 space-y-1">
-        <div className={panelEyebrowClass}>INSPECTOR</div>
-        <div className={panelContextClass}>{contextTitle}</div>
+    <div className="border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
+      <div className={panelEyebrowClass}>INSPECTOR</div>
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <div className={`${panelContextClass} min-w-0`}>{title}</div>
+          <ScopeLabel scope={scope} variant="section" />
+        </div>
+        {headerAction}
       </div>
-      {headerAction}
     </div>
     {children}
   </div>
@@ -594,7 +598,7 @@ const MultiSelectionPanel = ({
   onClearSelection,
 }) => (
   <PanelShell
-    contextTitle="Selection"
+    title="Selection"
     inspectorType="selection"
     headerAction={
       <ClearSelectionButton
@@ -640,7 +644,7 @@ const NodeInspector = ({
 
   return (
     <PanelShell
-      contextTitle="Node"
+      title="Node properties"
       inspectorType="node"
       headerAction={
         <ClearSelectionButton
@@ -649,60 +653,58 @@ const NodeInspector = ({
         />
       }
     >
-      <Section title="Node properties">
-        <div className="space-y-4">
-          <Field label="Label" scope="All frames">
-            <TextInput
-              value={selectedNode.label ?? ''}
-              onChange={value => onUpdateNode({ label: value })}
-              ariaLabel="Label"
-            />
-          </Field>
-          <Field label="Position" scope="All frames">
-            <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
-              X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
-            </div>
-          </Field>
-          <Field
-            label="Status / Style"
-            scope="Frame"
-            hasOverride={frameOverrides.status}
-            onResetOverride={() => onResetOverride?.('status')}
-            onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
+      <div className="space-y-4">
+        <Field label="Label" scope="All frames">
+          <TextInput
+            value={selectedNode.label ?? ''}
+            onChange={value => onUpdateNode({ label: value })}
+            ariaLabel="Label"
+          />
+        </Field>
+        <Field label="Position" scope="All frames">
+          <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
+            X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
+          </div>
+        </Field>
+        <Field
+          label="Status / Style"
+          scope="Frame"
+          hasOverride={frameOverrides.status}
+          onResetOverride={() => onResetOverride?.('status')}
+          onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
+        >
+          <NativeSelect
+            value={nodeStatus}
+            onChange={event => onUpdateNode({ status: event.target.value })}
           >
-            <NativeSelect
-              value={nodeStatus}
-              onChange={event => onUpdateNode({ status: event.target.value })}
-            >
-              {NODE_STATUS_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <ColorField
-            label="Color"
-            value={nodeColor}
-            fallback="#3b82f6"
-            placeholder="#22c55e or blank"
-            scope="Frame"
-            hasOverride={frameOverrides.color}
-            onResetOverride={() => onResetOverride?.('color')}
-            onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
-            onChange={value => onUpdateNode({ color: value })}
-          />
-          <ToggleRow
-            label="Visible"
-            checked={nodeVisible}
-            scope="Frame"
-            hasOverride={frameOverrides.visible}
-            onResetOverride={() => onResetOverride?.('visible')}
-            onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
-            onChange={checked => onUpdateNode({ visible: checked })}
-          />
-        </div>
-      </Section>
+            {NODE_STATUS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <ColorField
+          label="Color"
+          value={nodeColor}
+          fallback="#3b82f6"
+          placeholder="#22c55e or blank"
+          scope="Frame"
+          hasOverride={frameOverrides.color}
+          onResetOverride={() => onResetOverride?.('color')}
+          onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
+          onChange={value => onUpdateNode({ color: value })}
+        />
+        <ToggleRow
+          label="Visible"
+          checked={nodeVisible}
+          scope="Frame"
+          hasOverride={frameOverrides.visible}
+          onResetOverride={() => onResetOverride?.('visible')}
+          onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
+          onChange={checked => onUpdateNode({ visible: checked })}
+        />
+      </div>
 
       <Section title="Connected edges">
         <LinkedList
@@ -745,7 +747,7 @@ const EdgeInspector = ({
 
   return (
     <PanelShell
-      contextTitle="Edge"
+      title="Edge properties"
       inspectorType="edge"
       headerAction={
         <ClearSelectionButton
@@ -754,44 +756,42 @@ const EdgeInspector = ({
         />
       }
     >
-      <Section title="Edge properties">
-        <div className="space-y-4">
-          <Field label="Weight / Label" scope="All frames">
-            <TextInput
-              value={selectedEdge.label ?? ''}
-              onChange={value => onUpdateEdge({ label: value })}
-              placeholder="e.g. 7"
-              ariaLabel="Weight / Label"
-            />
-          </Field>
-          <ToggleRow
-            label="Directed"
-            checked={Boolean(selectedEdge.directed)}
-            scope="All frames"
-            onChange={checked => onUpdateEdge({ directed: checked })}
+      <div className="space-y-4">
+        <Field label="Weight / Label" scope="All frames">
+          <TextInput
+            value={selectedEdge.label ?? ''}
+            onChange={value => onUpdateEdge({ label: value })}
+            placeholder="e.g. 7"
+            ariaLabel="Weight / Label"
           />
-          <ColorField
-            label="Color"
-            value={edgeColor}
-            fallback="#64748b"
-            placeholder="#64748b"
-            scope="Frame"
-            hasOverride={frameOverrides.color}
-            onResetOverride={() => onResetOverride?.('color')}
-            onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
-            onChange={value => onUpdateEdge({ color: value })}
-          />
-          <ToggleRow
-            label="Visible"
-            checked={edgeVisible}
-            scope="Frame"
-            hasOverride={frameOverrides.visible}
-            onResetOverride={() => onResetOverride?.('visible')}
-            onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
-            onChange={checked => onUpdateEdge({ visible: checked })}
-          />
-        </div>
-      </Section>
+        </Field>
+        <ToggleRow
+          label="Directed"
+          checked={Boolean(selectedEdge.directed)}
+          scope="All frames"
+          onChange={checked => onUpdateEdge({ directed: checked })}
+        />
+        <ColorField
+          label="Color"
+          value={edgeColor}
+          fallback="#64748b"
+          placeholder="#64748b"
+          scope="Frame"
+          hasOverride={frameOverrides.color}
+          onResetOverride={() => onResetOverride?.('color')}
+          onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
+          onChange={value => onUpdateEdge({ color: value })}
+        />
+        <ToggleRow
+          label="Visible"
+          checked={edgeVisible}
+          scope="Frame"
+          hasOverride={frameOverrides.visible}
+          onResetOverride={() => onResetOverride?.('visible')}
+          onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
+          onChange={checked => onUpdateEdge({ visible: checked })}
+        />
+      </div>
 
       <Section title="Connected nodes">
         <LinkedList
@@ -821,83 +821,81 @@ const GlobalSettingsPanel = ({
   const curveAmountEnabled = edgeRouting === EDGE_ROUTING.bezier;
 
   return (
-    <PanelShell contextTitle="Canvas" inspectorType="canvas">
-      <Section title="Canvas settings" scope="Project-wide">
-        <div className="space-y-3">
-          <Field label="Routing">
-            <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
-              {edgeRouting === EDGE_ROUTING.bezier ? 'Curved' : 'Straight'}
-            </div>
-          </Field>
-          <RangeControl
-            label="Gravity (force)"
-            value={globalSettings.forceStrength}
-            min="0.2"
-            max="2"
-            step="0.1"
-            onChange={forceStrength => onUpdateGlobal({ forceStrength })}
-          />
-          <RangeControl
-            label="Curve Amount"
-            value={globalSettings.edgeCurvature}
-            min="0"
-            max="120"
-            step="5"
-            disabled={!curveAmountEnabled}
-            help={
-              <InfoHelp
-                label="Curve Amount help"
-                text="Only affects Curved edge routing"
-              />
-            }
-            onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
-          />
-          <RangeControl
-            label="Node size"
-            value={globalSettings.nodeSize ?? 22}
-            min="12"
-            max="44"
-            step="1"
-            onChange={nodeSize => onUpdateGlobal({ nodeSize })}
-          />
-          <NumberControl
-            label="Node Label Size"
-            value={
-              globalSettings.nodeLabelFontSize ??
-              getDefaultNodeLabelFontSize(globalSettings.nodeSize)
-            }
-            min={NODE_LABEL_FONT_SIZE_RANGE.min}
-            max={NODE_LABEL_FONT_SIZE_RANGE.max}
-            step="1"
-            testId="node-label-font-size-input"
-            onChange={nodeLabelFontSize =>
-              onUpdateGlobal({ nodeLabelFontSize })
-            }
-          />
-          <RangeControl
-            label="Edge width"
-            value={globalSettings.edgeWidth ?? 2.2}
-            min="1"
-            max="8"
-            step="0.2"
-            onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
-          />
-          <NumberControl
-            label="Edge Label Size"
-            value={
-              globalSettings.edgeLabelFontSize ??
-              getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
-            }
-            min={EDGE_LABEL_FONT_SIZE_RANGE.min}
-            max={EDGE_LABEL_FONT_SIZE_RANGE.max}
-            step="1"
-            testId="edge-label-font-size-input"
-            onChange={edgeLabelFontSize =>
-              onUpdateGlobal({ edgeLabelFontSize })
-            }
-          />
-        </div>
-      </Section>
+    <PanelShell
+      title="Canvas settings"
+      scope="Project-wide"
+      inspectorType="canvas"
+    >
+      <div className="space-y-3">
+        <Field label="Routing">
+          <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
+            {edgeRouting === EDGE_ROUTING.bezier ? 'Curved' : 'Straight'}
+          </div>
+        </Field>
+        <RangeControl
+          label="Gravity (force)"
+          value={globalSettings.forceStrength}
+          min="0.2"
+          max="2"
+          step="0.1"
+          onChange={forceStrength => onUpdateGlobal({ forceStrength })}
+        />
+        <RangeControl
+          label="Curve Amount"
+          value={globalSettings.edgeCurvature}
+          min="0"
+          max="120"
+          step="5"
+          disabled={!curveAmountEnabled}
+          help={
+            <InfoHelp
+              label="Curve Amount help"
+              text="Only affects Curved edge routing"
+            />
+          }
+          onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
+        />
+        <RangeControl
+          label="Node size"
+          value={globalSettings.nodeSize ?? 22}
+          min="12"
+          max="44"
+          step="1"
+          onChange={nodeSize => onUpdateGlobal({ nodeSize })}
+        />
+        <NumberControl
+          label="Node Label Size"
+          value={
+            globalSettings.nodeLabelFontSize ??
+            getDefaultNodeLabelFontSize(globalSettings.nodeSize)
+          }
+          min={NODE_LABEL_FONT_SIZE_RANGE.min}
+          max={NODE_LABEL_FONT_SIZE_RANGE.max}
+          step="1"
+          testId="node-label-font-size-input"
+          onChange={nodeLabelFontSize => onUpdateGlobal({ nodeLabelFontSize })}
+        />
+        <RangeControl
+          label="Edge width"
+          value={globalSettings.edgeWidth ?? 2.2}
+          min="1"
+          max="8"
+          step="0.2"
+          onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
+        />
+        <NumberControl
+          label="Edge Label Size"
+          value={
+            globalSettings.edgeLabelFontSize ??
+            getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
+          }
+          min={EDGE_LABEL_FONT_SIZE_RANGE.min}
+          max={EDGE_LABEL_FONT_SIZE_RANGE.max}
+          step="1"
+          testId="edge-label-font-size-input"
+          onChange={edgeLabelFontSize => onUpdateGlobal({ edgeLabelFontSize })}
+        />
+      </div>
       <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
         <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
           Select a node or edge to open its inspector.
