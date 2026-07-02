@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   CUSTOM_LEGEND_POSITION_LABELS,
   CUSTOM_LEGEND_POSITIONS,
@@ -45,6 +45,12 @@ const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const dataButtonClass =
   'min-h-[44px] rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9';
+const sidebarControlLabelClass =
+  'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+const compactNumberInputClass =
+  'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
+const helpButtonClass =
+  'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -97,6 +103,125 @@ const ToggleRow = ({ label, checked, onChange }) => (
     />
   </label>
 );
+
+const SidebarRangeControl = ({
+  label,
+  helpText,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  disabled = false,
+}) => {
+  const labelId = useId();
+  const helpId = useId();
+  const [draftValue, setDraftValue] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const displayValue = isEditing ? draftValue : String(value);
+  const numericMin = Number(min);
+  const numericMax = Number(max);
+  const numericStep = Number(step);
+  const decimalPlaces = String(step).includes('.')
+    ? String(step).split('.')[1].length
+    : 0;
+
+  const normalizeValue = rawValue => {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
+    if (!Number.isFinite(numericStep) || numericStep <= 0) {
+      return Number(clamped.toFixed(decimalPlaces));
+    }
+    const stepped =
+      numericMin +
+      Math.round((clamped - numericMin) / numericStep) * numericStep;
+    return Number(
+      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
+    );
+  };
+
+  const commitDraftValue = () => {
+    const nextValue = normalizeValue(displayValue);
+    if (nextValue === null) {
+      setDraftValue('');
+      setIsEditing(false);
+      return;
+    }
+    setDraftValue('');
+    setIsEditing(false);
+    onChange?.(nextValue);
+  };
+
+  return (
+    <div className="space-y-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2.5 dark:border-[#475569] dark:bg-[#1E293B]">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span id={labelId} className={`${sidebarControlLabelClass} truncate`}>
+            {label}
+          </span>
+          {helpText && (
+            <>
+              <button
+                type="button"
+                aria-describedby={helpId}
+                aria-label={`${label} help`}
+                className={helpButtonClass}
+                title={helpText}
+              >
+                ?
+              </button>
+              <span id={helpId} className="sr-only">
+                {helpText}
+              </span>
+            </>
+          )}
+        </span>
+        <input
+          aria-label={`${label} value`}
+          className={compactNumberInputClass}
+          disabled={disabled}
+          inputMode="decimal"
+          onBlur={commitDraftValue}
+          onChange={event => {
+            setIsEditing(true);
+            setDraftValue(event.target.value);
+          }}
+          onFocus={() => {
+            setIsEditing(true);
+            setDraftValue(String(value));
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur();
+            } else if (event.key === 'Escape') {
+              setDraftValue('');
+              setIsEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+          type="text"
+          value={displayValue}
+        />
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        aria-labelledby={labelId}
+        onChange={event => onChange?.(Number(event.target.value))}
+        className={joinClasses(
+          'h-1.5 w-full accent-[#0F2747] dark:accent-[#60A5FA]',
+          disabled &&
+            'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
+        )}
+      />
+    </div>
+  );
+};
 
 const ZoomValueInput = ({ value, disabled, onCommit }) => {
   const [draft, setDraft] = useState('');
@@ -210,6 +335,8 @@ const LeftSidebar = ({
   onDrawEdge,
   drawFrom,
   onAutoLayout,
+  forceStrength = 1,
+  onForceStrengthChange,
   onOpenImportMenu,
   onOpenExportMenu,
   onOpenLegendEditor,
@@ -312,6 +439,16 @@ const LeftSidebar = ({
             </ActionButton>
           ))}
         </div>
+        <SidebarRangeControl
+          label="Force strength"
+          helpText="Controls the next Force layout pass."
+          value={forceStrength}
+          min="0.2"
+          max="2"
+          step="0.1"
+          disabled={!onForceStrengthChange}
+          onChange={onForceStrengthChange}
+        />
       </SidebarSection>
 
       <SidebarSection>

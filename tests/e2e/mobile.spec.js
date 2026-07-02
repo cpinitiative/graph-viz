@@ -22,6 +22,7 @@ test.describe('Graph Studio mobile smoke', () => {
       .click();
     await expect(page.getByText('Tools')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Node' })).toBeVisible();
+    await expect(page.getByText('Force strength')).toBeVisible();
     await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
     await expect(page.getByRole('button', { name: 'Add Node' })).toBeHidden();
 
@@ -35,7 +36,7 @@ test.describe('Graph Studio mobile smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
-    await expect(page.getByText('Gravity (force)')).toBeVisible();
+    await expect(page.getByText('Gravity (force)')).toHaveCount(0);
     await page
       .getByRole('button', { name: 'Dismiss inspector overlay' })
       .click();

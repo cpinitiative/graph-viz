@@ -779,11 +779,11 @@ test.describe('Graph Studio desktop smoke', () => {
       'data-inspector-type',
       'canvas'
     );
-    await setRangeValue(page, 'Gravity (force)', 0.2);
+    await setRangeValue(page, 'Force strength', 0.2);
     await page.getByRole('button', { name: 'Force' }).click();
     const lowForcePositions = await getNodePositionSnapshot(page);
     await choosePreset(page, 'bfs');
-    await setRangeValue(page, 'Gravity (force)', 2);
+    await setRangeValue(page, 'Force strength', 2);
     await page.getByRole('button', { name: 'Force' }).click();
     await expect
       .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
@@ -1570,7 +1570,7 @@ while (true) {}
       propertyPanel(page).getByText('px', { exact: true })
     ).toHaveCount(0);
     for (const control of [
-      page.getByLabel('Gravity (force) value'),
+      page.getByLabel('Force strength value'),
       page.getByLabel('Node size value'),
       nodeLabelFontSizeInput,
       page.getByLabel('Edge width value'),
@@ -2317,6 +2317,14 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
 
     const curveAmount = page.getByRole('slider', { name: 'Curve Amount' });
+    await expect(
+      page.getByRole('slider', { name: 'Force strength' })
+    ).toBeVisible();
+    await expect(page.getByLabel('Force strength help')).toHaveAttribute(
+      'title',
+      'Controls the next Force layout pass.'
+    );
+    await expect(page.getByText('Gravity (force)')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
     await expect(curveAmount).toHaveCount(0);
     await expect(page.getByLabel('Curve Amount value')).toHaveCount(0);
@@ -2376,6 +2384,7 @@ while (true) {}
     await expect(page.getByLabel('Show caption')).not.toBeChecked();
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
+    await expect(page.getByLabel('Force strength value')).toHaveValue('1.2');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
     await expect(
@@ -2411,6 +2420,7 @@ while (true) {}
       x: 120,
       y: 80,
     });
+    expect(roundTripProject.settings.globalSettings.forceStrength).toBe(1.2);
     await closeExportMenu(page);
 
     await openImportMenu(page);

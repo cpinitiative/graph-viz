@@ -514,6 +514,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       lockCanvas,
       setLockCanvas,
       onAutoLayout: applyLayout,
+      forceStrength: globalSettings.forceStrength,
+      onForceStrengthChange: forceStrength =>
+        updateGlobalSettings({ forceStrength }),
       onOpenParser: () => setIsParserOpen(true),
       onExportText: exportText,
       onExportProject: exportProject,

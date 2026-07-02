@@ -746,14 +746,6 @@ const GlobalSettingsPanel = ({
             <option value={EDGE_ROUTING.bezier}>Curved</option>
           </NativeSelect>
         </Field>
-        <RangeControl
-          label="Gravity (force)"
-          value={globalSettings.forceStrength}
-          min="0.2"
-          max="2"
-          step="0.1"
-          onChange={forceStrength => onUpdateGlobal({ forceStrength })}
-        />
         {isCurvedRouting && (
           <RangeControl
             label="Curve Amount"
