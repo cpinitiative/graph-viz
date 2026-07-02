@@ -1804,7 +1804,7 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('supports unified editable legend preview and default reset', async ({
+  test('supports unified editable legend preview and position reset', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -1813,12 +1813,12 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
 
     const legendToggle = page.getByRole('checkbox', { name: /^Legend$/ });
+    const legendControls = page.getByTestId('custom-legend-controls');
     const legendEditToggle = page.getByTestId('custom-legend-edit-toggle');
     const legendModal = page.getByTestId('custom-legend-modal');
     const legendEditor = page.getByTestId('custom-legend-editor');
     const legendTitle = page.getByTestId('custom-legend-title-input');
     const legendPosition = page.getByTestId('custom-legend-position-select');
-    const legendPlacement = page.getByTestId('custom-legend-placement-select');
     const legendPreview = page.getByTestId('custom-export-legend');
 
     await expect(page.getByLabel('Show State Legend')).toBeHidden();
@@ -1838,7 +1838,7 @@ while (true) {}
       })
       .toBe(true);
     await expect(page.getByTestId('custom-legend-summary')).toHaveCount(0);
-    await expect(legendPlacement).toHaveValue('auto');
+    await expect(legendControls.locator('select')).toHaveCount(0);
     await expect(legendEditor).toBeHidden();
     await expect(legendToggle).not.toBeChecked();
     await expect(legendPreview).toBeHidden();
@@ -1948,7 +1948,7 @@ while (true) {}
     await page.getByTestId('custom-legend-entry-label-0').fill('Frontier edge');
     await page.getByTestId('custom-legend-entry-kind-0').selectOption('edge');
     await page.getByTestId('custom-legend-entry-color-0').fill('#f59e0b');
-    await legendPlacement.selectOption('top-left');
+    await legendPosition.selectOption('top-left');
 
     await expect(legendPreview).toHaveAttribute(
       'transform',
@@ -2023,20 +2023,26 @@ while (true) {}
     await expect(movedEntryMoveDown).toBeDisabled();
     await expect(movedEntryMoveUp).toBeFocused();
 
+    await expect(page.getByTestId('custom-legend-reset')).toHaveText(
+      'Reset to Auto'
+    );
     await page.getByTestId('custom-legend-reset').click();
     await expect(legendToggle).toBeChecked();
-    await expect(legendTitle).toHaveValue('Legend');
+    await expect(legendTitle).toHaveValue('Traversal Key');
     await expect(legendPosition).toHaveValue('auto');
-    await expect(legendPlacement).toHaveValue('auto');
-    await expect(page.getByTestId('custom-legend-entry-group-0')).toHaveValue(
-      'Nodes'
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Traversal Key' })
+    ).toBeVisible();
+    await expect(
+      legendPreview.locator('text').filter({ hasText: 'Frontier edge' })
+    ).toBeVisible();
+    await expect(movedEntry.locator('input[type="text"]').nth(0)).toHaveValue(
+      'hi'
     );
-    await expect(page.getByTestId('custom-legend-entry-label-0')).toHaveValue(
-      'Default node'
+    await expect(movedEntry.locator('input[type="text"]').nth(1)).toHaveValue(
+      'Frontier edge'
     );
-    await expect(page.getByTestId('custom-legend-entry-kind-0')).toHaveValue(
-      'node'
-    );
+    await expect(movedEntry.locator('select')).toHaveValue('edge');
     await expect(
       legendPreview.locator('text').filter({ hasText: 'Nodes' })
     ).toBeVisible();

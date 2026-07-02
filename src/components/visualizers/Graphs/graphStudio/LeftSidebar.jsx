@@ -1,9 +1,5 @@
 import { useId, useState } from 'react';
-import {
-  CUSTOM_LEGEND_POSITION_LABELS,
-  CUSTOM_LEGEND_POSITIONS,
-  DEFAULT_CUSTOM_LEGEND,
-} from './lib/customLegend';
+import { DEFAULT_CUSTOM_LEGEND } from './lib/customLegend';
 import NativeSelect from './NativeSelect';
 
 const TOOL_OPTIONS = [
@@ -374,9 +370,6 @@ const LeftSidebar = ({
     drawFrom !== null && drawFrom !== undefined
       ? `Source node ${drawFrom} selected. ${drawEdgeHelpText}`
       : drawEdgeHelpText;
-  const legendPosition = CUSTOM_LEGEND_POSITIONS.includes(customLegend.position)
-    ? customLegend.position
-    : DEFAULT_CUSTOM_LEGEND.position;
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -548,29 +541,6 @@ const LeftSidebar = ({
               Edit
             </button>
           </div>
-          <label
-            className="block space-y-1.5"
-            htmlFor="custom-legend-sidebar-position"
-          >
-            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]">
-              Placement
-            </span>
-            <NativeSelect
-              id="custom-legend-sidebar-position"
-              value={legendPosition}
-              aria-label="Legend Placement"
-              data-testid="custom-legend-placement-select"
-              onChange={event =>
-                patchCustomLegend({ position: event.target.value })
-              }
-            >
-              {CUSTOM_LEGEND_POSITIONS.map(position => (
-                <option key={position} value={position}>
-                  {CUSTOM_LEGEND_POSITION_LABELS[position]}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
         </div>
       </SidebarSection>
 
