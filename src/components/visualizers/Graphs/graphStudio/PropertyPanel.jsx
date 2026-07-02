@@ -24,9 +24,9 @@ const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const scopeLabelClass =
-  'shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#B45309] dark:text-[#FBBF24]';
+  'shrink-0 border border-[#D7DEE8] bg-[#FFFFFF] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]';
 const overrideIndicatorClass =
-  'text-[10px] font-semibold text-[#B45309] dark:text-[#FBBF24]';
+  'text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]';
 const inlineActionButtonClass =
   'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const compactNumberInputClass =
@@ -217,10 +217,11 @@ const PanelShell = ({ title, inspectorType, headerAction, children }) => (
   </div>
 );
 
-const Section = ({ title, help, children }) => (
+const Section = ({ title, scope, help, children }) => (
   <section className="space-y-3 border-b border-[#D7DEE8] pb-5 last:border-b-0 dark:border-[#334155]">
     <div className="flex items-center gap-2">
       <div className={sectionTitleClass}>{title}</div>
+      <ScopeLabel scope={scope} />
       {help}
     </div>
     {children}
@@ -236,8 +237,8 @@ const Field = ({
   children,
 }) => (
   <div className="block space-y-1.5">
-    <div className="flex items-center justify-between gap-2">
-      <span className={fieldLabelClass}>{label}</span>
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
       <ScopeLabel scope={scope} />
     </div>
     {children}
@@ -306,7 +307,7 @@ const ToggleRow = ({
   <div className="space-y-1">
     <label className={toggleRowClass}>
       <span className="flex min-w-0 items-center gap-2">
-        <span className={fieldLabelClass}>{label}</span>
+        <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
         <ScopeLabel scope={scope} />
       </span>
       <input
@@ -642,7 +643,7 @@ const NodeInspector = ({
           </Field>
           <Field
             label="Status / Style"
-            scope="Current frame"
+            scope="Frame"
             hasOverride={frameOverrides.status}
             onResetOverride={() => onResetOverride?.('status')}
             onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
@@ -663,7 +664,7 @@ const NodeInspector = ({
             value={nodeColor}
             fallback="#3b82f6"
             placeholder="#22c55e or blank"
-            scope="Current frame"
+            scope="Frame"
             hasOverride={frameOverrides.color}
             onResetOverride={() => onResetOverride?.('color')}
             onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
@@ -672,7 +673,7 @@ const NodeInspector = ({
           <ToggleRow
             label="Visible"
             checked={nodeVisible}
-            scope="Current frame"
+            scope="Frame"
             hasOverride={frameOverrides.visible}
             onResetOverride={() => onResetOverride?.('visible')}
             onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
@@ -752,7 +753,7 @@ const EdgeInspector = ({
             value={edgeColor}
             fallback="#64748b"
             placeholder="#64748b"
-            scope="Current frame"
+            scope="Frame"
             hasOverride={frameOverrides.color}
             onResetOverride={() => onResetOverride?.('color')}
             onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
@@ -761,7 +762,7 @@ const EdgeInspector = ({
           <ToggleRow
             label="Visible"
             checked={edgeVisible}
-            scope="Current frame"
+            scope="Frame"
             hasOverride={frameOverrides.visible}
             onResetOverride={() => onResetOverride?.('visible')}
             onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
@@ -799,16 +800,15 @@ const GlobalSettingsPanel = ({
 
   return (
     <PanelShell title="Canvas Inspector" inspectorType="canvas">
-      <Section title="Canvas Settings">
+      <Section title="Canvas Settings" scope="Project-wide">
         <div className="space-y-3">
-          <Field label="Routing" scope="Project-wide">
+          <Field label="Routing">
             <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
               {edgeRouting === EDGE_ROUTING.bezier ? 'Curved' : 'Straight'}
             </div>
           </Field>
           <RangeControl
             label="Gravity (force)"
-            scope="Project-wide"
             value={globalSettings.forceStrength}
             min="0.2"
             max="2"
@@ -817,7 +817,6 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Curve Amount"
-            scope="Project-wide"
             value={globalSettings.edgeCurvature}
             min="0"
             max="120"
@@ -833,7 +832,6 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Node size"
-            scope="Project-wide"
             value={globalSettings.nodeSize ?? 22}
             min="12"
             max="44"
@@ -842,7 +840,6 @@ const GlobalSettingsPanel = ({
           />
           <NumberControl
             label="Node Label Size"
-            scope="Project-wide"
             value={
               globalSettings.nodeLabelFontSize ??
               getDefaultNodeLabelFontSize(globalSettings.nodeSize)
@@ -857,7 +854,6 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Edge width"
-            scope="Project-wide"
             value={globalSettings.edgeWidth ?? 2.2}
             min="1"
             max="8"
@@ -866,7 +862,6 @@ const GlobalSettingsPanel = ({
           />
           <NumberControl
             label="Edge Label Size"
-            scope="Project-wide"
             value={
               globalSettings.edgeLabelFontSize ??
               getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)

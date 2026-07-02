@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
@@ -23,7 +23,7 @@ const detailLabelClass =
 const detailControlLabelClass =
   'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const scopeLabelClass =
-  'shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#B45309] dark:text-[#FBBF24]';
+  'shrink-0 border border-[#D7DEE8] bg-[#FFFFFF] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]';
 const inlineActionButtonClass =
   'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const frameCardBaseClass =
@@ -31,6 +31,12 @@ const frameCardBaseClass =
 const selectedFrameCardClass = 'border-[#0F2747] dark:border-[#60A5FA]';
 const unselectedFrameCardClass =
   'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
+const HELP_TOOLTIP_WIDTH = 276;
+const HELP_TOOLTIP_ESTIMATED_HEIGHT = 78;
+const HELP_TOOLTIP_GUTTER = 12;
+const HELP_TOOLTIP_OFFSET = 6;
+const TIMELINE_HELP_TEXT =
+  'Frame edits affect the current frame. Project-wide settings affect all frames. New nodes and edges appear from this frame onward.';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -80,6 +86,69 @@ const ChevronRightIcon = () => (
 const ScopeLabel = ({ scope }) => {
   if (!scope) return null;
   return <span className={scopeLabelClass}>{scope}</span>;
+};
+
+const TimelineHelp = () => {
+  const tooltipId = useId();
+  const buttonRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const showTooltip = () => {
+    const bounds = buttonRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const maxLeft = Math.max(
+      HELP_TOOLTIP_GUTTER,
+      window.innerWidth - HELP_TOOLTIP_WIDTH - HELP_TOOLTIP_GUTTER
+    );
+    const left = Math.min(maxLeft, Math.max(HELP_TOOLTIP_GUTTER, bounds.left));
+    const belowTop = bounds.bottom + HELP_TOOLTIP_OFFSET;
+    const aboveTop =
+      bounds.top - HELP_TOOLTIP_ESTIMATED_HEIGHT - HELP_TOOLTIP_OFFSET;
+    const top =
+      belowTop + HELP_TOOLTIP_ESTIMATED_HEIGHT <=
+      window.innerHeight - HELP_TOOLTIP_GUTTER
+        ? belowTop
+        : Math.max(HELP_TOOLTIP_GUTTER, aboveTop);
+
+    setTooltipPosition({ left, top });
+  };
+
+  const hideTooltip = () => setTooltipPosition(null);
+
+  return (
+    <span className="inline-flex items-center">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label="Timeline temporal model help"
+        aria-describedby={tooltipId}
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
+        onBlur={hideTooltip}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+      >
+        ?
+      </button>
+      <span id={tooltipId} className="sr-only">
+        {TIMELINE_HELP_TEXT}
+      </span>
+      {tooltipPosition && (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-50 w-[276px] border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          data-testid="timeline-temporal-help-tooltip"
+          style={{
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+          }}
+        >
+          {TIMELINE_HELP_TEXT}
+        </span>
+      )}
+    </span>
+  );
 };
 
 const DurationInput = ({ durationMs, onCommit }) => {
@@ -217,14 +286,11 @@ const TimelinePanel = ({
       tabIndex="0"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
           </div>
-          <div className="basis-full text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8] lg:basis-auto">
-            Frame edits affect current frame unless marked Project-wide. New
-            nodes/edges appear from this frame onward.
-          </div>
+          <TimelineHelp />
           <button
             type="button"
             className={playbackButtonClass}
@@ -389,7 +455,7 @@ const TimelinePanel = ({
           <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[116px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <span className="flex items-center gap-2">
               <span className={detailLabelClass}>Description</span>
-              <ScopeLabel scope="Current frame" />
+              <ScopeLabel scope="Frame" />
             </span>
             <input
               aria-label="Frame Description"
@@ -410,7 +476,7 @@ const TimelinePanel = ({
               <div className="flex shrink-0 items-center gap-2">
                 <label className={detailControlLabelClass}>
                   <span>Duration</span>
-                  <ScopeLabel scope="Current frame" />
+                  <ScopeLabel scope="Frame" />
                   <DurationInput
                     key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
                     durationMs={steps[currentFrame]?.durationMs ?? 600}
@@ -434,11 +500,11 @@ const TimelinePanel = ({
                     type="checkbox"
                   />
                   <span>Show caption</span>
-                  <ScopeLabel scope="Current frame" />
+                  <ScopeLabel scope="Frame" />
                 </label>
                 {hasCaptionVisibleOverride && (
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="text-[10px] font-semibold text-[#B45309] dark:text-[#FBBF24]">
+                    <span className="text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]">
                       Current frame override
                     </span>
                     <button
@@ -452,7 +518,7 @@ const TimelinePanel = ({
                 )}
                 <label className={detailControlLabelClass}>
                   <span>Style</span>
-                  <ScopeLabel scope="Project-wide" />
+                  <ScopeLabel scope="Project" />
                   <NativeSelect
                     aria-label="Caption Style"
                     data-testid="caption-style-select"
@@ -472,7 +538,7 @@ const TimelinePanel = ({
                 </label>
                 <label className={detailControlLabelClass}>
                   <span>Caption Font Size</span>
-                  <ScopeLabel scope="Project-wide" />
+                  <ScopeLabel scope="Project" />
                   <CaptionFontSizeInput
                     key={captionFontSize}
                     value={captionFontSize}
