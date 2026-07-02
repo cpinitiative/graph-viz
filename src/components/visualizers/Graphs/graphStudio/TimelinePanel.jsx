@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
@@ -22,11 +22,21 @@ const detailLabelClass =
   'shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const detailControlLabelClass =
   'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
+const inlineActionButtonClass =
+  'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const frameCardBaseClass =
   'relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none dark:bg-[#1E293B] md:min-w-[128px]';
 const selectedFrameCardClass = 'border-[#0F2747] dark:border-[#60A5FA]';
 const unselectedFrameCardClass =
   'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
+const DEFAULT_HELP_TOOLTIP_WIDTH = 276;
+const HELP_TOOLTIP_ESTIMATED_HEIGHT = 78;
+const HELP_TOOLTIP_GUTTER = 12;
+const HELP_TOOLTIP_OFFSET = 6;
+const TIMELINE_HELP_TEXT =
+  'Frame edits affect the current frame. Project settings affect all frames. New nodes and edges appear from this frame onward.';
+const CAPTION_SCOPE_HELP_TEXT =
+  'Show caption is frame-specific. Caption appearance is project-wide.';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -71,6 +81,92 @@ const ChevronRightIcon = () => (
   >
     <path d="M9 18l6-6-6-6" />
   </svg>
+);
+
+const HelpTooltip = ({
+  label,
+  text,
+  testId,
+  width = DEFAULT_HELP_TOOLTIP_WIDTH,
+  estimatedHeight = HELP_TOOLTIP_ESTIMATED_HEIGHT,
+}) => {
+  const tooltipId = useId();
+  const buttonRef = useRef(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
+
+  const showTooltip = () => {
+    const bounds = buttonRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const maxLeft = Math.max(
+      HELP_TOOLTIP_GUTTER,
+      window.innerWidth - width - HELP_TOOLTIP_GUTTER
+    );
+    const left = Math.min(maxLeft, Math.max(HELP_TOOLTIP_GUTTER, bounds.left));
+    const belowTop = bounds.bottom + HELP_TOOLTIP_OFFSET;
+    const aboveTop = bounds.top - estimatedHeight - HELP_TOOLTIP_OFFSET;
+    const top =
+      belowTop + estimatedHeight <= window.innerHeight - HELP_TOOLTIP_GUTTER
+        ? belowTop
+        : Math.max(HELP_TOOLTIP_GUTTER, aboveTop);
+
+    setTooltipPosition({ left, top });
+  };
+
+  const hideTooltip = () => setTooltipPosition(null);
+
+  return (
+    <span className="inline-flex items-center">
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={label}
+        aria-describedby={tooltipId}
+        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
+        onBlur={hideTooltip}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+      >
+        ?
+      </button>
+      <span id={tooltipId} className="sr-only">
+        {text}
+      </span>
+      {tooltipPosition && (
+        <span
+          role="tooltip"
+          className="pointer-events-none fixed z-50 border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+          data-testid={testId}
+          style={{
+            width: `${width}px`,
+            left: `${tooltipPosition.left}px`,
+            top: `${tooltipPosition.top}px`,
+          }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+};
+
+const TimelineHelp = () => (
+  <HelpTooltip
+    label="Timeline temporal model help"
+    text={TIMELINE_HELP_TEXT}
+    testId="timeline-temporal-help-tooltip"
+  />
+);
+
+const CaptionScopeHelp = () => (
+  <HelpTooltip
+    label="Caption scope help"
+    text={CAPTION_SCOPE_HELP_TEXT}
+    testId="caption-scope-help-tooltip"
+    width={244}
+    estimatedHeight={56}
+  />
 );
 
 const DurationInput = ({ durationMs, onCommit }) => {
@@ -178,7 +274,9 @@ const TimelinePanel = ({
   captionEnabled,
   captionStyle,
   captionFontSize,
+  hasCaptionVisibleOverride,
   onCaptionEnabledChange,
+  onResetCaptionVisibleOverride,
   onCaptionStyleChange,
   onCaptionFontSizeChange,
   onAddStep,
@@ -206,10 +304,11 @@ const TimelinePanel = ({
       tabIndex="0"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
           </div>
+          <TimelineHelp />
           <button
             type="button"
             className={playbackButtonClass}
@@ -240,7 +339,7 @@ const TimelinePanel = ({
             type="button"
             className={addButtonClass}
             onClick={onAddStep}
-            title="Create the next keyframe from the current visual state"
+            title="+ Keyframe creates a new frame from the current visual state"
           >
             + Keyframe
           </button>
@@ -248,7 +347,7 @@ const TimelinePanel = ({
             type="button"
             className={toolbarButtonClass}
             onClick={onDuplicateStep}
-            title="Create an exact copy of the current keyframe"
+            title="Duplicate copies this frame exactly, including overrides"
           >
             Duplicate
           </button>
@@ -367,10 +466,10 @@ const TimelinePanel = ({
       </div>
 
       <div
-        className="flex-none border-t border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-2 dark:border-[#334155] dark:bg-[#111827]"
+        className="flex-none border-t border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]"
         data-testid="frame-description-row"
       >
-        <div className="grid min-w-0 gap-2">
+        <div className="grid min-w-0 gap-1.5">
           <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[116px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <span className={detailLabelClass}>Description</span>
             <input
@@ -383,67 +482,77 @@ const TimelinePanel = ({
               placeholder="Enter a description for this frame..."
             />
           </label>
-          <div className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[116px_minmax(0,1fr)] lg:items-center lg:gap-3">
-            <div className={detailLabelClass}>Timing &amp; Caption</div>
-            <div
-              className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2"
-              data-testid="frame-detail-controls"
-            >
-              <div className="flex shrink-0 items-center gap-2">
-                <label className={detailControlLabelClass}>
-                  <span>Duration</span>
-                  <DurationInput
-                    key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
-                    durationMs={steps[currentFrame]?.durationMs ?? 600}
-                    onCommit={value =>
-                      onStepDurationChange(currentFrame, value)
-                    }
-                  />
-                </label>
+          <div
+            className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[116px_minmax(0,1fr)] lg:items-center lg:gap-3"
+            data-testid="frame-detail-controls"
+          >
+            <div className={detailLabelClass}>Timing</div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              <label className={detailControlLabelClass}>
+                <span>Duration</span>
+                <DurationInput
+                  key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
+                  durationMs={steps[currentFrame]?.durationMs ?? 600}
+                  onCommit={value => onStepDurationChange(currentFrame, value)}
+                />
+              </label>
+              <div className="hidden h-5 w-px bg-[#D7DEE8] dark:bg-[#334155] sm:block" />
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className={detailLabelClass}>Caption</span>
+                <CaptionScopeHelp />
               </div>
-              <div className="h-5 w-px bg-[#D7DEE8] dark:bg-[#334155]" />
-              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
-                  <input
-                    aria-label="Show caption"
-                    checked={Boolean(captionEnabled)}
-                    className="h-3.5 w-3.5 accent-[#B45309] dark:accent-[#60A5FA]"
-                    data-testid="frame-caption-toggle"
-                    onChange={event =>
-                      onCaptionEnabledChange?.(event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span>Show caption</span>
-                </label>
-                <label className={detailControlLabelClass}>
-                  <span>Style</span>
-                  <NativeSelect
-                    aria-label="Caption Style"
-                    data-testid="caption-style-select"
-                    onChange={event =>
-                      onCaptionStyleChange?.(event.target.value)
-                    }
-                    size="dense"
-                    value={captionStyle}
-                    wrapperClassName="w-[108px]"
+              <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
+                <input
+                  aria-label="Show caption"
+                  checked={Boolean(captionEnabled)}
+                  className="h-3.5 w-3.5 accent-[#B45309] dark:accent-[#60A5FA]"
+                  data-testid="frame-caption-toggle"
+                  onChange={event =>
+                    onCaptionEnabledChange?.(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>Show caption</span>
+              </label>
+              {hasCaptionVisibleOverride && (
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]">
+                    Current frame override
+                  </span>
+                  <button
+                    type="button"
+                    className={inlineActionButtonClass}
+                    onClick={onResetCaptionVisibleOverride}
                   >
-                    {CAPTION_STYLE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </label>
-                <label className={detailControlLabelClass}>
-                  <span>Caption Font Size</span>
-                  <CaptionFontSizeInput
-                    key={captionFontSize}
-                    value={captionFontSize}
-                    onCommit={onCaptionFontSizeChange}
-                  />
-                </label>
-              </div>
+                    Reset override
+                  </button>
+                </span>
+              )}
+              <label className={detailControlLabelClass}>
+                <span>Style</span>
+                <NativeSelect
+                  aria-label="Caption Style"
+                  data-testid="caption-style-select"
+                  onChange={event => onCaptionStyleChange?.(event.target.value)}
+                  size="dense"
+                  value={captionStyle}
+                  wrapperClassName="w-[108px]"
+                >
+                  {CAPTION_STYLE_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <label className={detailControlLabelClass}>
+                <span>Font size</span>
+                <CaptionFontSizeInput
+                  key={captionFontSize}
+                  value={captionFontSize}
+                  onCommit={onCaptionFontSizeChange}
+                />
+              </label>
             </div>
           </div>
         </div>

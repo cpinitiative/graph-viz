@@ -31,6 +31,7 @@ const nodeCircleSelector =
 const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
+const leftSidebar = page => page.getByTestId('left-sidebar');
 
 const getCanvasViewSnapshot = async page => ({
   x: await graphCanvas(page).getAttribute('data-view-x'),
@@ -558,8 +559,15 @@ test.describe('Graph Studio desktop smoke', () => {
     for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
-    await expect(page.getByText('Canvas Settings')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('INSPECTOR', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -613,7 +621,9 @@ test.describe('Graph Studio desktop smoke', () => {
       'true'
     );
     await expect(
-      page.getByText('Click the canvas to add a node.')
+      leftSidebar(page).getByText(
+        'Click canvas to add a node from Frame 1 onward.'
+      )
     ).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
@@ -630,8 +640,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    const drawEdgeHelper = page.getByText(
-      /Click a source node, then a target node\.|Source node .* selected\. Click a target node\./
+    const drawEdgeHelper = leftSidebar(page).getByText(
+      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
     );
     await expect(drawEdgeHelper).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
@@ -779,16 +789,26 @@ test.describe('Graph Studio desktop smoke', () => {
       await choosePreset(page, preset);
     }
 
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
     await graphNodes.first().click();
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first()
       .click();
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
 
     await choosePreset(page, 'bfs');
     const frameCounter = page.getByTestId('timeline-frame-counter');
@@ -1109,7 +1129,10 @@ while (true) {}
     const detailControls = page.getByTestId('frame-detail-controls');
     await expect(page.getByText('Description', { exact: true })).toBeVisible();
     await expect(
-      page.getByText('Timing & Caption', { exact: true })
+      detailControls.getByText('Timing', { exact: true })
+    ).toBeVisible();
+    await expect(
+      detailControls.getByText('Caption', { exact: true })
     ).toBeVisible();
     await expect(frameDescription).toBeVisible();
     await expect(durationInput).toBeVisible();
@@ -2021,7 +2044,9 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
     await expect(selectionRing).toBeVisible();
     await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
     await expect(selectionRing).toHaveAttribute('r', '25');
@@ -2064,7 +2089,9 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
@@ -2073,14 +2100,18 @@ while (true) {}
       'data-inspector-type',
       'canvas'
     );
-    await expect(page.getByText('Edge Properties')).toHaveCount(0);
+    await expect(propertyPanel(page).getByText('Edge properties')).toHaveCount(
+      0
+    );
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2101,7 +2132,10 @@ while (true) {}
       'data-inspector-type',
       'selection'
     );
-    await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Selection', { exact: true })
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Selected nodes')).toBeVisible();
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id]')
     ).toHaveCount(0);
@@ -2178,7 +2212,9 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2207,7 +2243,9 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2215,10 +2253,14 @@ while (true) {}
       'canvas'
     );
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toHaveCount(0);
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2788,7 +2830,9 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
@@ -2802,7 +2846,9 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
 
     await page.getByTestId('tool-button-select').click();
@@ -3268,7 +3314,9 @@ api.edge('loop', '#3b82f6');
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first();
     await edgeHitTarget.dispatchEvent('click');
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
 
     await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({
@@ -3342,7 +3390,9 @@ api.edge('loop', '#3b82f6');
       await graphCanvas(page)
         .locator(`[data-edge-hit-target-id="${edgeId}"]`)
         .dispatchEvent('click');
-      await expect(page.getByText('Edge Properties')).toBeVisible();
+      await expect(
+        propertyPanel(page).getByText('Edge properties')
+      ).toBeVisible();
       await expect(
         graphCanvas(page).locator(`[data-edge-arrowhead-id="${edgeId}"]`)
       ).toBeVisible();
