@@ -533,9 +533,7 @@ const TimelinePanel = ({
                 <NativeSelect
                   aria-label="Caption Style"
                   data-testid="caption-style-select"
-                  onChange={event =>
-                    onCaptionStyleChange?.(event.target.value)
-                  }
+                  onChange={event => onCaptionStyleChange?.(event.target.value)}
                   size="dense"
                   value={captionStyle}
                   wrapperClassName="w-[108px]"

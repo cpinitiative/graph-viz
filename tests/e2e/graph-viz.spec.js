@@ -565,7 +565,9 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas', { exact: true })
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Canvas settings')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -791,13 +793,17 @@ test.describe('Graph Studio desktop smoke', () => {
       propertyPanel(page).getByText('Canvas', { exact: true })
     ).toBeVisible();
     await graphNodes.first().click();
-    await expect(propertyPanel(page).getByText('Node properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
     await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first()
       .click();
-    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
     await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(
@@ -2038,7 +2044,9 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
-    await expect(propertyPanel(page).getByText('Node properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
     await expect(selectionRing).toBeVisible();
     await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
     await expect(selectionRing).toHaveAttribute('r', '25');
@@ -2081,7 +2089,9 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
-    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
@@ -3304,7 +3314,9 @@ api.edge('loop', '#3b82f6');
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first();
     await edgeHitTarget.dispatchEvent('click');
-    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
 
     await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({

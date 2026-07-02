@@ -217,7 +217,12 @@ const InfoHelp = ({ label, text }) => {
   );
 };
 
-const PanelShell = ({ contextTitle, inspectorType, headerAction, children }) => (
+const PanelShell = ({
+  contextTitle,
+  inspectorType,
+  headerAction,
+  children,
+}) => (
   <div
     className={panelClass}
     data-testid="property-panel"
