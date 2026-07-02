@@ -779,8 +779,14 @@ test.describe('Graph Studio desktop smoke', () => {
       'data-inspector-type',
       'canvas'
     );
+    await commitInputValue(zoomValueInput, 180);
+    const zoomBeforeForceRefit =
+      await graphCanvas(page).getAttribute('data-view-zoom');
     await setRangeValue(page, 'Force strength', 0.2);
     await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await expect
+      .poll(() => graphCanvas(page).getAttribute('data-view-zoom'))
+      .not.toBe(zoomBeforeForceRefit);
     const lowForcePositions = await getNodePositionSnapshot(page);
     await choosePreset(page, 'bfs');
     await setRangeValue(page, 'Force strength', 2);
@@ -2320,10 +2326,12 @@ while (true) {}
     await expect(
       page.getByRole('slider', { name: 'Force strength' })
     ).toBeVisible();
-    await expect(page.getByLabel('Force strength help')).toHaveAttribute(
-      'title',
+    await page.getByLabel('Force strength help').click();
+    await expect(page.getByRole('tooltip')).toHaveText(
       'Controls the next Force layout pass.'
     );
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expect(page.getByText('Gravity (force)')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
     await expect(curveAmount).toHaveCount(0);

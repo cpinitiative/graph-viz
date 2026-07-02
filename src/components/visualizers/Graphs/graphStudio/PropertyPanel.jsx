@@ -34,7 +34,7 @@ const sectionScopeLabelClass =
 const overrideIndicatorClass =
   'text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]';
 const inlineActionButtonClass =
-  'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
+  'inline-flex min-h-6 items-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
 const compactNumberInputClass =
   'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const inputClass =
@@ -54,6 +54,8 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
+const getScopeLabel = scope => (scope === 'Frame' ? 'Current Frame' : scope);
+
 const ScopeLabel = ({ scope, variant = 'field' }) => {
   if (!scope) return null;
   return (
@@ -62,7 +64,7 @@ const ScopeLabel = ({ scope, variant = 'field' }) => {
         variant === 'section' ? sectionScopeLabelClass : scopeLabelClass
       }
     >
-      {scope}
+      {getScopeLabel(scope)}
     </span>
   );
 };
@@ -71,27 +73,33 @@ const FieldMeta = ({ hasOverride, onResetOverride, onApplyToAll }) => {
   if (!hasOverride && !onApplyToAll) return null;
 
   return (
-    <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1">
-      {hasOverride && (
-        <span className={overrideIndicatorClass}>Current frame override</span>
-      )}
-      {hasOverride && onResetOverride && (
-        <button
-          type="button"
-          className={inlineActionButtonClass}
-          onClick={onResetOverride}
-        >
-          Reset override
-        </button>
-      )}
-      {onApplyToAll && (
-        <button
-          type="button"
-          className={inlineActionButtonClass}
-          onClick={onApplyToAll}
-        >
-          Apply to all frames
-        </button>
+    <div className="mt-2 flex min-h-6 flex-wrap items-center justify-between gap-2">
+      <span className="min-w-0">
+        {hasOverride && (
+          <span className={overrideIndicatorClass}>Current frame override</span>
+        )}
+      </span>
+      {(hasOverride || onApplyToAll) && (
+        <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+          {hasOverride && onResetOverride && (
+            <button
+              type="button"
+              className={inlineActionButtonClass}
+              onClick={onResetOverride}
+            >
+              Reset override
+            </button>
+          )}
+          {onApplyToAll && (
+            <button
+              type="button"
+              className={inlineActionButtonClass}
+              onClick={onApplyToAll}
+            >
+              Apply to all frames
+            </button>
+          )}
+        </span>
       )}
     </div>
   );
@@ -242,16 +250,16 @@ const ToggleRow = ({
 }) => (
   <div className="space-y-1">
     <label className={toggleRowClass}>
-      <span className="flex min-w-0 items-center gap-2">
-        <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
+      <span className="flex shrink-0 items-center gap-2">
         <ScopeLabel scope={scope} />
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={event => onChange(event.target.checked)}
+          className={checkboxClass}
+        />
       </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={event => onChange(event.target.checked)}
-        className={checkboxClass}
-      />
     </label>
     <FieldMeta
       hasOverride={hasOverride}

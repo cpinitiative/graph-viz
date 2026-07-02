@@ -498,6 +498,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     );
     setStatus(`Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}`);
   };
+  const handleAutoLayout = useCallback(
+    type => {
+      const nextGraph = applyLayout(type);
+      if (!lockCanvas && nextGraph?.nodes) {
+        setViewFromNodes(nextGraph.nodes);
+        bumpViewReset();
+      }
+    },
+    [applyLayout, bumpViewReset, lockCanvas, setViewFromNodes]
+  );
 
   const layoutProps = {
     sidebar: {
@@ -513,7 +523,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setCustomLegend,
       lockCanvas,
       setLockCanvas,
-      onAutoLayout: applyLayout,
+      onAutoLayout: handleAutoLayout,
       forceStrength: globalSettings.forceStrength,
       onForceStrengthChange: forceStrength =>
         updateGlobalSettings({ forceStrength }),

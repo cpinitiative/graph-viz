@@ -118,6 +118,7 @@ const SidebarRangeControl = ({
   const helpId = useId();
   const [draftValue, setDraftValue] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const displayValue = isEditing ? draftValue : String(value);
   const numericMin = Number(min);
   const numericMax = Number(max);
@@ -161,20 +162,36 @@ const SidebarRangeControl = ({
             {label}
           </span>
           {helpText && (
-            <>
+            <span className="relative inline-flex">
               <button
                 type="button"
                 aria-describedby={helpId}
+                aria-expanded={isHelpOpen}
                 aria-label={`${label} help`}
                 className={helpButtonClass}
-                title={helpText}
+                onBlur={() => setIsHelpOpen(false)}
+                onClick={() => setIsHelpOpen(true)}
+                onFocus={() => setIsHelpOpen(true)}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') setIsHelpOpen(false);
+                }}
+                onMouseEnter={() => setIsHelpOpen(true)}
+                onMouseLeave={() => setIsHelpOpen(false)}
               >
                 ?
               </button>
               <span id={helpId} className="sr-only">
                 {helpText}
               </span>
-            </>
+              {isHelpOpen && (
+                <span
+                  role="tooltip"
+                  className="pointer-events-none absolute left-0 top-full z-20 mt-1 w-52 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+                >
+                  {helpText}
+                </span>
+              )}
+            </span>
           )}
         </span>
         <input

@@ -303,6 +303,7 @@ export const useGraphStudioGraphModel = ({
       }
       setBaseGraph(nextGraph);
       setStatus(`Applied ${type} layout`);
+      return nextGraph;
     },
     [baseGraph, forceStrength, setBaseGraph, setStatus]
   );
