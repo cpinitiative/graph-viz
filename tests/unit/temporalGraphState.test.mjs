@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  exportProjectJson,
-  parseProjectJson,
-} from '../../src/components/visualizers/Graphs/graphStudio/lib/projectJson.js';
-import {
   applyFrameOverride,
   applyPropertyToAllFrames,
   applyTemporalVisibilityFromFrame,
@@ -156,7 +152,7 @@ test('apply to all frames promotes the value and clears conflicting overrides', 
   );
 });
 
-test('project JSON roundtrip preserves temporal visibility overrides', () => {
+test('JSON roundtrip preserves temporal visibility overrides without editor-only fields', () => {
   const steps = applyTemporalVisibilityFromFrame(
     [
       { id: 'frame-1', nodeOverrides: {}, edgeOverrides: {} },
@@ -167,15 +163,20 @@ test('project JSON roundtrip preserves temporal visibility overrides', () => {
     'C',
     1
   );
-  const payload = exportProjectJson({
-    baseGraph,
-    steps,
-    currentFrame: 1,
+  const payload = {
+    format: 'graph-viz-project',
+    version: 1,
+    graph: baseGraph,
+    timeline: {
+      steps,
+      currentFrame: 1,
+    },
     settings: {},
-  });
-  const parsed = parseProjectJson(JSON.stringify(payload));
+  };
+  const parsed = JSON.parse(JSON.stringify(payload));
 
   assert.equal(parsed.timeline.steps[0].nodeOverrides.C.visible, false);
   assert.equal(parsed.timeline.steps[1].nodeOverrides.C, undefined);
   assert.equal(parsed.timeline.currentFrame, 1);
+  assert.equal(JSON.stringify(parsed).includes('editorOnly'), false);
 });

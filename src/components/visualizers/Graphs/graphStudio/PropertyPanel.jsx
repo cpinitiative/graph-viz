@@ -249,8 +249,9 @@ const Field = ({
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder }) => (
+const TextInput = ({ value, onChange, placeholder, ariaLabel }) => (
   <input
+    aria-label={ariaLabel}
     className={inputClass}
     value={value}
     onChange={event => onChange(event.target.value)}
@@ -283,7 +284,12 @@ const ColorField = ({
         onChange={event => onChange(event.target.value)}
         className="h-10 w-10 cursor-pointer rounded bg-transparent p-0 md:h-8 md:w-8"
       />
-      <TextInput value={value} onChange={onChange} placeholder={placeholder} />
+      <TextInput
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        ariaLabel={label}
+      />
     </div>
   </Field>
 );
@@ -626,6 +632,7 @@ const NodeInspector = ({
             <TextInput
               value={selectedNode.label ?? ''}
               onChange={value => onUpdateNode({ label: value })}
+              ariaLabel="Label"
             />
           </Field>
           <Field label="Position" scope="All frames">
@@ -731,6 +738,7 @@ const EdgeInspector = ({
               value={selectedEdge.label ?? ''}
               onChange={value => onUpdateEdge({ label: value })}
               placeholder="e.g. 7"
+              ariaLabel="Weight / Label"
             />
           </Field>
           <ToggleRow
