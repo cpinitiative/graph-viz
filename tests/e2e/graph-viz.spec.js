@@ -2348,8 +2348,17 @@ while (true) {}
       page.getByRole('slider', { name: 'Force strength' })
     ).toBeVisible();
     await page.getByLabel('Force strength help').click();
-    await expect(page.getByRole('tooltip')).toHaveText(
+    const forceTooltip = page.getByRole('tooltip');
+    await expect(forceTooltip).toHaveText(
       'Controls the next Force layout pass.'
+    );
+    const forceTooltipBox = await forceTooltip.boundingBox();
+    const sidebarBox = await leftSidebar(page).boundingBox();
+    expect(forceTooltipBox).not.toBeNull();
+    expect(sidebarBox).not.toBeNull();
+    expect(forceTooltipBox.x).toBeGreaterThanOrEqual(sidebarBox.x - 1);
+    expect(forceTooltipBox.x + forceTooltipBox.width).toBeLessThanOrEqual(
+      sidebarBox.x + sidebarBox.width + 1
     );
     await page.keyboard.press('Escape');
     await expect(page.getByRole('tooltip')).toHaveCount(0);

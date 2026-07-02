@@ -186,7 +186,7 @@ const SidebarRangeControl = ({
               {isHelpOpen && (
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute left-0 top-full z-20 mt-1 w-52 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
+                  className="pointer-events-none absolute right-0 top-full z-20 mt-1 w-36 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
                 >
                   {helpText}
                 </span>
