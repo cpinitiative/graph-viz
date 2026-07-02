@@ -505,8 +505,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setMode: handleSetMode,
       drawFrom,
       onDrawEdge: startDrawEdge,
-      routing: edgeRouting,
-      setRouting: setEdgeRouting,
       snapEnabled,
       setSnapEnabled,
       showGrid,
@@ -604,6 +602,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onDeleteSelection: deleteSelection,
       onClearSelection: clearSelection,
       onUpdateGlobal: updateGlobalSettings,
+      onEdgeRoutingChange: setEdgeRouting,
     },
     timeline: {
       steps,

@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
 import {
@@ -19,7 +19,7 @@ const NODE_STATUS_OPTIONS = [
 const panelClass =
   'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
 const panelEyebrowClass =
-  'font-manrope text-[10px] font-bold uppercase tracking-[0.16em] text-[#64748B] dark:text-[#94A3B8]';
+  'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
 const panelContextClass =
   'font-manrope text-sm font-bold text-[#0F2747] dark:text-[#F8FAFC]';
 const sectionTitleClass =
@@ -51,10 +51,6 @@ const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const TOOLTIP_WIDTH = 244;
-const TOOLTIP_ESTIMATED_HEIGHT = 40;
-const TOOLTIP_GUTTER = 12;
-const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -128,92 +124,6 @@ const ClearSelectionButton = ({ label, onClick }) => {
         <line x1="6" y1="6" x2="18" y2="18" />
       </svg>
     </button>
-  );
-};
-
-const InfoHelp = ({ label, text }) => {
-  const tooltipId = useId();
-  const buttonRef = useRef(null);
-  const [tooltipPosition, setTooltipPosition] = useState(null);
-
-  const showTooltip = () => {
-    const bounds = buttonRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-
-    const panelBounds = buttonRef.current
-      ?.closest('[data-testid="property-panel"]')
-      ?.getBoundingClientRect();
-    const viewportMinLeft = TOOLTIP_GUTTER;
-    const viewportMaxLeft = Math.max(
-      TOOLTIP_GUTTER,
-      window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-    );
-    const panelMinLeft = panelBounds
-      ? Math.max(viewportMinLeft, panelBounds.left + TOOLTIP_GUTTER)
-      : viewportMinLeft;
-    const panelMaxLeft = panelBounds
-      ? Math.min(
-          viewportMaxLeft,
-          panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-        )
-      : viewportMaxLeft;
-    const preferredLeft = bounds.left - TOOLTIP_WIDTH + bounds.width;
-    const fallbackLeft = panelBounds
-      ? panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-      : viewportMaxLeft;
-    const left = Math.min(
-      viewportMaxLeft,
-      Math.max(
-        viewportMinLeft,
-        panelMaxLeft >= panelMinLeft
-          ? Math.min(panelMaxLeft, Math.max(panelMinLeft, preferredLeft))
-          : Math.min(fallbackLeft, viewportMaxLeft)
-      )
-    );
-    const belowTop = bounds.bottom + TOOLTIP_OFFSET;
-    const aboveTop = bounds.top - TOOLTIP_ESTIMATED_HEIGHT - TOOLTIP_OFFSET;
-    const top =
-      belowTop + TOOLTIP_ESTIMATED_HEIGHT <= window.innerHeight - TOOLTIP_GUTTER
-        ? belowTop
-        : Math.max(TOOLTIP_GUTTER, aboveTop);
-
-    setTooltipPosition({ left, top });
-  };
-
-  const hideTooltip = () => setTooltipPosition(null);
-
-  return (
-    <span className="inline-flex items-center">
-      <button
-        ref={buttonRef}
-        type="button"
-        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
-        aria-label={label}
-        aria-describedby={tooltipId}
-        onBlur={hideTooltip}
-        onFocus={showTooltip}
-        onMouseEnter={showTooltip}
-        onMouseLeave={hideTooltip}
-      >
-        ?
-      </button>
-      <span id={tooltipId} className="sr-only">
-        {text}
-      </span>
-      {tooltipPosition && (
-        <span
-          role="tooltip"
-          className="pointer-events-none fixed z-50 w-[244px] whitespace-nowrap border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
-          data-testid="inspector-info-tooltip"
-          style={{
-            left: `${tooltipPosition.left}px`,
-            top: `${tooltipPosition.top}px`,
-          }}
-        >
-          {text}
-        </span>
-      )}
-    </span>
   );
 };
 
@@ -375,7 +285,6 @@ const RangeControl = ({
   step,
   onChange,
   disabled = false,
-  help,
   scope,
 }) => {
   const labelId = useId();
@@ -424,7 +333,6 @@ const RangeControl = ({
             {label}
           </span>
           <ScopeLabel scope={scope} />
-          {help}
         </span>
         <input
           aria-label={`${label} value`}
@@ -816,9 +724,10 @@ const EdgeInspector = ({
 const GlobalSettingsPanel = ({
   globalSettings,
   edgeRouting,
+  onEdgeRoutingChange,
   onUpdateGlobal,
 }) => {
-  const curveAmountEnabled = edgeRouting === EDGE_ROUTING.bezier;
+  const isCurvedRouting = edgeRouting === EDGE_ROUTING.bezier;
 
   return (
     <PanelShell
@@ -827,10 +736,15 @@ const GlobalSettingsPanel = ({
       inspectorType="canvas"
     >
       <div className="space-y-3">
-        <Field label="Routing">
-          <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
-            {edgeRouting === EDGE_ROUTING.bezier ? 'Curved' : 'Straight'}
-          </div>
+        <Field label="Edge routing">
+          <NativeSelect
+            value={edgeRouting}
+            aria-label="Edge routing"
+            onChange={event => onEdgeRoutingChange?.(event.target.value)}
+          >
+            <option value={EDGE_ROUTING.straight}>Straight</option>
+            <option value={EDGE_ROUTING.bezier}>Curved</option>
+          </NativeSelect>
         </Field>
         <RangeControl
           label="Gravity (force)"
@@ -840,21 +754,16 @@ const GlobalSettingsPanel = ({
           step="0.1"
           onChange={forceStrength => onUpdateGlobal({ forceStrength })}
         />
-        <RangeControl
-          label="Curve Amount"
-          value={globalSettings.edgeCurvature}
-          min="0"
-          max="120"
-          step="5"
-          disabled={!curveAmountEnabled}
-          help={
-            <InfoHelp
-              label="Curve Amount help"
-              text="Only affects Curved edge routing"
-            />
-          }
-          onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
-        />
+        {isCurvedRouting && (
+          <RangeControl
+            label="Curve Amount"
+            value={globalSettings.edgeCurvature}
+            min="0"
+            max="120"
+            step="5"
+            onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
+          />
+        )}
         <RangeControl
           label="Node size"
           value={globalSettings.nodeSize ?? 22}
@@ -927,6 +836,7 @@ const PropertyPanel = ({
   onDeleteSelection,
   onClearSelection,
   onUpdateGlobal,
+  onEdgeRoutingChange,
 }) => {
   if (multiSelection.length > 1) {
     return (
@@ -976,6 +886,7 @@ const PropertyPanel = ({
       globalSettings={globalSettings}
       edgeRouting={edgeRouting}
       onUpdateGlobal={onUpdateGlobal}
+      onEdgeRoutingChange={onEdgeRoutingChange}
     />
   );
 };

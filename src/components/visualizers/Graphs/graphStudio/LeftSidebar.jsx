@@ -199,8 +199,6 @@ const ZoomInIcon = () => (
 const LeftSidebar = ({
   mode,
   setMode,
-  routing,
-  setRouting,
   snapEnabled,
   setSnapEnabled,
   showGrid,
@@ -366,18 +364,6 @@ const LeftSidebar = ({
             onChange={setLockCanvas}
           />
         </div>
-      </SidebarSection>
-
-      <SidebarSection>
-        <SectionTitle>Edge Routing</SectionTitle>
-        <NativeSelect
-          value={routing}
-          aria-label="Edge routing"
-          onChange={event => setRouting(event.target.value)}
-        >
-          <option value="straight">Straight</option>
-          <option value="bezier">Curved</option>
-        </NativeSelect>
       </SidebarSection>
 
       <SidebarSection>

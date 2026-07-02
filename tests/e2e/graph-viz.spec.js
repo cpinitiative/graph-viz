@@ -560,12 +560,18 @@ test.describe('Graph Studio desktop smoke', () => {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
     await expect(
+      leftSidebar(page).getByText('Edge Routing', { exact: true })
+    ).toHaveCount(0);
+    await expect(
       propertyPanel(page).getByText('INSPECTOR', { exact: true })
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await expect(propertyPanel(page).getByText('Project-wide')).toBeVisible();
+    await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
+      'straight'
+    );
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -1565,7 +1571,6 @@ while (true) {}
     ).toHaveCount(0);
     for (const control of [
       page.getByLabel('Gravity (force) value'),
-      page.getByLabel('Curve Amount value'),
       page.getByLabel('Node size value'),
       nodeLabelFontSizeInput,
       page.getByLabel('Edge width value'),
@@ -2305,30 +2310,17 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('keeps Curve Amount disabled in Straight routing and active in Curved routing', async ({
-    page,
-  }) => {
+  test('shows Curve Amount only in Curved edge routing', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
     const curveAmount = page.getByRole('slider', { name: 'Curve Amount' });
-    const curveAmountHelp = page.getByLabel('Curve Amount help');
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
-    await expect(curveAmount).toBeDisabled();
-    await expect(curveAmountHelp).toBeVisible();
-    await curveAmountHelp.focus();
-    const straightRoutingTooltip = page
-      .getByRole('tooltip')
-      .filter({ hasText: 'Only affects Curved edge routing' })
-      .last();
-    await expectTooltipInsideViewport(straightRoutingTooltip);
-    const tooltipBox = await straightRoutingTooltip.boundingBox();
-    expect(tooltipBox).not.toBeNull();
-    expect(tooltipBox.width).toBeGreaterThanOrEqual(240);
-    expect(tooltipBox.width).toBeLessThanOrEqual(250);
-    expect(tooltipBox.height).toBeLessThan(44);
+    await expect(curveAmount).toHaveCount(0);
+    await expect(page.getByLabel('Curve Amount value')).toHaveCount(0);
+    await expect(page.getByLabel('Curve Amount help')).toHaveCount(0);
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -2338,13 +2330,7 @@ while (true) {}
 
     await page.getByLabel('Edge routing').selectOption('bezier');
     await expect(curveAmount).toBeEnabled();
-    await curveAmountHelp.focus();
-    await expectTooltipInsideViewport(
-      page
-        .getByRole('tooltip')
-        .filter({ hasText: 'Only affects Curved edge routing' })
-        .last()
-    );
+    await expect(page.getByLabel('Curve Amount help')).toHaveCount(0);
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
       .not.toBe(straightPath);
