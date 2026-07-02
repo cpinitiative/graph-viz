@@ -768,7 +768,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await page.getByTestId('tool-button-select').click();
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
-      await page.getByRole('button', { name: layout }).click();
+      await page.getByRole('button', { name: layout, exact: true }).click();
       await expect(graphCanvas(page)).toBeVisible();
     }
 
@@ -780,11 +780,11 @@ test.describe('Graph Studio desktop smoke', () => {
       'canvas'
     );
     await setRangeValue(page, 'Force strength', 0.2);
-    await page.getByRole('button', { name: 'Force' }).click();
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
     const lowForcePositions = await getNodePositionSnapshot(page);
     await choosePreset(page, 'bfs');
     await setRangeValue(page, 'Force strength', 2);
-    await page.getByRole('button', { name: 'Force' }).click();
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
     await expect
       .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
       .not.toBe(JSON.stringify(lowForcePositions));
@@ -3715,7 +3715,7 @@ api.edge('e0', '#f59e0b');
     await expectDirectedEdgesAnchored(page);
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
-      await page.getByRole('button', { name: layout }).click();
+      await page.getByRole('button', { name: layout, exact: true }).click();
       await expect(graphCanvas(page)).toBeVisible();
       await expectDirectedEdgesAnchored(page);
     }
