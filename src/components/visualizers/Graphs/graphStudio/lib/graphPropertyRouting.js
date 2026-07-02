@@ -1,6 +1,6 @@
 /** Per-frame animation properties (step overrides). */
-export const STEP_NODE_PROPS = new Set(['status', 'color']);
-export const STEP_EDGE_PROPS = new Set(['color']);
+export const STEP_NODE_PROPS = new Set(['status', 'color', 'visible']);
+export const STEP_EDGE_PROPS = new Set(['status', 'color', 'visible']);
 
 export const splitNodePatch = patch => {
   const basePatch = {};

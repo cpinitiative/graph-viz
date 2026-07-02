@@ -31,6 +31,7 @@ const nodeCircleSelector =
 const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
 const propertyPanel = page => page.getByTestId('property-panel');
+const leftSidebar = page => page.getByTestId('left-sidebar');
 
 const getCanvasViewSnapshot = async page => ({
   x: await graphCanvas(page).getAttribute('data-view-x'),
@@ -558,8 +559,19 @@ test.describe('Graph Studio desktop smoke', () => {
     for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
-    await expect(page.getByText('Canvas Settings')).toBeVisible();
+    await expect(
+      leftSidebar(page).getByText('Edge Routing', { exact: true })
+    ).toHaveCount(0);
+    await expect(
+      propertyPanel(page).getByText('INSPECTOR', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Project-wide')).toBeVisible();
+    await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
+      'straight'
+    );
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -613,7 +625,9 @@ test.describe('Graph Studio desktop smoke', () => {
       'true'
     );
     await expect(
-      page.getByText('Click the canvas to add a node.')
+      leftSidebar(page).getByText(
+        'Click canvas to add a node from Frame 1 onward.'
+      )
     ).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
@@ -630,8 +644,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    const drawEdgeHelper = page.getByText(
-      /Click a source node, then a target node\.|Source node .* selected\. Click a target node\./
+    const drawEdgeHelper = leftSidebar(page).getByText(
+      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
     );
     await expect(drawEdgeHelper).toBeVisible();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
@@ -754,7 +768,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await page.getByTestId('tool-button-select').click();
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
-      await page.getByRole('button', { name: layout }).click();
+      await page.getByRole('button', { name: layout, exact: true }).click();
       await expect(graphCanvas(page)).toBeVisible();
     }
 
@@ -765,12 +779,18 @@ test.describe('Graph Studio desktop smoke', () => {
       'data-inspector-type',
       'canvas'
     );
-    await setRangeValue(page, 'Gravity (force)', 0.2);
-    await page.getByRole('button', { name: 'Force' }).click();
+    await commitInputValue(zoomValueInput, 180);
+    const zoomBeforeForceRefit =
+      await graphCanvas(page).getAttribute('data-view-zoom');
+    await setRangeValue(page, 'Force strength', 0.2);
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await expect
+      .poll(() => graphCanvas(page).getAttribute('data-view-zoom'))
+      .not.toBe(zoomBeforeForceRefit);
     const lowForcePositions = await getNodePositionSnapshot(page);
     await choosePreset(page, 'bfs');
-    await setRangeValue(page, 'Gravity (force)', 2);
-    await page.getByRole('button', { name: 'Force' }).click();
+    await setRangeValue(page, 'Force strength', 2);
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
     await expect
       .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
       .not.toBe(JSON.stringify(lowForcePositions));
@@ -779,16 +799,26 @@ test.describe('Graph Studio desktop smoke', () => {
       await choosePreset(page, preset);
     }
 
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
     await graphNodes.first().click();
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first()
       .click();
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
 
     await choosePreset(page, 'bfs');
     const frameCounter = page.getByTestId('timeline-frame-counter');
@@ -1107,9 +1137,19 @@ while (true) {}
 
     const descriptionRow = page.getByTestId('frame-description-row');
     const detailControls = page.getByTestId('frame-detail-controls');
-    await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    const descriptionLabel = descriptionRow.getByText('Description', {
+      exact: true,
+    });
+    const durationLabel = detailControls.getByText('Duration', {
+      exact: true,
+    });
+    await expect(descriptionLabel).toBeVisible();
+    await expect(durationLabel).toBeVisible();
     await expect(
-      page.getByText('Timing & Caption', { exact: true })
+      detailControls.getByText('Timing', { exact: true })
+    ).toHaveCount(0);
+    await expect(
+      detailControls.getByText('Caption', { exact: true })
     ).toBeVisible();
     await expect(frameDescription).toBeVisible();
     await expect(durationInput).toBeVisible();
@@ -1131,14 +1171,28 @@ while (true) {}
     );
     const descriptionBox = await descriptionRow.boundingBox();
     const detailControlsBox = await detailControls.boundingBox();
+    const descriptionLabelBox = await descriptionLabel.boundingBox();
+    const durationLabelBox = await durationLabel.boundingBox();
+    const frameDescriptionBox = await frameDescription.boundingBox();
+    const durationInputBox = await durationInput.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
     const canvasLayoutBox = await graphCanvas(page).boundingBox();
     const visibleFrameBox = await cards.first().boundingBox();
     expect(descriptionBox).not.toBeNull();
     expect(detailControlsBox).not.toBeNull();
+    expect(descriptionLabelBox).not.toBeNull();
+    expect(durationLabelBox).not.toBeNull();
+    expect(frameDescriptionBox).not.toBeNull();
+    expect(durationInputBox).not.toBeNull();
     expect(timelineBox).not.toBeNull();
     expect(canvasLayoutBox).not.toBeNull();
     expect(visibleFrameBox).not.toBeNull();
+    expect(
+      Math.abs(durationLabelBox.x - descriptionLabelBox.x)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(durationInputBox.x - frameDescriptionBox.x)
+    ).toBeLessThanOrEqual(1);
 
     const expectBoxInsideTimeline = box => {
       expect(box).not.toBeNull();
@@ -1543,8 +1597,7 @@ while (true) {}
       propertyPanel(page).getByText('px', { exact: true })
     ).toHaveCount(0);
     for (const control of [
-      page.getByLabel('Gravity (force) value'),
-      page.getByLabel('Curve Amount value'),
+      page.getByLabel('Force strength value'),
       page.getByLabel('Node size value'),
       nodeLabelFontSizeInput,
       page.getByLabel('Edge width value'),
@@ -2021,7 +2074,9 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Node properties')
+    ).toBeVisible();
     await expect(selectionRing).toBeVisible();
     await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
     await expect(selectionRing).toHaveAttribute('r', '25');
@@ -2064,7 +2119,9 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
@@ -2073,14 +2130,18 @@ while (true) {}
       'data-inspector-type',
       'canvas'
     );
-    await expect(page.getByText('Edge Properties')).toHaveCount(0);
+    await expect(propertyPanel(page).getByText('Edge properties')).toHaveCount(
+      0
+    );
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2101,7 +2162,10 @@ while (true) {}
       'data-inspector-type',
       'selection'
     );
-    await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Selection', { exact: true })
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Selected nodes')).toBeVisible();
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id]')
     ).toHaveCount(0);
@@ -2178,7 +2242,9 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2207,7 +2273,9 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2215,10 +2283,14 @@ while (true) {}
       'canvas'
     );
     await expect(
-      page.getByText('Click a source node, then a target node.')
+      leftSidebar(page).getByText(
+        /Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toHaveCount(0);
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2265,30 +2337,36 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('keeps Curve Amount disabled in Straight routing and active in Curved routing', async ({
-    page,
-  }) => {
+  test('shows Curve Amount only in Curved edge routing', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
     const curveAmount = page.getByRole('slider', { name: 'Curve Amount' });
-    const curveAmountHelp = page.getByLabel('Curve Amount help');
+    await expect(
+      page.getByRole('slider', { name: 'Force strength' })
+    ).toBeVisible();
+    await page.getByLabel('Force strength help').click();
+    const forceTooltip = page.getByRole('tooltip');
+    await expect(forceTooltip).toHaveText(
+      'Controls the next Force layout pass.'
+    );
+    const forceTooltipBox = await forceTooltip.boundingBox();
+    const sidebarBox = await leftSidebar(page).boundingBox();
+    expect(forceTooltipBox).not.toBeNull();
+    expect(sidebarBox).not.toBeNull();
+    expect(forceTooltipBox.x).toBeGreaterThanOrEqual(sidebarBox.x - 1);
+    expect(forceTooltipBox.x + forceTooltipBox.width).toBeLessThanOrEqual(
+      sidebarBox.x + sidebarBox.width + 1
+    );
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(page.getByText('Gravity (force)')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
-    await expect(curveAmount).toBeDisabled();
-    await expect(curveAmountHelp).toBeVisible();
-    await curveAmountHelp.focus();
-    const straightRoutingTooltip = page
-      .getByRole('tooltip')
-      .filter({ hasText: 'Only affects Curved edge routing' })
-      .last();
-    await expectTooltipInsideViewport(straightRoutingTooltip);
-    const tooltipBox = await straightRoutingTooltip.boundingBox();
-    expect(tooltipBox).not.toBeNull();
-    expect(tooltipBox.width).toBeGreaterThanOrEqual(240);
-    expect(tooltipBox.width).toBeLessThanOrEqual(250);
-    expect(tooltipBox.height).toBeLessThan(44);
+    await expect(curveAmount).toHaveCount(0);
+    await expect(page.getByLabel('Curve Amount value')).toHaveCount(0);
+    await expect(page.getByLabel('Curve Amount help')).toHaveCount(0);
 
     const firstEdgePath = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     await expect(firstEdgePath).toBeVisible();
@@ -2298,13 +2376,7 @@ while (true) {}
 
     await page.getByLabel('Edge routing').selectOption('bezier');
     await expect(curveAmount).toBeEnabled();
-    await curveAmountHelp.focus();
-    await expectTooltipInsideViewport(
-      page
-        .getByRole('tooltip')
-        .filter({ hasText: 'Only affects Curved edge routing' })
-        .last()
-    );
+    await expect(page.getByLabel('Curve Amount help')).toHaveCount(0);
     await expect
       .poll(() => firstEdgePath.getAttribute('d'))
       .not.toBe(straightPath);
@@ -2350,6 +2422,7 @@ while (true) {}
     await expect(page.getByLabel('Show caption')).not.toBeChecked();
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
+    await expect(page.getByLabel('Force strength value')).toHaveValue('1.2');
     await expect(page.getByLabel('Dot Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
     await expect(
@@ -2385,6 +2458,7 @@ while (true) {}
       x: 120,
       y: 80,
     });
+    expect(roundTripProject.settings.globalSettings.forceStrength).toBe(1.2);
     await closeExportMenu(page);
 
     await openImportMenu(page);
@@ -2788,7 +2862,9 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
@@ -2802,7 +2878,9 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(
-      page.getByText(/Source node .* selected\. Click a target node\./)
+      leftSidebar(page).getByText(
+        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+      )
     ).toBeVisible();
 
     await page.getByTestId('tool-button-select').click();
@@ -3268,7 +3346,9 @@ api.edge('loop', '#3b82f6');
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first();
     await edgeHitTarget.dispatchEvent('click');
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
 
     await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({
@@ -3342,7 +3422,9 @@ api.edge('loop', '#3b82f6');
       await graphCanvas(page)
         .locator(`[data-edge-hit-target-id="${edgeId}"]`)
         .dispatchEvent('click');
-      await expect(page.getByText('Edge Properties')).toBeVisible();
+      await expect(
+        propertyPanel(page).getByText('Edge properties')
+      ).toBeVisible();
       await expect(
         graphCanvas(page).locator(`[data-edge-arrowhead-id="${edgeId}"]`)
       ).toBeVisible();
@@ -3671,7 +3753,7 @@ api.edge('e0', '#f59e0b');
     await expectDirectedEdgesAnchored(page);
 
     for (const layout of ['Circle', 'Tree', 'Force']) {
-      await page.getByRole('button', { name: layout }).click();
+      await page.getByRole('button', { name: layout, exact: true }).click();
       await expect(graphCanvas(page)).toBeVisible();
       await expectDirectedEdgesAnchored(page);
     }

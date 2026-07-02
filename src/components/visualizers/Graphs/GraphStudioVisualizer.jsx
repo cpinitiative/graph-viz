@@ -38,6 +38,7 @@ import {
   hasOpenModal,
   isEditableKeyboardTarget,
 } from './graphStudio/lib/keyboardTargets';
+import { getFrameOverrideState } from './graphStudio/lib/temporalGraphState';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
 
@@ -196,7 +197,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     updateBaseNode,
     updateBaseNodesBulk,
     updateBaseEdge,
-    setStepProperty,
+    setFrameOverride,
+    resetFrameOverride,
+    applyTemporalPropertyToAllFrames,
     addNodeAt,
     addEdge,
     deleteSelection,
@@ -216,15 +219,26 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedObject,
     setSelectedNodeIds,
   });
-  const { updateSelectedNode, updateSelectedEdge, applyPatchToSelectedNodes } =
-    useGraphStudioSelectionPatchers({
-      selectedNode,
-      selectedEdge,
-      selectedNodeIds,
-      updateBaseNode,
-      updateBaseEdge,
-      setStepProperty,
-    });
+  const {
+    updateSelectedNode,
+    updateSelectedEdge,
+    applyPatchToSelectedNodes,
+    resetSelectedNodeOverride,
+    resetSelectedEdgeOverride,
+    applySelectedNodeToAllFrames,
+    applySelectedEdgeToAllFrames,
+  } = useGraphStudioSelectionPatchers({
+    selectedNode,
+    selectedEdge,
+    selectedNodeIds,
+    updateBaseNode,
+    updateBaseEdge,
+    setFrameOverride,
+    resetFrameOverride,
+    applyTemporalPropertyToAllFrames,
+    currentFrame,
+    setStatus,
+  });
   const {
     drawFrom,
     clearDrawState,
@@ -250,6 +264,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedObject,
     setSelectedNodeIds,
     clearSelection,
+    currentFrame,
   });
   const previousFrameRef = useRef(currentFrame);
   useEffect(() => {
@@ -426,6 +441,43 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () => computeStepDiff(previousGraph, computedGraph),
     [previousGraph, computedGraph]
   );
+  const currentStep = useMemo(
+    () => steps[currentFrame] ?? {},
+    [currentFrame, steps]
+  );
+  const selectedNodeFrameOverrides = useMemo(
+    () =>
+      selectedNode
+        ? getFrameOverrideState(currentStep, 'node', selectedNode.id, [
+            'color',
+            'status',
+            'visible',
+          ])
+        : {},
+    [currentStep, selectedNode]
+  );
+  const selectedEdgeFrameOverrides = useMemo(
+    () =>
+      selectedEdge
+        ? getFrameOverrideState(currentStep, 'edge', selectedEdge.id, [
+            'color',
+            'visible',
+          ])
+        : {},
+    [currentStep, selectedEdge]
+  );
+  const hasCaptionVisibleOverride =
+    isOwnPatchKey(currentStep, 'captionVisible') ||
+    isOwnPatchKey(currentStep, 'showCaption');
+  const resetCaptionVisibleOverride = useCallback(() => {
+    updateStep(currentFrame, step => {
+      const next = { ...step };
+      delete next.captionVisible;
+      delete next.showCaption;
+      return next;
+    });
+    setStatus(`Caption visibility reset for Frame ${currentFrame + 1}`);
+  }, [currentFrame, setStatus, updateStep]);
   const applyPreset = presetName => {
     const preset = GRAPH_PRESETS[presetName];
     if (!preset) return;
@@ -446,6 +498,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     );
     setStatus(`Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}`);
   };
+  const handleAutoLayout = useCallback(
+    type => {
+      const nextGraph = applyLayout(type);
+      if (!lockCanvas && nextGraph?.nodes) {
+        setViewFromNodes(nextGraph.nodes);
+        bumpViewReset();
+      }
+    },
+    [applyLayout, bumpViewReset, lockCanvas, setViewFromNodes]
+  );
 
   const layoutProps = {
     sidebar: {
@@ -453,8 +515,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setMode: handleSetMode,
       drawFrom,
       onDrawEdge: startDrawEdge,
-      routing: edgeRouting,
-      setRouting: setEdgeRouting,
       snapEnabled,
       setSnapEnabled,
       showGrid,
@@ -463,7 +523,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setCustomLegend,
       lockCanvas,
       setLockCanvas,
-      onAutoLayout: applyLayout,
+      onAutoLayout: handleAutoLayout,
+      forceStrength: globalSettings.forceStrength,
+      onForceStrengthChange: forceStrength =>
+        updateGlobalSettings({ forceStrength }),
       onOpenParser: () => setIsParserOpen(true),
       onExportText: exportText,
       onExportProject: exportProject,
@@ -538,14 +601,21 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       multiSelection: selectedNodeIds,
       globalSettings,
       edgeRouting,
+      nodeFrameOverrides: selectedNodeFrameOverrides,
+      edgeFrameOverrides: selectedEdgeFrameOverrides,
       onUpdateNode: updateSelectedNode,
       onUpdateEdge: updateSelectedEdge,
+      onResetNodeOverride: resetSelectedNodeOverride,
+      onResetEdgeOverride: resetSelectedEdgeOverride,
+      onApplyNodeToAllFrames: applySelectedNodeToAllFrames,
+      onApplyEdgeToAllFrames: applySelectedEdgeToAllFrames,
       onSelectEdge: edgeId => onSelectEdge(edgeId),
       onSelectNode: nodeId => onSelectNode(nodeId, false),
       onApplyToSelection: applyPatchToSelectedNodes,
       onDeleteSelection: deleteSelection,
       onClearSelection: clearSelection,
       onUpdateGlobal: updateGlobalSettings,
+      onEdgeRoutingChange: setEdgeRouting,
     },
     timeline: {
       steps,
@@ -559,8 +629,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       captionStyle: normalizedCaptionOverlay.style,
       captionSize: normalizedCaptionOverlay.size,
       captionFontSize: normalizedCaptionOverlay.fontSize,
-      onCaptionEnabledChange: enabled =>
-        updateStep(currentFrame, 'captionVisible', enabled),
+      hasCaptionVisibleOverride,
+      onCaptionEnabledChange: enabled => {
+        updateStep(currentFrame, 'captionVisible', enabled);
+        setStatus(`Caption visibility updated for Frame ${currentFrame + 1}`);
+      },
+      onResetCaptionVisibleOverride: resetCaptionVisibleOverride,
       onCaptionStyleChange: style =>
         setCaptionOverlay(prev => ({
           ...normalizeCaptionOverlay(prev),
@@ -587,10 +661,14 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onAddStep: () => {
         addStep(currentFrame);
         setCurrentFrame(currentFrame + 1, frameCount + 1);
+        setStatus(
+          `Frame ${currentFrame + 2} created from current visual state`
+        );
       },
       onDuplicateStep: () => {
         duplicateStep(currentFrame);
         setCurrentFrame(currentFrame + 1, frameCount + 1);
+        setStatus(`Frame ${currentFrame + 2} duplicated exactly`);
       },
       onDeleteStep: () => {
         if (steps.length <= 1) return;

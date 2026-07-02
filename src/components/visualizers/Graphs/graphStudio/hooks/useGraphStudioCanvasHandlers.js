@@ -12,9 +12,13 @@ export const useGraphStudioCanvasHandlers = ({
   setSelectedObject,
   setSelectedNodeIds,
   clearSelection,
+  currentFrame = 0,
 }) => {
   const [drawFrom, setDrawFrom] = useState(null);
   const dragStateRef = useRef(null);
+  const frameNumber = currentFrame + 1;
+  const addNodeHelpText = `Click canvas to add a node from Frame ${frameNumber} onward.`;
+  const drawEdgeHelpText = `Connect nodes to add an edge from Frame ${frameNumber} onward.`;
 
   const clearDrawState = useCallback(() => {
     setDrawFrom(null);
@@ -72,14 +76,13 @@ export const useGraphStudioCanvasHandlers = ({
       if (drawFrom === null || drawFrom === undefined) {
         clearSelection();
         setDrawFrom(nodeId);
-        setStatus(`Draw Edge: source node ${nodeId} selected`);
+        setStatus(`Source node ${nodeId} selected. ${drawEdgeHelpText}`);
         return;
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
-      setStatus(`Edge ${drawFrom} → ${nodeId} added`);
     },
-    [addEdge, clearSelection, drawFrom, setStatus]
+    [addEdge, clearSelection, drawEdgeHelpText, drawFrom, setStatus]
   );
 
   const handleSetMode = useCallback(
@@ -88,15 +91,22 @@ export const useGraphStudioCanvasHandlers = ({
       else {
         clearSelection();
         if (drawFrom === null || drawFrom === undefined) {
-          setStatus('Draw Edge: click a source node, then a target node');
+          setStatus(drawEdgeHelpText);
         }
       }
       if (nextMode === 'add') {
-        setStatus('Add Node: click the canvas to add a node');
+        setStatus(addNodeHelpText);
       }
       setMode(nextMode);
     },
-    [clearSelection, drawFrom, setMode, setStatus]
+    [
+      addNodeHelpText,
+      clearSelection,
+      drawEdgeHelpText,
+      drawFrom,
+      setMode,
+      setStatus,
+    ]
   );
 
   const startDrawEdge = useCallback(() => {
@@ -112,14 +122,21 @@ export const useGraphStudioCanvasHandlers = ({
       clearSelection();
       setDrawFrom(sourceId);
       setMode('draw');
-      setStatus(`Draw Edge: source node ${sourceId} selected`);
+      setStatus(`Source node ${sourceId} selected. ${drawEdgeHelpText}`);
       return;
     }
     clearSelection();
     setDrawFrom(null);
     setMode('draw');
-    setStatus('Draw Edge: click a source node, then a target node');
-  }, [addEdge, clearSelection, selectedNodeIds, setMode, setStatus]);
+    setStatus(drawEdgeHelpText);
+  }, [
+    addEdge,
+    clearSelection,
+    drawEdgeHelpText,
+    selectedNodeIds,
+    setMode,
+    setStatus,
+  ]);
 
   const onNodePointerDown = useCallback(
     ({ nodeId, worldX, worldY }) => {

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { resolveFrameGraph } from './graphStudio/lib/temporalGraphState';
 
 const clampFrame = (frame, count) => {
   if (!count) return 0;
@@ -105,21 +106,7 @@ const setByPath = (target, path, value) => {
  * @property {string} [description]
  */
 export const computeGraphAtStep = (baseGraph, step) => {
-  const nodeOverrides = step?.nodeOverrides ?? {};
-  const edgeOverrides = step?.edgeOverrides ?? {};
-  const nodes = (baseGraph?.nodes ?? []).map(node => ({
-    ...node,
-    ...(nodeOverrides[String(node.id)] ?? {}),
-    id: node.id,
-  }));
-  const edges = (baseGraph?.edges ?? []).map(edge => ({
-    ...edge,
-    ...(edgeOverrides[String(edge.id)] ?? {}),
-    id: edge.id,
-    from: edge.from,
-    to: edge.to,
-  }));
-  return { nodes, edges };
+  return resolveFrameGraph(baseGraph, step);
 };
 
 export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
@@ -165,6 +152,14 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
       const frameIndex = clampFrame(index, prev.length);
       const next = [...prev];
       const draft = cloneStep(next[frameIndex]);
+      if (typeof property === 'function') {
+        const produced = property(draft);
+        next[frameIndex] = normalizeAnimationStep(
+          produced ?? draft,
+          frameIndex
+        );
+        return next;
+      }
       if (typeof property === 'string') {
         setByPath(draft, property, value);
       } else if (property && typeof property === 'object') {

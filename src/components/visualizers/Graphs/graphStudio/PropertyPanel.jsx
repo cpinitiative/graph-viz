@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
 import {
@@ -18,11 +18,23 @@ const NODE_STATUS_OPTIONS = [
 
 const panelClass =
   'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
-const sectionTitleClass =
+const panelEyebrowClass =
   'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
+const panelContextClass =
+  'font-manrope text-sm font-bold text-[#0F2747] dark:text-[#F8FAFC]';
+const sectionTitleClass =
+  'font-manrope text-xs font-bold text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+const scopeLabelClass =
+  'inline-flex shrink-0 items-center rounded-sm bg-[#EEF2F6] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:bg-[#1E293B] dark:text-[#94A3B8]';
+const sectionScopeLabelClass =
+  'shrink-0 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:text-[#94A3B8]';
+const overrideIndicatorClass =
+  'text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]';
+const inlineActionButtonClass =
+  'inline-flex min-h-6 items-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
 const compactNumberInputClass =
   'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const inputClass =
@@ -39,12 +51,59 @@ const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
-const TOOLTIP_WIDTH = 244;
-const TOOLTIP_ESTIMATED_HEIGHT = 40;
-const TOOLTIP_GUTTER = 12;
-const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
+
+const getScopeLabel = scope => (scope === 'Frame' ? 'Current Frame' : scope);
+
+const ScopeLabel = ({ scope, variant = 'field' }) => {
+  if (!scope) return null;
+  return (
+    <span
+      className={
+        variant === 'section' ? sectionScopeLabelClass : scopeLabelClass
+      }
+    >
+      {getScopeLabel(scope)}
+    </span>
+  );
+};
+
+const FieldMeta = ({ hasOverride, onResetOverride, onApplyToAll }) => {
+  if (!hasOverride && !onApplyToAll) return null;
+
+  return (
+    <div className="mt-2 flex min-h-6 flex-wrap items-center justify-between gap-2">
+      <span className="min-w-0">
+        {hasOverride && (
+          <span className={overrideIndicatorClass}>Current frame override</span>
+        )}
+      </span>
+      {(hasOverride || onApplyToAll) && (
+        <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+          {hasOverride && onResetOverride && (
+            <button
+              type="button"
+              className={inlineActionButtonClass}
+              onClick={onResetOverride}
+            >
+              Reset override
+            </button>
+          )}
+          {onApplyToAll && (
+            <button
+              type="button"
+              className={inlineActionButtonClass}
+              onClick={onApplyToAll}
+            >
+              Apply to all frames
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+};
 
 const ClearSelectionButton = ({ label, onClick }) => {
   if (!onClick) return null;
@@ -76,125 +135,68 @@ const ClearSelectionButton = ({ label, onClick }) => {
   );
 };
 
-const InfoHelp = ({ label, text }) => {
-  const tooltipId = useId();
-  const buttonRef = useRef(null);
-  const [tooltipPosition, setTooltipPosition] = useState(null);
-
-  const showTooltip = () => {
-    const bounds = buttonRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-
-    const panelBounds = buttonRef.current
-      ?.closest('[data-testid="property-panel"]')
-      ?.getBoundingClientRect();
-    const viewportMinLeft = TOOLTIP_GUTTER;
-    const viewportMaxLeft = Math.max(
-      TOOLTIP_GUTTER,
-      window.innerWidth - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-    );
-    const panelMinLeft = panelBounds
-      ? Math.max(viewportMinLeft, panelBounds.left + TOOLTIP_GUTTER)
-      : viewportMinLeft;
-    const panelMaxLeft = panelBounds
-      ? Math.min(
-          viewportMaxLeft,
-          panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-        )
-      : viewportMaxLeft;
-    const preferredLeft = bounds.left - TOOLTIP_WIDTH + bounds.width;
-    const fallbackLeft = panelBounds
-      ? panelBounds.right - TOOLTIP_WIDTH - TOOLTIP_GUTTER
-      : viewportMaxLeft;
-    const left = Math.min(
-      viewportMaxLeft,
-      Math.max(
-        viewportMinLeft,
-        panelMaxLeft >= panelMinLeft
-          ? Math.min(panelMaxLeft, Math.max(panelMinLeft, preferredLeft))
-          : Math.min(fallbackLeft, viewportMaxLeft)
-      )
-    );
-    const belowTop = bounds.bottom + TOOLTIP_OFFSET;
-    const aboveTop = bounds.top - TOOLTIP_ESTIMATED_HEIGHT - TOOLTIP_OFFSET;
-    const top =
-      belowTop + TOOLTIP_ESTIMATED_HEIGHT <= window.innerHeight - TOOLTIP_GUTTER
-        ? belowTop
-        : Math.max(TOOLTIP_GUTTER, aboveTop);
-
-    setTooltipPosition({ left, top });
-  };
-
-  const hideTooltip = () => setTooltipPosition(null);
-
-  return (
-    <span className="inline-flex items-center">
-      <button
-        ref={buttonRef}
-        type="button"
-        className="flex h-4 w-4 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]"
-        aria-label={label}
-        aria-describedby={tooltipId}
-        onBlur={hideTooltip}
-        onFocus={showTooltip}
-        onMouseEnter={showTooltip}
-        onMouseLeave={hideTooltip}
-      >
-        ?
-      </button>
-      <span id={tooltipId} className="sr-only">
-        {text}
-      </span>
-      {tooltipPosition && (
-        <span
-          role="tooltip"
-          className="pointer-events-none fixed z-50 w-[244px] whitespace-nowrap border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
-          data-testid="inspector-info-tooltip"
-          style={{
-            left: `${tooltipPosition.left}px`,
-            top: `${tooltipPosition.top}px`,
-          }}
-        >
-          {text}
-        </span>
-      )}
-    </span>
-  );
-};
-
-const PanelShell = ({ title, inspectorType, headerAction, children }) => (
+const PanelShell = ({
+  title,
+  scope,
+  inspectorType,
+  headerAction,
+  children,
+}) => (
   <div
     className={panelClass}
     data-testid="property-panel"
     data-inspector-type={inspectorType}
   >
-    <div className="flex items-center justify-between gap-3 border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
-      <div className={sectionTitleClass}>{title}</div>
-      {headerAction}
+    <div className="border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
+      <div className={panelEyebrowClass}>INSPECTOR</div>
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <div className={`${panelContextClass} min-w-0`}>{title}</div>
+          <ScopeLabel scope={scope} variant="section" />
+        </div>
+        {headerAction}
+      </div>
     </div>
     {children}
   </div>
 );
 
-const Section = ({ title, help, children }) => (
-  <section className="space-y-3 border-b border-[#D7DEE8] pb-5 last:border-b-0 dark:border-[#334155]">
-    <div className="flex items-center gap-2">
+const Section = ({ title, scope, help, children }) => (
+  <section className="space-y-3">
+    <div className="flex items-baseline gap-2">
       <div className={sectionTitleClass}>{title}</div>
+      <ScopeLabel scope={scope} variant="section" />
       {help}
     </div>
     {children}
   </section>
 );
 
-const Field = ({ label, children }) => (
-  <label className="block space-y-1.5">
-    <span className={fieldLabelClass}>{label}</span>
+const Field = ({
+  label,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  children,
+}) => (
+  <div className="block space-y-1.5">
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
+      <ScopeLabel scope={scope} />
+    </div>
     {children}
-  </label>
+    <FieldMeta
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
+    />
+  </div>
 );
 
-const TextInput = ({ value, onChange, placeholder }) => (
+const TextInput = ({ value, onChange, placeholder, ariaLabel }) => (
   <input
+    aria-label={ariaLabel}
     className={inputClass}
     value={value}
     onChange={event => onChange(event.target.value)}
@@ -202,8 +204,24 @@ const TextInput = ({ value, onChange, placeholder }) => (
   />
 );
 
-const ColorField = ({ label, value, fallback, placeholder, onChange }) => (
-  <Field label={label}>
+const ColorField = ({
+  label,
+  value,
+  fallback,
+  placeholder,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+}) => (
+  <Field
+    label={label}
+    scope={scope}
+    hasOverride={hasOverride}
+    onResetOverride={onResetOverride}
+    onApplyToAll={onApplyToAll}
+  >
     <div className="flex items-center gap-2">
       <input
         type="color"
@@ -211,21 +229,44 @@ const ColorField = ({ label, value, fallback, placeholder, onChange }) => (
         onChange={event => onChange(event.target.value)}
         className="h-10 w-10 cursor-pointer rounded bg-transparent p-0 md:h-8 md:w-8"
       />
-      <TextInput value={value} onChange={onChange} placeholder={placeholder} />
+      <TextInput
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        ariaLabel={label}
+      />
     </div>
   </Field>
 );
 
-const ToggleRow = ({ label, checked, onChange }) => (
-  <label className={toggleRowClass}>
-    <span className={fieldLabelClass}>{label}</span>
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={event => onChange(event.target.checked)}
-      className={checkboxClass}
+const ToggleRow = ({
+  label,
+  checked,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+}) => (
+  <div className="space-y-1">
+    <label className={toggleRowClass}>
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
+      <span className="flex shrink-0 items-center gap-2">
+        <ScopeLabel scope={scope} />
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={event => onChange(event.target.checked)}
+          className={checkboxClass}
+        />
+      </span>
+    </label>
+    <FieldMeta
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
     />
-  </label>
+  </div>
 );
 
 const ActionButton = ({ children, className, ...props }) => (
@@ -252,7 +293,7 @@ const RangeControl = ({
   step,
   onChange,
   disabled = false,
-  help,
+  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -299,7 +340,7 @@ const RangeControl = ({
           <span id={labelId} className={`${fieldLabelClass} truncate`}>
             {label}
           </span>
-          {help}
+          <ScopeLabel scope={scope} />
         </span>
         <input
           aria-label={`${label} value`}
@@ -356,6 +397,7 @@ const NumberControl = ({
   onChange,
   suffix,
   testId,
+  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -397,8 +439,11 @@ const NumberControl = ({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-      <span id={labelId} className={`${fieldLabelClass} truncate`}>
-        {label}
+      <span className="flex min-w-0 items-center gap-2">
+        <span id={labelId} className={`${fieldLabelClass} truncate`}>
+          {label}
+        </span>
+        <ScopeLabel scope={scope} />
       </span>
       <span className="flex items-center gap-1">
         <input
@@ -469,7 +514,7 @@ const MultiSelectionPanel = ({
   onClearSelection,
 }) => (
   <PanelShell
-    title="Selection Inspector"
+    title="Selection"
     inspectorType="selection"
     headerAction={
       <ClearSelectionButton
@@ -478,7 +523,7 @@ const MultiSelectionPanel = ({
       />
     }
   >
-    <Section title="Selected Nodes">
+    <Section title="Selected nodes">
       <p className={bodyTextClass}>{selectedCount} items selected</p>
       <div className="space-y-2">
         <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
@@ -490,7 +535,9 @@ const MultiSelectionPanel = ({
         <ActionButton onClick={() => onApplyToSelection({ color: '#22c55e' })}>
           Color green
         </ActionButton>
-        <DeleteButton onClick={onDeleteSelection}>Delete selected</DeleteButton>
+        <DeleteButton onClick={onDeleteSelection}>
+          Delete from project
+        </DeleteButton>
       </div>
     </Section>
   </PanelShell>
@@ -499,16 +546,21 @@ const MultiSelectionPanel = ({
 const NodeInspector = ({
   selectedNode,
   connectedEdges,
+  frameOverrides = {},
   onUpdateNode,
+  onResetOverride,
+  onApplyToAllFrames,
   onSelectEdge,
   onDeleteSelection,
   onClearSelection,
 }) => {
   const nodeColor = selectedNode.color ?? '';
+  const nodeStatus = String(selectedNode.status ?? 'default');
+  const nodeVisible = selectedNode.visible !== false;
 
   return (
     <PanelShell
-      title="Node Properties"
+      title="Node properties"
       inspectorType="node"
       headerAction={
         <ClearSelectionButton
@@ -517,37 +569,60 @@ const NodeInspector = ({
         />
       }
     >
-      <Section title="Node Details">
-        <div className="space-y-4">
-          <Field label="Label">
-            <TextInput
-              value={selectedNode.label ?? ''}
-              onChange={value => onUpdateNode({ label: value })}
-            />
-          </Field>
-          <Field label="Status">
-            <NativeSelect
-              value={String(selectedNode.status ?? 'default')}
-              onChange={event => onUpdateNode({ status: event.target.value })}
-            >
-              {NODE_STATUS_OPTIONS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <ColorField
-            label="Highlight color"
-            value={nodeColor}
-            fallback="#3b82f6"
-            placeholder="#22c55e or blank"
-            onChange={value => onUpdateNode({ color: value })}
+      <div className="space-y-4">
+        <Field label="Label" scope="All frames">
+          <TextInput
+            value={selectedNode.label ?? ''}
+            onChange={value => onUpdateNode({ label: value })}
+            ariaLabel="Label"
           />
-        </div>
-      </Section>
+        </Field>
+        <Field label="Position" scope="All frames">
+          <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
+            X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
+          </div>
+        </Field>
+        <Field
+          label="Status / Style"
+          scope="Frame"
+          hasOverride={frameOverrides.status}
+          onResetOverride={() => onResetOverride?.('status')}
+          onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
+        >
+          <NativeSelect
+            value={nodeStatus}
+            onChange={event => onUpdateNode({ status: event.target.value })}
+          >
+            {NODE_STATUS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <ColorField
+          label="Color"
+          value={nodeColor}
+          fallback="#3b82f6"
+          placeholder="#22c55e or blank"
+          scope="Frame"
+          hasOverride={frameOverrides.color}
+          onResetOverride={() => onResetOverride?.('color')}
+          onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
+          onChange={value => onUpdateNode({ color: value })}
+        />
+        <ToggleRow
+          label="Visible"
+          checked={nodeVisible}
+          scope="Frame"
+          hasOverride={frameOverrides.visible}
+          onResetOverride={() => onResetOverride?.('visible')}
+          onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
+          onChange={checked => onUpdateNode({ visible: checked })}
+        />
+      </div>
 
-      <Section title="Connected Edges">
+      <Section title="Connected edges">
         <LinkedList
           items={connectedEdges}
           emptyLabel="No connected edges"
@@ -565,7 +640,9 @@ const NodeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>Delete node</DeleteButton>
+      <DeleteButton onClick={onDeleteSelection}>
+        Delete from project
+      </DeleteButton>
     </PanelShell>
   );
 };
@@ -573,16 +650,20 @@ const NodeInspector = ({
 const EdgeInspector = ({
   selectedEdge,
   connectedNodes,
+  frameOverrides = {},
   onUpdateEdge,
+  onResetOverride,
+  onApplyToAllFrames,
   onSelectNode,
   onDeleteSelection,
   onClearSelection,
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
+  const edgeVisible = selectedEdge.visible !== false;
 
   return (
     <PanelShell
-      title="Edge Properties"
+      title="Edge properties"
       inspectorType="edge"
       headerAction={
         <ClearSelectionButton
@@ -591,31 +672,44 @@ const EdgeInspector = ({
         />
       }
     >
-      <Section title="Edge Details">
-        <div className="space-y-4">
-          <Field label="Weight / Label">
-            <TextInput
-              value={selectedEdge.label ?? ''}
-              onChange={value => onUpdateEdge({ label: value })}
-              placeholder="e.g. 7"
-            />
-          </Field>
-          <ToggleRow
-            label="Directed"
-            checked={Boolean(selectedEdge.directed)}
-            onChange={checked => onUpdateEdge({ directed: checked })}
+      <div className="space-y-4">
+        <Field label="Weight / Label" scope="All frames">
+          <TextInput
+            value={selectedEdge.label ?? ''}
+            onChange={value => onUpdateEdge({ label: value })}
+            placeholder="e.g. 7"
+            ariaLabel="Weight / Label"
           />
-          <ColorField
-            label="Highlight color"
-            value={edgeColor}
-            fallback="#64748b"
-            placeholder="#64748b"
-            onChange={value => onUpdateEdge({ color: value })}
-          />
-        </div>
-      </Section>
+        </Field>
+        <ToggleRow
+          label="Directed"
+          checked={Boolean(selectedEdge.directed)}
+          scope="All frames"
+          onChange={checked => onUpdateEdge({ directed: checked })}
+        />
+        <ColorField
+          label="Color"
+          value={edgeColor}
+          fallback="#64748b"
+          placeholder="#64748b"
+          scope="Frame"
+          hasOverride={frameOverrides.color}
+          onResetOverride={() => onResetOverride?.('color')}
+          onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
+          onChange={value => onUpdateEdge({ color: value })}
+        />
+        <ToggleRow
+          label="Visible"
+          checked={edgeVisible}
+          scope="Frame"
+          hasOverride={frameOverrides.visible}
+          onResetOverride={() => onResetOverride?.('visible')}
+          onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
+          onChange={checked => onUpdateEdge({ visible: checked })}
+        />
+      </div>
 
-      <Section title="Connected Nodes">
+      <Section title="Connected nodes">
         <LinkedList
           items={connectedNodes}
           emptyLabel="No connected nodes"
@@ -628,7 +722,9 @@ const EdgeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>Delete edge</DeleteButton>
+      <DeleteButton onClick={onDeleteSelection}>
+        Delete from project
+      </DeleteButton>
     </PanelShell>
   );
 };
@@ -636,83 +732,79 @@ const EdgeInspector = ({
 const GlobalSettingsPanel = ({
   globalSettings,
   edgeRouting,
+  onEdgeRoutingChange,
   onUpdateGlobal,
 }) => {
-  const curveAmountEnabled = edgeRouting === EDGE_ROUTING.bezier;
+  const isCurvedRouting = edgeRouting === EDGE_ROUTING.bezier;
 
   return (
-    <PanelShell title="Canvas Inspector" inspectorType="canvas">
-      <Section title="Canvas Settings">
-        <div className="space-y-3">
-          <RangeControl
-            label="Gravity (force)"
-            value={globalSettings.forceStrength}
-            min="0.2"
-            max="2"
-            step="0.1"
-            onChange={forceStrength => onUpdateGlobal({ forceStrength })}
-          />
+    <PanelShell
+      title="Canvas settings"
+      scope="Project-wide"
+      inspectorType="canvas"
+    >
+      <div className="space-y-3">
+        <Field label="Edge routing">
+          <NativeSelect
+            value={edgeRouting}
+            aria-label="Edge routing"
+            onChange={event => onEdgeRoutingChange?.(event.target.value)}
+          >
+            <option value={EDGE_ROUTING.straight}>Straight</option>
+            <option value={EDGE_ROUTING.bezier}>Curved</option>
+          </NativeSelect>
+        </Field>
+        {isCurvedRouting && (
           <RangeControl
             label="Curve Amount"
             value={globalSettings.edgeCurvature}
             min="0"
             max="120"
             step="5"
-            disabled={!curveAmountEnabled}
-            help={
-              <InfoHelp
-                label="Curve Amount help"
-                text="Only affects Curved edge routing"
-              />
-            }
             onChange={edgeCurvature => onUpdateGlobal({ edgeCurvature })}
           />
-          <RangeControl
-            label="Node size"
-            value={globalSettings.nodeSize ?? 22}
-            min="12"
-            max="44"
-            step="1"
-            onChange={nodeSize => onUpdateGlobal({ nodeSize })}
-          />
-          <NumberControl
-            label="Node Label Size"
-            value={
-              globalSettings.nodeLabelFontSize ??
-              getDefaultNodeLabelFontSize(globalSettings.nodeSize)
-            }
-            min={NODE_LABEL_FONT_SIZE_RANGE.min}
-            max={NODE_LABEL_FONT_SIZE_RANGE.max}
-            step="1"
-            testId="node-label-font-size-input"
-            onChange={nodeLabelFontSize =>
-              onUpdateGlobal({ nodeLabelFontSize })
-            }
-          />
-          <RangeControl
-            label="Edge width"
-            value={globalSettings.edgeWidth ?? 2.2}
-            min="1"
-            max="8"
-            step="0.2"
-            onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
-          />
-          <NumberControl
-            label="Edge Label Size"
-            value={
-              globalSettings.edgeLabelFontSize ??
-              getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
-            }
-            min={EDGE_LABEL_FONT_SIZE_RANGE.min}
-            max={EDGE_LABEL_FONT_SIZE_RANGE.max}
-            step="1"
-            testId="edge-label-font-size-input"
-            onChange={edgeLabelFontSize =>
-              onUpdateGlobal({ edgeLabelFontSize })
-            }
-          />
-        </div>
-      </Section>
+        )}
+        <RangeControl
+          label="Node size"
+          value={globalSettings.nodeSize ?? 22}
+          min="12"
+          max="44"
+          step="1"
+          onChange={nodeSize => onUpdateGlobal({ nodeSize })}
+        />
+        <NumberControl
+          label="Node Label Size"
+          value={
+            globalSettings.nodeLabelFontSize ??
+            getDefaultNodeLabelFontSize(globalSettings.nodeSize)
+          }
+          min={NODE_LABEL_FONT_SIZE_RANGE.min}
+          max={NODE_LABEL_FONT_SIZE_RANGE.max}
+          step="1"
+          testId="node-label-font-size-input"
+          onChange={nodeLabelFontSize => onUpdateGlobal({ nodeLabelFontSize })}
+        />
+        <RangeControl
+          label="Edge width"
+          value={globalSettings.edgeWidth ?? 2.2}
+          min="1"
+          max="8"
+          step="0.2"
+          onChange={edgeWidth => onUpdateGlobal({ edgeWidth })}
+        />
+        <NumberControl
+          label="Edge Label Size"
+          value={
+            globalSettings.edgeLabelFontSize ??
+            getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
+          }
+          min={EDGE_LABEL_FONT_SIZE_RANGE.min}
+          max={EDGE_LABEL_FONT_SIZE_RANGE.max}
+          step="1"
+          testId="edge-label-font-size-input"
+          onChange={edgeLabelFontSize => onUpdateGlobal({ edgeLabelFontSize })}
+        />
+      </div>
       <div className="border border-[#D7DEE8] bg-[#FFFFFF] p-3 dark:border-[#475569] dark:bg-[#1E293B]">
         <div className="text-center text-xs text-[#475569] dark:text-[#CBD5E1]">
           Select a node or edge to open its inspector.
@@ -730,14 +822,21 @@ const PropertyPanel = ({
   multiSelection,
   globalSettings,
   edgeRouting,
+  nodeFrameOverrides,
+  edgeFrameOverrides,
   onUpdateNode,
   onUpdateEdge,
+  onResetNodeOverride,
+  onResetEdgeOverride,
+  onApplyNodeToAllFrames,
+  onApplyEdgeToAllFrames,
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
   onDeleteSelection,
   onClearSelection,
   onUpdateGlobal,
+  onEdgeRoutingChange,
 }) => {
   if (multiSelection.length > 1) {
     return (
@@ -755,7 +854,10 @@ const PropertyPanel = ({
       <NodeInspector
         selectedNode={selectedNode}
         connectedEdges={connectedEdges}
+        frameOverrides={nodeFrameOverrides}
         onUpdateNode={onUpdateNode}
+        onResetOverride={onResetNodeOverride}
+        onApplyToAllFrames={onApplyNodeToAllFrames}
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
@@ -768,7 +870,10 @@ const PropertyPanel = ({
       <EdgeInspector
         selectedEdge={selectedEdge}
         connectedNodes={connectedNodes}
+        frameOverrides={edgeFrameOverrides}
         onUpdateEdge={onUpdateEdge}
+        onResetOverride={onResetEdgeOverride}
+        onApplyToAllFrames={onApplyEdgeToAllFrames}
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
@@ -781,6 +886,7 @@ const PropertyPanel = ({
       globalSettings={globalSettings}
       edgeRouting={edgeRouting}
       onUpdateGlobal={onUpdateGlobal}
+      onEdgeRoutingChange={onEdgeRoutingChange}
     />
   );
 };
