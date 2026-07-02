@@ -218,16 +218,20 @@ const LeftSidebar = ({
   isLegendEditorOpen = false,
   onOpenScript,
   onApplyPreset,
+  currentFrame = 0,
   onCenterView,
   zoomPercent,
   onZoomIn,
   onZoomOut,
   onZoomCommit,
 }) => {
+  const frameNumber = currentFrame + 1;
+  const addNodeHelpText = `Click canvas to add a node from Frame ${frameNumber} onward.`;
+  const drawEdgeHelpText = `Connect nodes to add an edge from Frame ${frameNumber} onward.`;
   const drawHelpText =
     drawFrom !== null && drawFrom !== undefined
-      ? `Source node ${drawFrom} selected. Click a target node.`
-      : 'Click a source node, then a target node.';
+      ? `Source node ${drawFrom} selected. ${drawEdgeHelpText}`
+      : drawEdgeHelpText;
   const legendPosition = CUSTOM_LEGEND_POSITIONS.includes(customLegend.position)
     ? customLegend.position
     : DEFAULT_CUSTOM_LEGEND.position;
@@ -269,7 +273,7 @@ const LeftSidebar = ({
         </div>
         {mode === 'add' && (
           <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-            Click the canvas to add a node.
+            {addNodeHelpText}
           </p>
         )}
         {mode === 'draw' && (
