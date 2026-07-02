@@ -22,6 +22,10 @@ const detailLabelClass =
   'shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const detailControlLabelClass =
   'flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
+const scopeLabelClass =
+  'shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#B45309] dark:text-[#FBBF24]';
+const inlineActionButtonClass =
+  'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const frameCardBaseClass =
   'relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none dark:bg-[#1E293B] md:min-w-[128px]';
 const selectedFrameCardClass = 'border-[#0F2747] dark:border-[#60A5FA]';
@@ -72,6 +76,11 @@ const ChevronRightIcon = () => (
     <path d="M9 18l6-6-6-6" />
   </svg>
 );
+
+const ScopeLabel = ({ scope }) => {
+  if (!scope) return null;
+  return <span className={scopeLabelClass}>{scope}</span>;
+};
 
 const DurationInput = ({ durationMs, onCommit }) => {
   const normalizedDuration = Number.isFinite(Number(durationMs))
@@ -178,7 +187,9 @@ const TimelinePanel = ({
   captionEnabled,
   captionStyle,
   captionFontSize,
+  hasCaptionVisibleOverride,
   onCaptionEnabledChange,
+  onResetCaptionVisibleOverride,
   onCaptionStyleChange,
   onCaptionFontSizeChange,
   onAddStep,
@@ -210,6 +221,10 @@ const TimelinePanel = ({
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
           </div>
+          <div className="basis-full text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8] lg:basis-auto">
+            Frame edits affect current frame unless marked Project-wide. New
+            nodes/edges appear from this frame onward.
+          </div>
           <button
             type="button"
             className={playbackButtonClass}
@@ -240,7 +255,7 @@ const TimelinePanel = ({
             type="button"
             className={addButtonClass}
             onClick={onAddStep}
-            title="Create the next keyframe from the current visual state"
+            title="+ Keyframe creates a new frame from the current visual state"
           >
             + Keyframe
           </button>
@@ -248,7 +263,7 @@ const TimelinePanel = ({
             type="button"
             className={toolbarButtonClass}
             onClick={onDuplicateStep}
-            title="Create an exact copy of the current keyframe"
+            title="Duplicate copies this frame exactly, including overrides"
           >
             Duplicate
           </button>
@@ -372,7 +387,10 @@ const TimelinePanel = ({
       >
         <div className="grid min-w-0 gap-2">
           <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[116px_minmax(0,1fr)] sm:items-center sm:gap-3">
-            <span className={detailLabelClass}>Description</span>
+            <span className="flex items-center gap-2">
+              <span className={detailLabelClass}>Description</span>
+              <ScopeLabel scope="Current frame" />
+            </span>
             <input
               aria-label="Frame Description"
               value={steps[currentFrame]?.description ?? ''}
@@ -392,6 +410,7 @@ const TimelinePanel = ({
               <div className="flex shrink-0 items-center gap-2">
                 <label className={detailControlLabelClass}>
                   <span>Duration</span>
+                  <ScopeLabel scope="Current frame" />
                   <DurationInput
                     key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
                     durationMs={steps[currentFrame]?.durationMs ?? 600}
@@ -415,9 +434,25 @@ const TimelinePanel = ({
                     type="checkbox"
                   />
                   <span>Show caption</span>
+                  <ScopeLabel scope="Current frame" />
                 </label>
+                {hasCaptionVisibleOverride && (
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-[10px] font-semibold text-[#B45309] dark:text-[#FBBF24]">
+                      Current frame override
+                    </span>
+                    <button
+                      type="button"
+                      className={inlineActionButtonClass}
+                      onClick={onResetCaptionVisibleOverride}
+                    >
+                      Reset override
+                    </button>
+                  </span>
+                )}
                 <label className={detailControlLabelClass}>
                   <span>Style</span>
+                  <ScopeLabel scope="Project-wide" />
                   <NativeSelect
                     aria-label="Caption Style"
                     data-testid="caption-style-select"
@@ -437,6 +472,7 @@ const TimelinePanel = ({
                 </label>
                 <label className={detailControlLabelClass}>
                   <span>Caption Font Size</span>
+                  <ScopeLabel scope="Project-wide" />
                   <CaptionFontSizeInput
                     key={captionFontSize}
                     value={captionFontSize}

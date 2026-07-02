@@ -7,6 +7,12 @@ import {
   snapToGrid,
   treeLayout,
 } from '../graphStudioUtils';
+import {
+  applyFrameOverride,
+  applyPropertyToAllFrames,
+  applyTemporalVisibilityFromFrame,
+  removeFrameOverrideProperties,
+} from '../lib/temporalGraphState';
 
 const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
   nextNodeIdRef.current =
@@ -93,6 +99,38 @@ export const useGraphStudioGraphModel = ({
     [currentFrame, updateStep]
   );
 
+  const setFrameOverride = useCallback(
+    (objectType, objectId, patch) => {
+      updateStep(currentFrame, step =>
+        applyFrameOverride(step, objectType, objectId, patch)
+      );
+    },
+    [currentFrame, updateStep]
+  );
+
+  const resetFrameOverride = useCallback(
+    (objectType, objectId, keys) => {
+      updateStep(currentFrame, step =>
+        removeFrameOverrideProperties(step, objectType, objectId, keys)
+      );
+    },
+    [currentFrame, updateStep]
+  );
+
+  const applyTemporalPropertyToAllFrames = useCallback(
+    (objectType, objectId, patch) => {
+      const next = applyPropertyToAllFrames({
+        baseGraph,
+        steps,
+        objectType,
+        objectId,
+        patch,
+      });
+      replaceTimeline(next.baseGraph, next.steps, currentFrame);
+    },
+    [baseGraph, currentFrame, replaceTimeline, steps]
+  );
+
   const addNodeAt = useCallback(
     point => {
       const id = nextNodeIdRef.current;
@@ -101,10 +139,10 @@ export const useGraphStudioGraphModel = ({
         x: snapEnabled ? snapToGrid(point.x) : point.x,
         y: snapEnabled ? snapToGrid(point.y) : point.y,
       });
-      setBaseGraph(prev => ({
-        ...prev,
+      const nextBaseGraph = {
+        ...baseGraph,
         nodes: [
-          ...prev.nodes,
+          ...baseGraph.nodes,
           {
             id,
             label: String(id),
@@ -113,17 +151,27 @@ export const useGraphStudioGraphModel = ({
             visible: true,
           },
         ],
-      }));
+      };
+      const nextSteps = applyTemporalVisibilityFromFrame(
+        steps,
+        'node',
+        id,
+        currentFrame
+      );
+      replaceTimeline(nextBaseGraph, nextSteps, currentFrame);
       setSelectedObject({ type: 'node', id });
       setSelectedNodeIds([String(id)]);
-      setStatus(`Node ${id} added`);
+      setStatus(`Node ${id} added from Frame ${currentFrame + 1} onward`);
     },
     [
-      setBaseGraph,
+      baseGraph,
+      currentFrame,
+      replaceTimeline,
       setSelectedNodeIds,
       setSelectedObject,
       setStatus,
       snapEnabled,
+      steps,
     ]
   );
 
@@ -135,10 +183,10 @@ export const useGraphStudioGraphModel = ({
     (from, to) => {
       const id = `e${nextEdgeIdRef.current}`;
       nextEdgeIdRef.current += 1;
-      setBaseGraph(prev => ({
-        ...prev,
+      const nextBaseGraph = {
+        ...baseGraph,
         edges: [
-          ...prev.edges,
+          ...baseGraph.edges,
           {
             id,
             from,
@@ -150,12 +198,30 @@ export const useGraphStudioGraphModel = ({
             visible: true,
           },
         ],
-      }));
+      };
+      const nextSteps = applyTemporalVisibilityFromFrame(
+        steps,
+        'edge',
+        id,
+        currentFrame
+      );
+      replaceTimeline(nextBaseGraph, nextSteps, currentFrame);
       setSelectedNodeIds([]);
       setSelectedObject({ type: 'edge', id });
-      setStatus(`Edge ${from} → ${to} added`);
+      setStatus(
+        `Edge ${from} → ${to} added from Frame ${currentFrame + 1} onward`
+      );
+      return id;
     },
-    [setBaseGraph, setSelectedNodeIds, setSelectedObject, setStatus]
+    [
+      baseGraph,
+      currentFrame,
+      replaceTimeline,
+      setSelectedNodeIds,
+      setSelectedObject,
+      setStatus,
+      steps,
+    ]
   );
 
   const deleteSelection = useCallback(() => {
@@ -188,7 +254,7 @@ export const useGraphStudioGraphModel = ({
       replaceTimeline(nextBaseGraph, nextSteps);
       setSelectedNodeIds([]);
       setSelectedObject(null);
-      setStatus('Selection deleted');
+      setStatus('Selection deleted from project');
       return;
     }
     if (selectedEdge) {
@@ -205,7 +271,7 @@ export const useGraphStudioGraphModel = ({
       });
       replaceTimeline(nextBaseGraph, nextSteps);
       setSelectedObject(null);
-      setStatus(`Edge ${selectedEdge.id} deleted`);
+      setStatus(`Edge ${selectedEdge.id} deleted from project`);
     }
   }, [
     baseGraph,
@@ -246,6 +312,9 @@ export const useGraphStudioGraphModel = ({
     updateBaseNodesBulk,
     updateBaseEdge,
     setStepProperty,
+    setFrameOverride,
+    resetFrameOverride,
+    applyTemporalPropertyToAllFrames,
     addNodeAt,
     addNode,
     addEdge,

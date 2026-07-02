@@ -23,6 +23,12 @@ const sectionTitleClass =
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+const scopeLabelClass =
+  'shrink-0 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#B45309] dark:text-[#FBBF24]';
+const overrideIndicatorClass =
+  'text-[10px] font-semibold text-[#B45309] dark:text-[#FBBF24]';
+const inlineActionButtonClass =
+  'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const compactNumberInputClass =
   'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const inputClass =
@@ -45,6 +51,41 @@ const TOOLTIP_GUTTER = 12;
 const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
+
+const ScopeLabel = ({ scope }) => {
+  if (!scope) return null;
+  return <span className={scopeLabelClass}>{scope}</span>;
+};
+
+const FieldMeta = ({ hasOverride, onResetOverride, onApplyToAll }) => {
+  if (!hasOverride && !onApplyToAll) return null;
+
+  return (
+    <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1">
+      {hasOverride && (
+        <span className={overrideIndicatorClass}>Current frame override</span>
+      )}
+      {hasOverride && onResetOverride && (
+        <button
+          type="button"
+          className={inlineActionButtonClass}
+          onClick={onResetOverride}
+        >
+          Reset override
+        </button>
+      )}
+      {onApplyToAll && (
+        <button
+          type="button"
+          className={inlineActionButtonClass}
+          onClick={onApplyToAll}
+        >
+          Apply to all frames
+        </button>
+      )}
+    </div>
+  );
+};
 
 const ClearSelectionButton = ({ label, onClick }) => {
   if (!onClick) return null;
@@ -186,11 +227,26 @@ const Section = ({ title, help, children }) => (
   </section>
 );
 
-const Field = ({ label, children }) => (
-  <label className="block space-y-1.5">
-    <span className={fieldLabelClass}>{label}</span>
+const Field = ({
+  label,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  children,
+}) => (
+  <div className="block space-y-1.5">
+    <div className="flex items-center justify-between gap-2">
+      <span className={fieldLabelClass}>{label}</span>
+      <ScopeLabel scope={scope} />
+    </div>
     {children}
-  </label>
+    <FieldMeta
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
+    />
+  </div>
 );
 
 const TextInput = ({ value, onChange, placeholder }) => (
@@ -202,8 +258,24 @@ const TextInput = ({ value, onChange, placeholder }) => (
   />
 );
 
-const ColorField = ({ label, value, fallback, placeholder, onChange }) => (
-  <Field label={label}>
+const ColorField = ({
+  label,
+  value,
+  fallback,
+  placeholder,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+}) => (
+  <Field
+    label={label}
+    scope={scope}
+    hasOverride={hasOverride}
+    onResetOverride={onResetOverride}
+    onApplyToAll={onApplyToAll}
+  >
     <div className="flex items-center gap-2">
       <input
         type="color"
@@ -216,16 +288,34 @@ const ColorField = ({ label, value, fallback, placeholder, onChange }) => (
   </Field>
 );
 
-const ToggleRow = ({ label, checked, onChange }) => (
-  <label className={toggleRowClass}>
-    <span className={fieldLabelClass}>{label}</span>
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={event => onChange(event.target.checked)}
-      className={checkboxClass}
+const ToggleRow = ({
+  label,
+  checked,
+  scope,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+}) => (
+  <div className="space-y-1">
+    <label className={toggleRowClass}>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className={fieldLabelClass}>{label}</span>
+        <ScopeLabel scope={scope} />
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={event => onChange(event.target.checked)}
+        className={checkboxClass}
+      />
+    </label>
+    <FieldMeta
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
     />
-  </label>
+  </div>
 );
 
 const ActionButton = ({ children, className, ...props }) => (
@@ -253,6 +343,7 @@ const RangeControl = ({
   onChange,
   disabled = false,
   help,
+  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -299,6 +390,7 @@ const RangeControl = ({
           <span id={labelId} className={`${fieldLabelClass} truncate`}>
             {label}
           </span>
+          <ScopeLabel scope={scope} />
           {help}
         </span>
         <input
@@ -356,6 +448,7 @@ const NumberControl = ({
   onChange,
   suffix,
   testId,
+  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -397,8 +490,11 @@ const NumberControl = ({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-      <span id={labelId} className={`${fieldLabelClass} truncate`}>
-        {label}
+      <span className="flex min-w-0 items-center gap-2">
+        <span id={labelId} className={`${fieldLabelClass} truncate`}>
+          {label}
+        </span>
+        <ScopeLabel scope={scope} />
       </span>
       <span className="flex items-center gap-1">
         <input
@@ -490,7 +586,9 @@ const MultiSelectionPanel = ({
         <ActionButton onClick={() => onApplyToSelection({ color: '#22c55e' })}>
           Color green
         </ActionButton>
-        <DeleteButton onClick={onDeleteSelection}>Delete selected</DeleteButton>
+        <DeleteButton onClick={onDeleteSelection}>
+          Delete from project
+        </DeleteButton>
       </div>
     </Section>
   </PanelShell>
@@ -499,12 +597,17 @@ const MultiSelectionPanel = ({
 const NodeInspector = ({
   selectedNode,
   connectedEdges,
+  frameOverrides = {},
   onUpdateNode,
+  onResetOverride,
+  onApplyToAllFrames,
   onSelectEdge,
   onDeleteSelection,
   onClearSelection,
 }) => {
   const nodeColor = selectedNode.color ?? '';
+  const nodeStatus = String(selectedNode.status ?? 'default');
+  const nodeVisible = selectedNode.visible !== false;
 
   return (
     <PanelShell
@@ -519,15 +622,26 @@ const NodeInspector = ({
     >
       <Section title="Node Details">
         <div className="space-y-4">
-          <Field label="Label">
+          <Field label="Label" scope="All frames">
             <TextInput
               value={selectedNode.label ?? ''}
               onChange={value => onUpdateNode({ label: value })}
             />
           </Field>
-          <Field label="Status">
+          <Field label="Position" scope="All frames">
+            <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
+              X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
+            </div>
+          </Field>
+          <Field
+            label="Status / Style"
+            scope="Current frame"
+            hasOverride={frameOverrides.status}
+            onResetOverride={() => onResetOverride?.('status')}
+            onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
+          >
             <NativeSelect
-              value={String(selectedNode.status ?? 'default')}
+              value={nodeStatus}
               onChange={event => onUpdateNode({ status: event.target.value })}
             >
               {NODE_STATUS_OPTIONS.map(([value, label]) => (
@@ -538,11 +652,24 @@ const NodeInspector = ({
             </NativeSelect>
           </Field>
           <ColorField
-            label="Highlight color"
+            label="Color"
             value={nodeColor}
             fallback="#3b82f6"
             placeholder="#22c55e or blank"
+            scope="Current frame"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
             onChange={value => onUpdateNode({ color: value })}
+          />
+          <ToggleRow
+            label="Visible"
+            checked={nodeVisible}
+            scope="Current frame"
+            hasOverride={frameOverrides.visible}
+            onResetOverride={() => onResetOverride?.('visible')}
+            onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
+            onChange={checked => onUpdateNode({ visible: checked })}
           />
         </div>
       </Section>
@@ -565,7 +692,9 @@ const NodeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>Delete node</DeleteButton>
+      <DeleteButton onClick={onDeleteSelection}>
+        Delete from project
+      </DeleteButton>
     </PanelShell>
   );
 };
@@ -573,12 +702,16 @@ const NodeInspector = ({
 const EdgeInspector = ({
   selectedEdge,
   connectedNodes,
+  frameOverrides = {},
   onUpdateEdge,
+  onResetOverride,
+  onApplyToAllFrames,
   onSelectNode,
   onDeleteSelection,
   onClearSelection,
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
+  const edgeVisible = selectedEdge.visible !== false;
 
   return (
     <PanelShell
@@ -593,7 +726,7 @@ const EdgeInspector = ({
     >
       <Section title="Edge Details">
         <div className="space-y-4">
-          <Field label="Weight / Label">
+          <Field label="Weight / Label" scope="All frames">
             <TextInput
               value={selectedEdge.label ?? ''}
               onChange={value => onUpdateEdge({ label: value })}
@@ -603,14 +736,28 @@ const EdgeInspector = ({
           <ToggleRow
             label="Directed"
             checked={Boolean(selectedEdge.directed)}
+            scope="All frames"
             onChange={checked => onUpdateEdge({ directed: checked })}
           />
           <ColorField
-            label="Highlight color"
+            label="Color"
             value={edgeColor}
             fallback="#64748b"
             placeholder="#64748b"
+            scope="Current frame"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
             onChange={value => onUpdateEdge({ color: value })}
+          />
+          <ToggleRow
+            label="Visible"
+            checked={edgeVisible}
+            scope="Current frame"
+            hasOverride={frameOverrides.visible}
+            onResetOverride={() => onResetOverride?.('visible')}
+            onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
+            onChange={checked => onUpdateEdge({ visible: checked })}
           />
         </div>
       </Section>
@@ -628,7 +775,9 @@ const EdgeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>Delete edge</DeleteButton>
+      <DeleteButton onClick={onDeleteSelection}>
+        Delete from project
+      </DeleteButton>
     </PanelShell>
   );
 };
@@ -644,8 +793,14 @@ const GlobalSettingsPanel = ({
     <PanelShell title="Canvas Inspector" inspectorType="canvas">
       <Section title="Canvas Settings">
         <div className="space-y-3">
+          <Field label="Routing" scope="Project-wide">
+            <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
+              {edgeRouting === EDGE_ROUTING.bezier ? 'Curved' : 'Straight'}
+            </div>
+          </Field>
           <RangeControl
             label="Gravity (force)"
+            scope="Project-wide"
             value={globalSettings.forceStrength}
             min="0.2"
             max="2"
@@ -654,6 +809,7 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Curve Amount"
+            scope="Project-wide"
             value={globalSettings.edgeCurvature}
             min="0"
             max="120"
@@ -669,6 +825,7 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Node size"
+            scope="Project-wide"
             value={globalSettings.nodeSize ?? 22}
             min="12"
             max="44"
@@ -677,6 +834,7 @@ const GlobalSettingsPanel = ({
           />
           <NumberControl
             label="Node Label Size"
+            scope="Project-wide"
             value={
               globalSettings.nodeLabelFontSize ??
               getDefaultNodeLabelFontSize(globalSettings.nodeSize)
@@ -691,6 +849,7 @@ const GlobalSettingsPanel = ({
           />
           <RangeControl
             label="Edge width"
+            scope="Project-wide"
             value={globalSettings.edgeWidth ?? 2.2}
             min="1"
             max="8"
@@ -699,6 +858,7 @@ const GlobalSettingsPanel = ({
           />
           <NumberControl
             label="Edge Label Size"
+            scope="Project-wide"
             value={
               globalSettings.edgeLabelFontSize ??
               getDefaultEdgeLabelFontSize(globalSettings.edgeWidth)
@@ -730,8 +890,14 @@ const PropertyPanel = ({
   multiSelection,
   globalSettings,
   edgeRouting,
+  nodeFrameOverrides,
+  edgeFrameOverrides,
   onUpdateNode,
   onUpdateEdge,
+  onResetNodeOverride,
+  onResetEdgeOverride,
+  onApplyNodeToAllFrames,
+  onApplyEdgeToAllFrames,
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
@@ -755,7 +921,10 @@ const PropertyPanel = ({
       <NodeInspector
         selectedNode={selectedNode}
         connectedEdges={connectedEdges}
+        frameOverrides={nodeFrameOverrides}
         onUpdateNode={onUpdateNode}
+        onResetOverride={onResetNodeOverride}
+        onApplyToAllFrames={onApplyNodeToAllFrames}
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
@@ -768,7 +937,10 @@ const PropertyPanel = ({
       <EdgeInspector
         selectedEdge={selectedEdge}
         connectedNodes={connectedNodes}
+        frameOverrides={edgeFrameOverrides}
         onUpdateEdge={onUpdateEdge}
+        onResetOverride={onResetEdgeOverride}
+        onApplyToAllFrames={onApplyEdgeToAllFrames}
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}

@@ -77,7 +77,6 @@ export const useGraphStudioCanvasHandlers = ({
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
-      setStatus(`Edge ${drawFrom} → ${nodeId} added`);
     },
     [addEdge, clearSelection, drawFrom, setStatus]
   );
