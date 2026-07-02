@@ -470,7 +470,7 @@ const TimelinePanel = ({
         data-testid="frame-description-row"
       >
         <div className="grid min-w-0 gap-1.5">
-          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[116px_minmax(0,1fr)] sm:items-center sm:gap-3">
+          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <span className={detailLabelClass}>Description</span>
             <input
               aria-label="Frame Description"
@@ -483,19 +483,16 @@ const TimelinePanel = ({
             />
           </label>
           <div
-            className="grid min-w-0 grid-cols-1 gap-1.5 lg:grid-cols-[116px_minmax(0,1fr)] lg:items-center lg:gap-3"
+            className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3"
             data-testid="frame-detail-controls"
           >
-            <div className={detailLabelClass}>Timing</div>
+            <div className={detailLabelClass}>Duration</div>
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-              <label className={detailControlLabelClass}>
-                <span>Duration</span>
-                <DurationInput
-                  key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
-                  durationMs={steps[currentFrame]?.durationMs ?? 600}
-                  onCommit={value => onStepDurationChange(currentFrame, value)}
-                />
-              </label>
+              <DurationInput
+                key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
+                durationMs={steps[currentFrame]?.durationMs ?? 600}
+                onCommit={value => onStepDurationChange(currentFrame, value)}
+              />
               <div className="hidden h-5 w-px bg-[#D7DEE8] dark:bg-[#334155] sm:block" />
               <div className="flex min-w-0 items-center gap-1.5">
                 <span className={detailLabelClass}>Caption</span>

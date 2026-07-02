@@ -1137,10 +1137,17 @@ while (true) {}
 
     const descriptionRow = page.getByTestId('frame-description-row');
     const detailControls = page.getByTestId('frame-detail-controls');
-    await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    const descriptionLabel = descriptionRow.getByText('Description', {
+      exact: true,
+    });
+    const durationLabel = detailControls.getByText('Duration', {
+      exact: true,
+    });
+    await expect(descriptionLabel).toBeVisible();
+    await expect(durationLabel).toBeVisible();
     await expect(
       detailControls.getByText('Timing', { exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       detailControls.getByText('Caption', { exact: true })
     ).toBeVisible();
@@ -1164,14 +1171,28 @@ while (true) {}
     );
     const descriptionBox = await descriptionRow.boundingBox();
     const detailControlsBox = await detailControls.boundingBox();
+    const descriptionLabelBox = await descriptionLabel.boundingBox();
+    const durationLabelBox = await durationLabel.boundingBox();
+    const frameDescriptionBox = await frameDescription.boundingBox();
+    const durationInputBox = await durationInput.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
     const canvasLayoutBox = await graphCanvas(page).boundingBox();
     const visibleFrameBox = await cards.first().boundingBox();
     expect(descriptionBox).not.toBeNull();
     expect(detailControlsBox).not.toBeNull();
+    expect(descriptionLabelBox).not.toBeNull();
+    expect(durationLabelBox).not.toBeNull();
+    expect(frameDescriptionBox).not.toBeNull();
+    expect(durationInputBox).not.toBeNull();
     expect(timelineBox).not.toBeNull();
     expect(canvasLayoutBox).not.toBeNull();
     expect(visibleFrameBox).not.toBeNull();
+    expect(
+      Math.abs(durationLabelBox.x - descriptionLabelBox.x)
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(durationInputBox.x - frameDescriptionBox.x)
+    ).toBeLessThanOrEqual(1);
 
     const expectBoxInsideTimeline = box => {
       expect(box).not.toBeNull();
