@@ -18,13 +18,19 @@ const NODE_STATUS_OPTIONS = [
 
 const panelClass =
   'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
+const panelEyebrowClass =
+  'font-manrope text-[10px] font-bold uppercase tracking-[0.16em] text-[#64748B] dark:text-[#94A3B8]';
+const panelContextClass =
+  'font-manrope text-sm font-bold text-[#0F2747] dark:text-[#F8FAFC]';
 const sectionTitleClass =
-  'font-manrope text-[11px] font-bold uppercase tracking-[0.14em] text-[#0F2747] dark:text-[#F8FAFC]';
+  'font-manrope text-xs font-bold text-[#0F2747] dark:text-[#F8FAFC]';
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
 const scopeLabelClass =
-  'shrink-0 border border-[#D7DEE8] bg-[#FFFFFF] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:border-[#475569] dark:bg-[#111827] dark:text-[#CBD5E1]';
+  'inline-flex shrink-0 items-center rounded-sm bg-[#EEF2F6] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:bg-[#1E293B] dark:text-[#94A3B8]';
+const sectionScopeLabelClass =
+  'shrink-0 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:text-[#94A3B8]';
 const overrideIndicatorClass =
   'text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]';
 const inlineActionButtonClass =
@@ -52,9 +58,17 @@ const TOOLTIP_OFFSET = 6;
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const ScopeLabel = ({ scope }) => {
+const ScopeLabel = ({ scope, variant = 'field' }) => {
   if (!scope) return null;
-  return <span className={scopeLabelClass}>{scope}</span>;
+  return (
+    <span
+      className={
+        variant === 'section' ? sectionScopeLabelClass : scopeLabelClass
+      }
+    >
+      {scope}
+    </span>
+  );
 };
 
 const FieldMeta = ({ hasOverride, onResetOverride, onApplyToAll }) => {
@@ -203,14 +217,17 @@ const InfoHelp = ({ label, text }) => {
   );
 };
 
-const PanelShell = ({ title, inspectorType, headerAction, children }) => (
+const PanelShell = ({ contextTitle, inspectorType, headerAction, children }) => (
   <div
     className={panelClass}
     data-testid="property-panel"
     data-inspector-type={inspectorType}
   >
-    <div className="flex items-center justify-between gap-3 border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
-      <div className={sectionTitleClass}>{title}</div>
+    <div className="flex items-start justify-between gap-3 border-b border-[#D7DEE8] pb-3 dark:border-[#334155]">
+      <div className="min-w-0 space-y-1">
+        <div className={panelEyebrowClass}>INSPECTOR</div>
+        <div className={panelContextClass}>{contextTitle}</div>
+      </div>
       {headerAction}
     </div>
     {children}
@@ -218,10 +235,10 @@ const PanelShell = ({ title, inspectorType, headerAction, children }) => (
 );
 
 const Section = ({ title, scope, help, children }) => (
-  <section className="space-y-3 border-b border-[#D7DEE8] pb-5 last:border-b-0 dark:border-[#334155]">
-    <div className="flex items-center gap-2">
+  <section className="space-y-3">
+    <div className="flex items-baseline gap-2">
       <div className={sectionTitleClass}>{title}</div>
-      <ScopeLabel scope={scope} />
+      <ScopeLabel scope={scope} variant="section" />
       {help}
     </div>
     {children}
@@ -572,7 +589,7 @@ const MultiSelectionPanel = ({
   onClearSelection,
 }) => (
   <PanelShell
-    title="Selection Inspector"
+    contextTitle="Selection"
     inspectorType="selection"
     headerAction={
       <ClearSelectionButton
@@ -581,7 +598,7 @@ const MultiSelectionPanel = ({
       />
     }
   >
-    <Section title="Selected Nodes">
+    <Section title="Selected nodes">
       <p className={bodyTextClass}>{selectedCount} items selected</p>
       <div className="space-y-2">
         <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
@@ -618,7 +635,7 @@ const NodeInspector = ({
 
   return (
     <PanelShell
-      title="Node Properties"
+      contextTitle="Node"
       inspectorType="node"
       headerAction={
         <ClearSelectionButton
@@ -627,7 +644,7 @@ const NodeInspector = ({
         />
       }
     >
-      <Section title="Node Details">
+      <Section title="Node properties">
         <div className="space-y-4">
           <Field label="Label" scope="All frames">
             <TextInput
@@ -682,7 +699,7 @@ const NodeInspector = ({
         </div>
       </Section>
 
-      <Section title="Connected Edges">
+      <Section title="Connected edges">
         <LinkedList
           items={connectedEdges}
           emptyLabel="No connected edges"
@@ -723,7 +740,7 @@ const EdgeInspector = ({
 
   return (
     <PanelShell
-      title="Edge Properties"
+      contextTitle="Edge"
       inspectorType="edge"
       headerAction={
         <ClearSelectionButton
@@ -732,7 +749,7 @@ const EdgeInspector = ({
         />
       }
     >
-      <Section title="Edge Details">
+      <Section title="Edge properties">
         <div className="space-y-4">
           <Field label="Weight / Label" scope="All frames">
             <TextInput
@@ -771,7 +788,7 @@ const EdgeInspector = ({
         </div>
       </Section>
 
-      <Section title="Connected Nodes">
+      <Section title="Connected nodes">
         <LinkedList
           items={connectedNodes}
           emptyLabel="No connected nodes"
@@ -799,8 +816,8 @@ const GlobalSettingsPanel = ({
   const curveAmountEnabled = edgeRouting === EDGE_ROUTING.bezier;
 
   return (
-    <PanelShell title="Canvas Inspector" inspectorType="canvas">
-      <Section title="Canvas Settings" scope="Project-wide">
+    <PanelShell contextTitle="Canvas" inspectorType="canvas">
+      <Section title="Canvas settings" scope="Project-wide">
         <div className="space-y-3">
           <Field label="Routing">
             <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">

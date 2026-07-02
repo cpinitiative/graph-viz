@@ -559,8 +559,13 @@ test.describe('Graph Studio desktop smoke', () => {
     for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
-    await expect(page.getByText('Canvas Settings')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('INSPECTOR', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Canvas settings')).toBeVisible();
     await expect(page.getByText('Timeline')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
@@ -782,16 +787,22 @@ test.describe('Graph Studio desktop smoke', () => {
       await choosePreset(page, preset);
     }
 
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
     await graphNodes.first().click();
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Node properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first()
       .click();
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
-    await expect(page.getByText('Canvas Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Canvas', { exact: true })
+    ).toBeVisible();
 
     await choosePreset(page, 'bfs');
     const frameCounter = page.getByTestId('timeline-frame-counter');
@@ -2027,7 +2038,7 @@ while (true) {}
       'data-inspector-type',
       'node'
     );
-    await expect(page.getByText('Node Properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Node properties')).toBeVisible();
     await expect(selectionRing).toBeVisible();
     await expect(selectionRing).toHaveAttribute('stroke', '#2F6FD6');
     await expect(selectionRing).toHaveAttribute('r', '25');
@@ -2070,7 +2081,7 @@ while (true) {}
       'data-inspector-type',
       'edge'
     );
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
     await expect(
       page.getByText('Weight/direction: all frames · Color: current frame')
     ).toHaveCount(0);
@@ -2079,7 +2090,9 @@ while (true) {}
       'data-inspector-type',
       'canvas'
     );
-    await expect(page.getByText('Edge Properties')).toHaveCount(0);
+    await expect(propertyPanel(page).getByText('Edge properties')).toHaveCount(
+      0
+    );
     await firstNode.click();
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
@@ -2109,7 +2122,10 @@ while (true) {}
       'data-inspector-type',
       'selection'
     );
-    await expect(page.getByText('Selection Inspector')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Selection', { exact: true })
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText('Selected nodes')).toBeVisible();
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id]')
     ).toHaveCount(0);
@@ -3288,7 +3304,7 @@ api.edge('loop', '#3b82f6');
       .locator('path[stroke="rgba(0,0,0,0)"]')
       .first();
     await edgeHitTarget.dispatchEvent('click');
-    await expect(page.getByText('Edge Properties')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Edge properties')).toBeVisible();
 
     await openExportMenu(page);
     const svgDownload = await expectDownloadFrom({
@@ -3362,7 +3378,9 @@ api.edge('loop', '#3b82f6');
       await graphCanvas(page)
         .locator(`[data-edge-hit-target-id="${edgeId}"]`)
         .dispatchEvent('click');
-      await expect(page.getByText('Edge Properties')).toBeVisible();
+      await expect(
+        propertyPanel(page).getByText('Edge properties')
+      ).toBeVisible();
       await expect(
         graphCanvas(page).locator(`[data-edge-arrowhead-id="${edgeId}"]`)
       ).toBeVisible();
