@@ -2571,7 +2571,7 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
-  test('derives edge visibility from hidden endpoint nodes', async ({
+  test('derives edge visibility from not-shown endpoint nodes', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -2607,7 +2607,7 @@ while (true) {}
       .setInputFiles(fixturePath('effective-edge-visibility.graphviz.json'));
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
-    await expect(page.getByText('Node B hidden')).toBeVisible();
+    await expect(page.getByText('Node B not shown')).toBeVisible();
 
     await expect(
       graphCanvas(page).locator('[data-node-label-id="B"]')
@@ -2688,8 +2688,39 @@ while (true) {}
     await page.getByText('Frame 1', { exact: true }).click();
     await expect(edgeParts('eAB')).toHaveCount(0);
     await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(
+        'Edge eAB is not shown because Node B is not shown on this frame'
+      )
+    ).toBeVisible();
+    await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
+      0
+    );
+
+    await propertyPanel(page).getByTestId('inspector-clear-selection').click();
+    await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
+    const recoveryAffordance = page.getByTestId('presence-recovery-affordance');
+    await expect(
+      recoveryAffordance.getByText('1 object not shown this frame')
+    ).toBeVisible();
+    await recoveryAffordance
+      .getByRole('button', { name: /1 object not shown this frame/i })
+      .click();
+    await expect(recoveryAffordance.getByText('Node B')).toBeVisible();
+    await recoveryAffordance.getByRole('button', { name: 'Show here' }).click();
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="B"]')
+    ).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="eAB"]')
+    ).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="eBC"]')
+    ).toHaveCount(1);
 
     expect(errors).toEqual([]);
   });

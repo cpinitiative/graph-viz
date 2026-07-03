@@ -3,11 +3,11 @@ import {
   chooseBestLabelPosition,
   insetSegment,
   measureLabelRect,
-} from '../graphCanvasUtils';
+} from '../graphCanvasUtils.js';
 import {
   getVisibleNodes,
   isEdgeEffectivelyVisible,
-} from './effectiveVisibility';
+} from './effectiveVisibility.js';
 
 const compareStableStrings = (left, right) => {
   if (left === right) return 0;

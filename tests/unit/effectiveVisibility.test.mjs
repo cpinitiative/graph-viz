@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  EDGE_ROUTING,
+  NODE_RADIUS,
+} from '../../src/components/visualizers/Graphs/graphStudio/constants.js';
+import { getEdgeRenderData } from '../../src/components/visualizers/Graphs/graphStudio/lib/edgeRenderData.js';
+import {
   isEdgeEffectivelyVisible,
   isNodeVisible,
 } from '../../src/components/visualizers/Graphs/graphStudio/lib/effectiveVisibility.js';
@@ -32,11 +37,11 @@ const edges = [
     visible: true,
   },
   {
-    id: 'eHidden',
+    id: 'eNotShown',
     from: 'A',
     to: 'C',
     directed: true,
-    label: 'hidden',
+    label: 'not shown',
     color: '#64748b',
     visible: false,
   },
@@ -55,7 +60,7 @@ test('effective edge visibility requires visible edge and visible endpoints', ()
   );
 });
 
-test('hidden source node hides incident edge effectively', () => {
+test('source node not shown removes incident edge effectively', () => {
   const graph = resolveFrameGraph(
     { nodes, edges },
     { nodeOverrides: { A: { visible: false } }, edgeOverrides: {} }
@@ -65,7 +70,7 @@ test('hidden source node hides incident edge effectively', () => {
   assert.equal(isEdgeEffectivelyVisible(graph.edges[1], nodeMap), false);
 });
 
-test('hidden target node hides incident edge effectively', () => {
+test('target node not shown removes incident edge effectively', () => {
   const graph = resolveFrameGraph(
     { nodes: nodes.map(node => ({ ...node, visible: true })), edges },
     { nodeOverrides: { C: { visible: false } }, edgeOverrides: {} }
@@ -75,7 +80,7 @@ test('hidden target node hides incident edge effectively', () => {
   assert.equal(isEdgeEffectivelyVisible(graph.edges[1], nodeMap), false);
 });
 
-test('explicitly hidden edge stays hidden when endpoints are visible', () => {
+test('explicitly not-shown edge stays not shown when endpoints are visible', () => {
   const visibleNodes = nodes.map(node => ({ ...node, visible: true }));
   const graph = resolveFrameGraph(
     { nodes: visibleNodes, edges },
@@ -86,10 +91,10 @@ test('explicitly hidden edge stays hidden when endpoints are visible', () => {
   assert.equal(isEdgeEffectivelyVisible(graph.edges[1], nodeMap), false);
 });
 
-test('edge reappears when endpoints are visible again and edge is not hidden', () => {
+test('edge reappears when endpoints are visible again and edge is shown', () => {
   const visibleNodes = nodes.map(node => ({ ...node, visible: true }));
   const baseGraph = { nodes: visibleNodes, edges };
-  const hiddenFrame = resolveFrameGraph(baseGraph, {
+  const notShownFrame = resolveFrameGraph(baseGraph, {
     nodeOverrides: { C: { visible: false } },
     edgeOverrides: {},
   });
@@ -97,15 +102,15 @@ test('edge reappears when endpoints are visible again and edge is not hidden', (
     nodeOverrides: {},
     edgeOverrides: {},
   });
-  const hiddenNodeMap = new Map(
-    hiddenFrame.nodes.map(node => [String(node.id), node])
+  const notShownNodeMap = new Map(
+    notShownFrame.nodes.map(node => [String(node.id), node])
   );
   const visibleNodeMap = new Map(
     visibleFrame.nodes.map(node => [String(node.id), node])
   );
 
   assert.equal(
-    isEdgeEffectivelyVisible(hiddenFrame.edges[1], hiddenNodeMap),
+    isEdgeEffectivelyVisible(notShownFrame.edges[1], notShownNodeMap),
     false
   );
   assert.equal(
@@ -125,4 +130,38 @@ test('effective edge visibility does not write derived edge overrides', () => {
   assert.equal(isEdgeEffectivelyVisible(graph.edges[0], nodeMap), false);
   assert.deepEqual(step.edgeOverrides, {});
   assert.equal(edges[0].visible, true);
+});
+
+test('explicitly shown edge still does not render if endpoint node is not shown', () => {
+  const visibleNodes = nodes.map(node => ({ ...node, visible: true }));
+  const step = {
+    nodeOverrides: { B: { visible: false } },
+    edgeOverrides: { eAB: { visible: true } },
+  };
+  const graph = resolveFrameGraph({ nodes: visibleNodes, edges }, step);
+  const nodeMap = new Map(graph.nodes.map(node => [String(node.id), node]));
+
+  assert.equal(isEdgeEffectivelyVisible(graph.edges[0], nodeMap), false);
+  assert.equal(step.edgeOverrides.eAB.visible, true);
+});
+
+test('edge render data omits incident edge when endpoint node is not shown', () => {
+  const graph = resolveFrameGraph(
+    { nodes: nodes.map(node => ({ ...node, visible: true })), edges },
+    { nodeOverrides: { B: { visible: false } }, edgeOverrides: {} }
+  );
+  const nodeMap = new Map(graph.nodes.map(node => [String(node.id), node]));
+  const renderData = getEdgeRenderData({
+    edges: graph.edges,
+    nodes: graph.nodes,
+    nodeMap,
+    edgeRouting: EDGE_ROUTING.straight,
+    edgeCurvature: 46,
+    nodeRadius: NODE_RADIUS,
+  });
+
+  assert.deepEqual(
+    renderData.map(item => item.edge.id),
+    ['eAC']
+  );
 });

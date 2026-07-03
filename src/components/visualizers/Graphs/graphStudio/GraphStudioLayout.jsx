@@ -45,6 +45,99 @@ const getStatusClassName = status => {
   return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
 };
 
+const recoveryShellClass =
+  'absolute right-3 top-3 z-30 w-80 max-w-[90%] border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
+const recoveryToggleClass =
+  'flex min-h-8 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#F8F9FA] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:text-[#E2E8F0] dark:hover:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA]';
+const recoveryActionClass =
+  'min-h-7 border border-[#CBD5E1] bg-[#FFFFFF] px-2 text-[10px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
+
+const getRecoverySignature = entries =>
+  (entries ?? [])
+    .map(entry => `${entry.type}:${entry.id}:${entry.note ?? ''}`)
+    .join('|');
+
+const PresenceRecoveryAffordance = ({ recovery }) => {
+  const entries = Array.isArray(recovery?.entries) ? recovery.entries : [];
+  const [expandedSignature, setExpandedSignature] = useState('');
+  const recoverySignature = getRecoverySignature(entries);
+
+  if (!entries.length) return null;
+
+  const expanded = expandedSignature === recoverySignature;
+  const objectLabel = entries.length === 1 ? 'object' : 'objects';
+
+  return (
+    <div
+      className={recoveryShellClass}
+      data-testid="presence-recovery-affordance"
+    >
+      <button
+        type="button"
+        className={recoveryToggleClass}
+        aria-expanded={expanded}
+        onClick={() =>
+          setExpandedSignature(prev =>
+            prev === recoverySignature ? '' : recoverySignature
+          )
+        }
+      >
+        <span>
+          {entries.length} {objectLabel} not shown this frame
+        </span>
+        <span aria-hidden="true" className="text-[#64748B] dark:text-[#94A3B8]">
+          {expanded ? 'Collapse' : 'Expand'}
+        </span>
+      </button>
+      {expanded && (
+        <div className="max-h-56 overflow-y-auto border-t border-[#D7DEE8] p-2 dark:border-[#334155]">
+          <div className="space-y-1.5">
+            {entries.map(entry => (
+              <div
+                key={`${entry.type}-${entry.id}`}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border border-[#E2E8F0] bg-[#F8F9FA] px-2 py-1.5 dark:border-[#334155] dark:bg-[#1E293B]"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+                    {entry.label}
+                  </div>
+                  {entry.note && (
+                    <div className="truncate text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+                      {entry.note}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    className={recoveryActionClass}
+                    onClick={() => {
+                      recovery?.onShowHere?.(entry.type, entry.id);
+                      setExpandedSignature('');
+                    }}
+                  >
+                    Show here
+                  </button>
+                  <button
+                    type="button"
+                    className={recoveryActionClass}
+                    onClick={() => {
+                      recovery?.onShowOnward?.(entry.type, entry.id);
+                      setExpandedSignature('');
+                    }}
+                  >
+                    Show onward
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MenuIcon = () => (
   <svg
     width="20"
@@ -124,9 +217,10 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   );
 };
 
-const CanvasStage = ({ canvas, status }) => (
+const CanvasStage = ({ canvas, status, presenceRecovery }) => (
   <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
     <GraphCanvas {...canvas} />
+    <PresenceRecoveryAffordance recovery={presenceRecovery} />
     {status && (
       <div
         className={getStatusClassName(status)}
@@ -231,6 +325,7 @@ const GraphStudioLayout = ({
   property,
   timeline,
   modals,
+  presenceRecovery,
   status,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -312,7 +407,11 @@ const GraphStudioLayout = ({
         )}
 
         <div className="relative min-h-0 flex-1">
-          <CanvasStage canvas={canvas} status={status} />
+          <CanvasStage
+            canvas={canvas}
+            presenceRecovery={presenceRecovery}
+            status={status}
+          />
         </div>
 
         <div className="min-h-[260px] flex-none border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
@@ -334,7 +433,11 @@ const GraphStudioLayout = ({
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel minSize="40%" defaultSize="60%">
-              <CanvasStage canvas={canvas} status={status} />
+              <CanvasStage
+                canvas={canvas}
+                presenceRecovery={presenceRecovery}
+                status={status}
+              />
             </Panel>
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel defaultSize="22%" minSize="16%" className={SIDE_PANEL_CLASS}>

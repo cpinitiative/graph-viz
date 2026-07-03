@@ -45,7 +45,7 @@
     "steps": [
       {
         "id": "step-hidden-node",
-        "description": "Node B hidden",
+        "description": "Node B not shown",
         "durationMs": 600,
         "nodeOverrides": {
           "B": { "visible": false }
@@ -54,7 +54,7 @@
       },
       {
         "id": "step-visible-node",
-        "description": "Node B visible again",
+        "description": "Node B shown again",
         "durationMs": 600,
         "nodeOverrides": {},
         "edgeOverrides": {

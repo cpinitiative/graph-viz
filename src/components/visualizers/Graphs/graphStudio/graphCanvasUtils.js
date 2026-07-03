@@ -3,7 +3,7 @@ import {
   NODE_RADIUS,
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
-} from './constants';
+} from './constants.js';
 
 const MIN_ZOOM_FLOOR = 0.1;
 const MAX_ZOOM = 2.6;
