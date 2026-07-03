@@ -728,14 +728,16 @@ test.describe('Graph Studio desktop smoke', () => {
             controlsInsideRow &&
             maxCenter - minCenter <= 3 &&
             boxes[0].width >= 60 &&
-            boxes[0].height <= 34 &&
+            boxes[0].height >= 35 &&
+            boxes[0].height <= 38 &&
             Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
-            boxes[2].width >= 55 &&
-            boxes[2].width <= 57 &&
+            boxes[1].width >= 35 &&
+            boxes[1].width <= 38 &&
+            boxes[2].width >= 63 &&
+            boxes[2].width <= 65 &&
             Math.abs(zoomFieldCenter - zoomValueCenter) <= 1 &&
-            rowLeftInset >= 7 &&
-            rowRightInset >= 7 &&
-            Math.abs(rowLeftInset - rowRightInset) <= 2
+            rowLeftInset <= 1 &&
+            rowRightInset <= 1
           );
         })
         .toBe(true);
