@@ -457,7 +457,7 @@ const LeftSidebar = ({
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
         <div
-          className="grid grid-cols-[minmax(64px,1fr)_32px_56px_32px] items-center gap-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 py-1.5 dark:border-[#475569] dark:bg-[#111827]"
+          className="grid grid-cols-[minmax(64px,1fr)_32px_56px_32px] items-center gap-1 px-2 py-1.5"
           data-testid="view-canvas-zoom-row"
         >
           <button
@@ -489,7 +489,7 @@ const LeftSidebar = ({
         </div>
         <div className="space-y-2">
           <ToggleRow
-            label="Dot Grid"
+            label="Show Grid"
             checked={showGrid}
             onChange={setShowGrid}
           />

@@ -89,7 +89,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [mode, setMode] = useState('select');
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
   const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
   const currentCaptionOverlay = {
@@ -122,6 +122,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const [status, setStatusState] = useState('');
   const setStatus = useCallback(nextStatus => {
     setStatusState(String(nextStatus ?? ''));
+  }, []);
+  const updateSnapEnabled = useCallback(enabled => {
+    const nextEnabled = Boolean(enabled);
+    setSnapEnabled(nextEnabled);
+    if (nextEnabled) setShowGrid(true);
+  }, []);
+  const updateShowGrid = useCallback(visible => {
+    const nextVisible = Boolean(visible);
+    setShowGrid(nextVisible);
+    if (!nextVisible) setSnapEnabled(false);
   }, []);
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
@@ -319,9 +329,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     edgeRouting,
     setEdgeRouting,
     snapEnabled,
-    setSnapEnabled,
+    setSnapEnabled: updateSnapEnabled,
     showGrid,
-    setShowGrid,
+    setShowGrid: updateShowGrid,
     captionOverlay,
     setCaptionOverlay,
     customLegend,
@@ -516,9 +526,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       drawFrom,
       onDrawEdge: startDrawEdge,
       snapEnabled,
-      setSnapEnabled,
+      setSnapEnabled: updateSnapEnabled,
       showGrid,
-      setShowGrid,
+      setShowGrid: updateShowGrid,
       customLegend,
       setCustomLegend,
       lockCanvas,

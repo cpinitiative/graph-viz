@@ -25,7 +25,7 @@ const DEFAULT_STEP = {
 const DEFAULT_SETTINGS = {
   edgeRouting: EDGE_ROUTING.straight,
   snapEnabled: true,
-  showGrid: false,
+  showGrid: true,
   captionOverlay: DEFAULT_CAPTION_OVERLAY,
   customLegend: DEFAULT_CUSTOM_LEGEND,
   lockCanvas: false,
@@ -172,16 +172,20 @@ const sanitizeSettings = settings => {
         ...DEFAULT_CUSTOM_LEGEND,
         enabled: input.showLegend === true,
       });
+  const snapEnabled = booleanOrDefault(
+    input.snapEnabled,
+    DEFAULT_SETTINGS.snapEnabled
+  );
+  const showGrid = snapEnabled
+    ? true
+    : booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid);
   return {
     edgeRouting:
       input.edgeRouting === EDGE_ROUTING.bezier
         ? EDGE_ROUTING.bezier
         : EDGE_ROUTING.straight,
-    snapEnabled: booleanOrDefault(
-      input.snapEnabled,
-      DEFAULT_SETTINGS.snapEnabled
-    ),
-    showGrid: booleanOrDefault(input.showGrid, DEFAULT_SETTINGS.showGrid),
+    snapEnabled,
+    showGrid,
     captionOverlay: normalizeCaptionOverlay(input.captionOverlay),
     customLegend,
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),

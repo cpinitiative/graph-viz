@@ -656,6 +656,8 @@ test.describe('Graph Studio desktop smoke', () => {
     await page.getByTestId('tool-button-select').click();
     await expect(drawEdgeHelper).toBeHidden();
 
+    const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
+    const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
     const lockView = page.getByRole('checkbox', { name: 'Lock View' });
     const fitViewButton = page.getByRole('button', { name: 'Fit View' });
     const zoomOutButton = page.getByRole('button', { name: 'Zoom Out' });
@@ -670,9 +672,30 @@ test.describe('Graph Studio desktop smoke', () => {
     });
     const forceStrengthValue = page.getByLabel('Force strength value');
     await expect(lockView).not.toBeChecked();
+    await expect(showGrid).toBeChecked();
+    await expect(snapToGrid).toBeChecked();
+    await showGrid.uncheck();
+    await expect(showGrid).not.toBeChecked();
+    await expect(snapToGrid).not.toBeChecked();
+    await snapToGrid.check();
+    await expect(showGrid).toBeChecked();
+    await expect(snapToGrid).toBeChecked();
     await expect(fitViewButton).toBeEnabled();
     await expect(zoomValueInput).toBeVisible();
     await expect(zoomValue).toHaveText(/%$/);
+    await expect
+      .poll(() =>
+        zoomRow.evaluate(element => {
+          const style = window.getComputedStyle(element);
+          return [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ];
+        })
+      )
+      .toEqual(['0px', '0px', '0px', '0px']);
     const assertZoomRowLayout = async () => {
       await expect
         .poll(async () => {
@@ -2486,7 +2509,7 @@ while (true) {}
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('bezier');
     await expect(page.getByLabel('Force strength value')).toHaveValue('1.2');
-    await expect(page.getByLabel('Dot Grid')).toBeChecked();
+    await expect(page.getByLabel('Show Grid')).toBeChecked();
     await expect(page.getByLabel('Snap to Grid')).not.toBeChecked();
     await expect(
       page.getByRole('checkbox', { name: /^Legend$/ })
@@ -3201,6 +3224,8 @@ while (true) {}
     await expect(
       page.getByRole('checkbox', { name: 'Lock View' })
     ).toBeChecked();
+    await expect(page.getByLabel('Show Grid')).toBeChecked();
+    await expect(page.getByLabel('Snap to Grid')).toBeChecked();
     await expect(page.getByLabel('Caption Style')).toHaveValue('subtle');
     await expect(page.getByLabel('Caption Size', { exact: true })).toHaveCount(
       0
