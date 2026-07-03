@@ -42,6 +42,7 @@ const inputClass =
 const inspectorButtonFocusClass =
   'focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:focus-visible:ring-[#60A5FA]';
 const actionButtonClass = `min-h-[44px] w-full rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9 md:py-2 ${inspectorButtonFocusClass}`;
+const visibilityActionButtonClass = `min-h-8 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1.5 text-center text-[10px] font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1] dark:hover:bg-[#334155] ${inspectorButtonFocusClass}`;
 const headerActionButtonClass =
   '-m-2 flex h-9 w-9 shrink-0 items-center justify-center text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#0F172A] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 dark:text-[#94A3B8] dark:hover:bg-[#1E293B] dark:hover:text-[#F8FAFC] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
 const deleteButtonClass =
@@ -54,7 +55,7 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const getScopeLabel = scope => (scope === 'Frame' ? 'Current Frame' : scope);
+const getScopeLabel = scope => (scope === 'Project-wide' ? 'Project' : scope);
 
 const ScopeLabel = ({ scope, variant = 'field' }) => {
   if (!scope) return null;
@@ -279,10 +280,68 @@ const ActionButton = ({ children, className, ...props }) => (
   </button>
 );
 
-const DeleteButton = ({ children, onClick }) => (
-  <button type="button" className={deleteButtonClass} onClick={onClick}>
+const DeleteButton = ({ children, onClick, title, ariaLabel }) => (
+  <button
+    type="button"
+    className={deleteButtonClass}
+    aria-label={ariaLabel}
+    title={title}
+    onClick={onClick}
+  >
     {children}
   </button>
+);
+
+const VisibilityActions = ({
+  onSetVisibilityForFrame,
+  onSetVisibilityFromFrame,
+}) => (
+  <div className="space-y-2">
+    <div className="flex min-w-0 items-center justify-between gap-2">
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>
+        Visibility actions
+      </span>
+      <ScopeLabel scope="Frame" />
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        className={visibilityActionButtonClass}
+        aria-label="Hide this frame"
+        title="Hide this frame"
+        onClick={() => onSetVisibilityForFrame?.(false)}
+      >
+        Hide frame
+      </button>
+      <button
+        type="button"
+        className={visibilityActionButtonClass}
+        aria-label="Hide from this frame onward"
+        title="Hide from this frame onward"
+        onClick={() => onSetVisibilityFromFrame?.(false)}
+      >
+        Hide onward
+      </button>
+      <button
+        type="button"
+        className={visibilityActionButtonClass}
+        aria-label="Show this frame"
+        title="Show this frame"
+        onClick={() => onSetVisibilityForFrame?.(true)}
+      >
+        Show frame
+      </button>
+      <button
+        type="button"
+        className={visibilityActionButtonClass}
+        aria-label="Show from this frame onward"
+        title="Show from this frame onward"
+        onClick={() => onSetVisibilityFromFrame?.(true)}
+      >
+        Show onward
+      </button>
+    </div>
+  </div>
 );
 
 const RangeControl = ({
@@ -535,7 +594,11 @@ const MultiSelectionPanel = ({
         <ActionButton onClick={() => onApplyToSelection({ color: '#22c55e' })}>
           Color green
         </ActionButton>
-        <DeleteButton onClick={onDeleteSelection}>
+        <DeleteButton
+          ariaLabel="Delete selected nodes from project"
+          title="Remove selected nodes from the entire project."
+          onClick={onDeleteSelection}
+        >
           Delete from project
         </DeleteButton>
       </div>
@@ -550,6 +613,8 @@ const NodeInspector = ({
   onUpdateNode,
   onResetOverride,
   onApplyToAllFrames,
+  onSetVisibilityForFrame,
+  onSetVisibilityFromFrame,
   onSelectEdge,
   onDeleteSelection,
   onClearSelection,
@@ -620,6 +685,10 @@ const NodeInspector = ({
           onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
           onChange={checked => onUpdateNode({ visible: checked })}
         />
+        <VisibilityActions
+          onSetVisibilityForFrame={onSetVisibilityForFrame}
+          onSetVisibilityFromFrame={onSetVisibilityFromFrame}
+        />
       </div>
 
       <Section title="Connected edges">
@@ -640,7 +709,11 @@ const NodeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>
+      <DeleteButton
+        ariaLabel="Delete node from project"
+        title="Remove this node from the entire project."
+        onClick={onDeleteSelection}
+      >
         Delete from project
       </DeleteButton>
     </PanelShell>
@@ -654,6 +727,8 @@ const EdgeInspector = ({
   onUpdateEdge,
   onResetOverride,
   onApplyToAllFrames,
+  onSetVisibilityForFrame,
+  onSetVisibilityFromFrame,
   onSelectNode,
   onDeleteSelection,
   onClearSelection,
@@ -707,6 +782,10 @@ const EdgeInspector = ({
           onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
           onChange={checked => onUpdateEdge({ visible: checked })}
         />
+        <VisibilityActions
+          onSetVisibilityForFrame={onSetVisibilityForFrame}
+          onSetVisibilityFromFrame={onSetVisibilityFromFrame}
+        />
       </div>
 
       <Section title="Connected nodes">
@@ -722,7 +801,11 @@ const EdgeInspector = ({
         />
       </Section>
 
-      <DeleteButton onClick={onDeleteSelection}>
+      <DeleteButton
+        ariaLabel="Delete edge from project"
+        title="Remove this edge from the entire project."
+        onClick={onDeleteSelection}
+      >
         Delete from project
       </DeleteButton>
     </PanelShell>
@@ -830,6 +913,10 @@ const PropertyPanel = ({
   onResetEdgeOverride,
   onApplyNodeToAllFrames,
   onApplyEdgeToAllFrames,
+  onSetNodeVisibilityForFrame,
+  onSetNodeVisibilityFromFrame,
+  onSetEdgeVisibilityForFrame,
+  onSetEdgeVisibilityFromFrame,
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
@@ -858,6 +945,8 @@ const PropertyPanel = ({
         onUpdateNode={onUpdateNode}
         onResetOverride={onResetNodeOverride}
         onApplyToAllFrames={onApplyNodeToAllFrames}
+        onSetVisibilityForFrame={onSetNodeVisibilityForFrame}
+        onSetVisibilityFromFrame={onSetNodeVisibilityFromFrame}
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
@@ -874,6 +963,8 @@ const PropertyPanel = ({
         onUpdateEdge={onUpdateEdge}
         onResetOverride={onResetEdgeOverride}
         onApplyToAllFrames={onApplyEdgeToAllFrames}
+        onSetVisibilityForFrame={onSetEdgeVisibilityForFrame}
+        onSetVisibilityFromFrame={onSetEdgeVisibilityFromFrame}
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}

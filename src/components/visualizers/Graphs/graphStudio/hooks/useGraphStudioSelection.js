@@ -131,6 +131,8 @@ export const useGraphStudioSelectionPatchers = ({
   setFrameOverride,
   resetFrameOverride,
   applyTemporalPropertyToAllFrames,
+  setTemporalVisibility,
+  setTemporalVisibilityFromFrame,
   currentFrame,
   setStatus,
 }) => {
@@ -235,6 +237,50 @@ export const useGraphStudioSelectionPatchers = ({
     [applyTemporalPropertyToAllFrames, selectedEdge, setStatus]
   );
 
+  const setSelectedNodeVisibilityForFrame = useCallback(
+    visible => {
+      if (!selectedNode) return;
+      setTemporalVisibility?.('node', selectedNode.id, visible);
+      setStatus?.(
+        `Node ${selectedNode.id} ${visible ? 'shown' : 'hidden'} on Frame ${frameNumber}`
+      );
+    },
+    [frameNumber, selectedNode, setStatus, setTemporalVisibility]
+  );
+
+  const setSelectedNodeVisibilityFromFrame = useCallback(
+    visible => {
+      if (!selectedNode) return;
+      setTemporalVisibilityFromFrame?.('node', selectedNode.id, visible);
+      setStatus?.(
+        `Node ${selectedNode.id} ${visible ? 'shown' : 'hidden'} from Frame ${frameNumber} onward`
+      );
+    },
+    [frameNumber, selectedNode, setStatus, setTemporalVisibilityFromFrame]
+  );
+
+  const setSelectedEdgeVisibilityForFrame = useCallback(
+    visible => {
+      if (!selectedEdge) return;
+      setTemporalVisibility?.('edge', selectedEdge.id, visible);
+      setStatus?.(
+        `Edge ${selectedEdge.id} ${visible ? 'shown' : 'hidden'} on Frame ${frameNumber}`
+      );
+    },
+    [frameNumber, selectedEdge, setStatus, setTemporalVisibility]
+  );
+
+  const setSelectedEdgeVisibilityFromFrame = useCallback(
+    visible => {
+      if (!selectedEdge) return;
+      setTemporalVisibilityFromFrame?.('edge', selectedEdge.id, visible);
+      setStatus?.(
+        `Edge ${selectedEdge.id} ${visible ? 'shown' : 'hidden'} from Frame ${frameNumber} onward`
+      );
+    },
+    [frameNumber, selectedEdge, setStatus, setTemporalVisibilityFromFrame]
+  );
+
   return {
     updateSelectedNode,
     updateSelectedEdge,
@@ -243,5 +289,9 @@ export const useGraphStudioSelectionPatchers = ({
     resetSelectedEdgeOverride,
     applySelectedNodeToAllFrames,
     applySelectedEdgeToAllFrames,
+    setSelectedNodeVisibilityForFrame,
+    setSelectedNodeVisibilityFromFrame,
+    setSelectedEdgeVisibilityForFrame,
+    setSelectedEdgeVisibilityFromFrame,
   };
 };
