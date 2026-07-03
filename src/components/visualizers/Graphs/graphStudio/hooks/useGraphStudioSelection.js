@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  isEdgeEffectivelyVisible,
+  isNodeVisible,
+} from '../lib/effectiveVisibility';
 import { splitEdgePatch, splitNodePatch } from '../lib/graphPropertyRouting';
 
 const PROPERTY_LABELS = {
@@ -16,6 +20,10 @@ const getFirstPatchKey = patch => Object.keys(patch ?? {})[0];
 export const useGraphStudioSelection = ({ computedGraph }) => {
   const [selectedObject, setSelectedObject] = useState(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
+  const nodeMap = useMemo(
+    () => new Map(computedGraph.nodes.map(node => [String(node.id), node])),
+    [computedGraph.nodes]
+  );
 
   const selectedNodeIdSet = useMemo(
     () => new Set(selectedNodeIds.map(String)),
@@ -43,40 +51,49 @@ export const useGraphStudioSelection = ({ computedGraph }) => {
   useEffect(() => {
     if (!selectedObject) return;
     if (selectedObject.type === 'node') {
-      const exists = computedGraph.nodes.some(
+      const node = computedGraph.nodes.find(
         node => String(node.id) === String(selectedObject.id)
       );
-      if (!exists) {
+      if (!node || !isNodeVisible(node)) {
         const timeout = setTimeout(() => setSelectedObject(null), 0);
         return () => clearTimeout(timeout);
       }
       return;
     }
     if (selectedObject.type === 'edge') {
-      const exists = computedGraph.edges.some(
+      const edge = computedGraph.edges.find(
         edge => String(edge.id) === String(selectedObject.id)
       );
-      if (!exists) {
+      if (!edge || !isEdgeEffectivelyVisible(edge, nodeMap)) {
         const timeout = setTimeout(() => setSelectedObject(null), 0);
         return () => clearTimeout(timeout);
       }
     }
     return;
-  }, [selectedObject, computedGraph]);
+  }, [selectedObject, computedGraph, nodeMap]);
+
+  useEffect(() => {
+    if (!selectedNodeIds.length) return undefined;
+    const visibleNodeIds = selectedNodeIds.filter(id =>
+      isNodeVisible(nodeMap.get(String(id)))
+    );
+    if (visibleNodeIds.length === selectedNodeIds.length) return undefined;
+    const timeout = setTimeout(() => setSelectedNodeIds(visibleNodeIds), 0);
+    return () => clearTimeout(timeout);
+  }, [nodeMap, selectedNodeIds]);
 
   const nodeConnectedEdges = useMemo(() => {
     if (!selectedNode) return [];
     const nodeId = String(selectedNode.id);
     return computedGraph.edges.filter(
-      edge => String(edge.from) === nodeId || String(edge.to) === nodeId
+      edge =>
+        (String(edge.from) === nodeId || String(edge.to) === nodeId) &&
+        isEdgeEffectivelyVisible(edge, nodeMap)
     );
-  }, [selectedNode, computedGraph.edges]);
+  }, [computedGraph.edges, nodeMap, selectedNode]);
 
   const edgeConnectedNodes = useMemo(() => {
     if (!selectedEdge) return [];
-    const nodeMap = new Map(
-      computedGraph.nodes.map(node => [String(node.id), node])
-    );
     const fromNode = nodeMap.get(String(selectedEdge.from));
     const toNode = nodeMap.get(String(selectedEdge.to));
     return [fromNode, toNode].filter(
@@ -84,7 +101,7 @@ export const useGraphStudioSelection = ({ computedGraph }) => {
         node &&
         nodes.findIndex(item => String(item?.id) === String(node.id)) === index
     );
-  }, [selectedEdge, computedGraph.nodes]);
+  }, [selectedEdge, nodeMap]);
 
   const clearSelection = useCallback(() => {
     setSelectedObject(null);

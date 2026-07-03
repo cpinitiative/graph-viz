@@ -2353,20 +2353,7 @@ while (true) {}
     await expect(
       page.getByRole('slider', { name: 'Force strength' })
     ).toBeVisible();
-    await page.getByLabel('Force strength help').click();
-    const forceTooltip = page.getByRole('tooltip');
-    await expect(forceTooltip).toHaveText(
-      'Controls the next Force layout pass.'
-    );
-    const forceTooltipBox = await forceTooltip.boundingBox();
-    const sidebarBox = await leftSidebar(page).boundingBox();
-    expect(forceTooltipBox).not.toBeNull();
-    expect(sidebarBox).not.toBeNull();
-    expect(forceTooltipBox.x).toBeGreaterThanOrEqual(sidebarBox.x - 1);
-    expect(forceTooltipBox.x + forceTooltipBox.width).toBeLessThanOrEqual(
-      sidebarBox.x + sidebarBox.width + 1
-    );
-    await page.keyboard.press('Escape');
+    await expect(page.getByLabel('Force strength help')).toHaveCount(0);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expect(page.getByText('Gravity (force)')).toHaveCount(0);
     await expect(page.getByLabel('Edge routing')).toHaveValue('straight');
@@ -2476,6 +2463,129 @@ while (true) {}
     await expect(
       page.getByPlaceholder('Enter a description for this frame...')
     ).toHaveValue('Imported fixture frame two');
+
+    expect(errors).toEqual([]);
+  });
+
+  test('derives edge visibility from hidden endpoint nodes', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    const edgeParts = edgeId =>
+      graphCanvas(page).locator(
+        [
+          `[data-edge-path-id="${edgeId}"]`,
+          `[data-edge-arrowhead-id="${edgeId}"]`,
+          `[data-edge-label-id="${edgeId}"]`,
+          `[data-edge-hit-target-id="${edgeId}"]`,
+        ].join(',')
+      );
+    const expectSvgEdgeVisibility = (svgText, edgeId, visible) => {
+      const fragments = [
+        `data-edge-path-id="${edgeId}"`,
+        `data-edge-arrowhead-id="${edgeId}"`,
+        `data-edge-label-id="${edgeId}"`,
+        `data-edge-hit-target-id="${edgeId}"`,
+      ];
+      fragments.forEach(fragment => {
+        if (visible) expect(svgText).toContain(fragment);
+        else expect(svgText).not.toContain(fragment);
+      });
+    };
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    await openImportMenu(page);
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('effective-edge-visibility.graphviz.json'));
+    await expect(page.getByText('Project imported')).toBeVisible();
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByText('Node B hidden')).toBeVisible();
+
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="B"]')
+    ).toHaveCount(0);
+    await expect(edgeParts('eAB')).toHaveCount(0);
+    await expect(edgeParts('eBC')).toHaveCount(0);
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="eAC"]')
+    ).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-edge-arrowhead-id="eAC"]')
+    ).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-edge-label-id="eAC"]')
+    ).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-edge-hit-target-id="eAC"]')
+    ).toHaveCount(1);
+
+    let exportMenu = await openExportMenu(page);
+    const previewSvgText = await getPreviewSvgText(page);
+    expectSvgEdgeVisibility(previewSvgText, 'eAB', false);
+    expectSvgEdgeVisibility(previewSvgText, 'eBC', false);
+    expectSvgEdgeVisibility(previewSvgText, 'eAC', true);
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const exportedSvgText = await fs.readFile(svgPath, 'utf8');
+    expectSvgEdgeVisibility(exportedSvgText, 'eAB', false);
+    expectSvgEdgeVisibility(exportedSvgText, 'eBC', false);
+    expectSvgEdgeVisibility(exportedSvgText, 'eAC', true);
+
+    const projectDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('project-export-button'),
+      filenamePattern: /\.graphviz\.json$/,
+    });
+    const exportedProject = await readJsonDownload(projectDownload);
+    expect(exportedProject.graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'eAB', visible: true }),
+        expect.objectContaining({ id: 'eBC', visible: true }),
+        expect.objectContaining({ id: 'eAC', visible: true }),
+      ])
+    );
+    expect(exportedProject.timeline.steps[0].nodeOverrides.B.visible).toBe(
+      false
+    );
+    expect(exportedProject.timeline.steps[0].edgeOverrides).toEqual({});
+    expect(exportedProject.timeline.steps[1].edgeOverrides.eAC.visible).toBe(
+      false
+    );
+    await closeExportMenu(page);
+
+    await page.getByText('Frame 2', { exact: true }).click();
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="B"]')
+    ).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="eAB"]')
+    ).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-edge-path-id="eBC"]')
+    ).toHaveCount(1);
+    await expect(edgeParts('eAC')).toHaveCount(0);
+
+    await graphCanvas(page).locator('[data-edge-hit-target-id="eAB"]').click({
+      force: true,
+    });
+    await expect(
+      propertyPanel(page).getByText('Edge properties')
+    ).toBeVisible();
+    await page.getByText('Frame 1', { exact: true }).click();
+    await expect(edgeParts('eAB')).toHaveCount(0);
+    await expect(
+      propertyPanel(page).getByText('Canvas settings')
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });

@@ -1,0 +1,82 @@
+{
+  "format": "graph-viz-project",
+  "version": 1,
+  "exportedAt": "2026-07-02T00:00:00.000Z",
+  "graph": {
+    "nodes": [
+      { "id": "A", "label": "A", "x": 340, "y": 360, "visible": true },
+      { "id": "B", "label": "B", "x": 560, "y": 360, "visible": true },
+      { "id": "C", "label": "C", "x": 780, "y": 360, "visible": true }
+    ],
+    "edges": [
+      {
+        "id": "eAB",
+        "from": "A",
+        "to": "B",
+        "directed": true,
+        "label": "ab",
+        "color": "#64748b",
+        "duration": 450,
+        "visible": true
+      },
+      {
+        "id": "eBC",
+        "from": "B",
+        "to": "C",
+        "directed": true,
+        "label": "bc",
+        "color": "#64748b",
+        "duration": 450,
+        "visible": true
+      },
+      {
+        "id": "eAC",
+        "from": "A",
+        "to": "C",
+        "directed": true,
+        "label": "ac",
+        "color": "#64748b",
+        "duration": 450,
+        "visible": true
+      }
+    ]
+  },
+  "timeline": {
+    "steps": [
+      {
+        "id": "step-hidden-node",
+        "description": "Node B hidden",
+        "durationMs": 600,
+        "nodeOverrides": {
+          "B": { "visible": false }
+        },
+        "edgeOverrides": {}
+      },
+      {
+        "id": "step-visible-node",
+        "description": "Node B visible again",
+        "durationMs": 600,
+        "nodeOverrides": {},
+        "edgeOverrides": {
+          "eAC": { "visible": false }
+        }
+      }
+    ],
+    "currentFrame": 0
+  },
+  "settings": {
+    "edgeRouting": "straight",
+    "snapEnabled": true,
+    "showGrid": false,
+    "lockCanvas": false,
+    "viewState": { "zoom": 1, "x": 0, "y": 0 },
+    "globalSettings": {
+      "forceStrength": 1,
+      "edgeCurvature": 46,
+      "nodeSize": 24,
+      "edgeWidth": 3,
+      "nodeLabelFontSize": 12,
+      "edgeLabelFontSize": 14
+    }
+  }
+}
