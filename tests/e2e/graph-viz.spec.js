@@ -572,7 +572,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Project-wide')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Project')).toBeVisible();
     await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
       'straight'
     );
@@ -1068,6 +1068,7 @@ while (true) {}
     const cards = page.getByTestId('timeline-frame-card');
     const frameCounter = page.getByTestId('timeline-frame-counter');
     const timelinePanel = page.getByTestId('timeline-panel');
+    const addKeyframeButton = page.getByRole('button', { name: '+ Keyframe' });
     const frameDescription = page.getByLabel('Frame Description');
     const durationInput = page.getByTestId('frame-duration-input');
     const captionToggle = page.getByLabel('Show caption');
@@ -1272,6 +1273,7 @@ while (true) {}
     const durationInputBox = await durationInput.boundingBox();
     const timelineBox = await timelinePanel.boundingBox();
     const canvasLayoutBox = await graphCanvas(page).boundingBox();
+    const addKeyframeButtonBox = await addKeyframeButton.boundingBox();
     const visibleFrameBox = await cards.first().boundingBox();
     expect(descriptionBox).not.toBeNull();
     expect(detailControlsBox).not.toBeNull();
@@ -1281,6 +1283,7 @@ while (true) {}
     expect(durationInputBox).not.toBeNull();
     expect(timelineBox).not.toBeNull();
     expect(canvasLayoutBox).not.toBeNull();
+    expect(addKeyframeButtonBox).not.toBeNull();
     expect(visibleFrameBox).not.toBeNull();
     expect(
       Math.abs(durationLabelBox.x - descriptionLabelBox.x)
@@ -1318,6 +1321,12 @@ while (true) {}
     );
     expect(canvasLayoutBox.y + canvasLayoutBox.height).toBeLessThanOrEqual(
       timelineBox.y
+    );
+    expect(addKeyframeButtonBox.x).toBeGreaterThanOrEqual(
+      canvasLayoutBox.x + canvasLayoutBox.width + 2
+    );
+    expect(addKeyframeButtonBox.x).toBeLessThanOrEqual(
+      canvasLayoutBox.x + canvasLayoutBox.width + 16
     );
     expect(canvasLayoutBox.height).toBeGreaterThan(timelineBox.height);
     expect(descriptionBox.height).toBeLessThan(timelineBox.height / 2);

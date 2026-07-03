@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampNodePosition, snapToGrid } from '../graphStudioUtils';
+import { isNodeVisible } from '../lib/effectiveVisibility';
 
 export const useGraphStudioCanvasHandlers = ({
   setMode,
   setStatus,
   baseGraph,
+  computedGraph,
   addEdge,
   updateBaseNodesBulk,
   selectedNodeIds,
@@ -19,6 +21,16 @@ export const useGraphStudioCanvasHandlers = ({
   const frameNumber = currentFrame + 1;
   const addNodeHelpText = `Click canvas to add a node from Frame ${frameNumber} onward.`;
   const drawEdgeHelpText = `Connect nodes to add an edge from Frame ${frameNumber} onward.`;
+
+  useEffect(() => {
+    if (drawFrom === null || drawFrom === undefined) return undefined;
+    const sourceNode = (computedGraph?.nodes ?? []).find(
+      node => String(node.id) === String(drawFrom)
+    );
+    if (isNodeVisible(sourceNode)) return undefined;
+    const timeout = setTimeout(() => setDrawFrom(null), 0);
+    return () => clearTimeout(timeout);
+  }, [computedGraph, drawFrom]);
 
   const clearDrawState = useCallback(() => {
     setDrawFrom(null);

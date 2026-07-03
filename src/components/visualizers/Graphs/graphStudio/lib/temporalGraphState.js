@@ -28,6 +28,21 @@ const getObjectOverride = (step, objectType, objectId) => {
   return isRecord(override) ? override : {};
 };
 
+const getBaseObject = (baseGraph, objectType, objectId) => {
+  const collectionKey = getGraphCollectionKey(objectType);
+  if (!collectionKey) return null;
+  return (
+    (baseGraph?.[collectionKey] ?? []).find(
+      item => String(item.id) === String(objectId)
+    ) ?? null
+  );
+};
+
+const isBaseObjectVisible = (baseGraph, objectType, objectId) => {
+  const object = getBaseObject(baseGraph, objectType, objectId);
+  return object?.visible !== false;
+};
+
 export const resolveFrameGraph = (baseGraph, step) => {
   const nodeOverrides = isRecord(step?.nodeOverrides) ? step.nodeOverrides : {};
   const edgeOverrides = isRecord(step?.edgeOverrides) ? step.edgeOverrides : {};
@@ -122,6 +137,148 @@ export const applyTemporalVisibilityFromFrame = (
       ? applyFrameOverride(step, objectType, objectId, { visible: false })
       : removeFrameOverrideProperties(step, objectType, objectId, 'visible')
   );
+};
+
+export const applyVisibilityToStep = ({
+  baseGraph,
+  step,
+  objectType,
+  objectId,
+  visible,
+}) => {
+  if (visible === false) {
+    return applyFrameOverride(step, objectType, objectId, { visible: false });
+  }
+
+  if (isBaseObjectVisible(baseGraph, objectType, objectId)) {
+    return removeFrameOverrideProperties(step, objectType, objectId, 'visible');
+  }
+
+  return applyFrameOverride(step, objectType, objectId, { visible: true });
+};
+
+export const applyVisibilityToFrame = ({
+  baseGraph,
+  steps,
+  objectType,
+  objectId,
+  frameIndex,
+  visible,
+}) => {
+  const safeFrameIndex = Math.max(0, Number(frameIndex) || 0);
+  return (Array.isArray(steps) ? steps : []).map((step, index) =>
+    index === safeFrameIndex
+      ? applyVisibilityToStep({
+          baseGraph,
+          step,
+          objectType,
+          objectId,
+          visible,
+        })
+      : cloneJson(step ?? {})
+  );
+};
+
+export const applyVisibilityFromFrame = ({
+  baseGraph,
+  steps,
+  objectType,
+  objectId,
+  frameIndex,
+  visible,
+}) => {
+  const safeFrameIndex = Math.max(0, Number(frameIndex) || 0);
+  return (Array.isArray(steps) ? steps : []).map((step, index) =>
+    index < safeFrameIndex
+      ? cloneJson(step ?? {})
+      : applyVisibilityToStep({
+          baseGraph,
+          step,
+          objectType,
+          objectId,
+          visible,
+        })
+  );
+};
+
+export const deleteObjectsFromProject = ({
+  baseGraph,
+  steps,
+  objectType,
+  objectIds,
+}) => {
+  const ids = new Set(
+    (Array.isArray(objectIds) ? objectIds : [objectIds]).map(String)
+  );
+  const nextGraph = cloneJson(baseGraph ?? { nodes: [], edges: [] });
+  const nextStepsInput = Array.isArray(steps) ? steps : [];
+
+  if (!ids.size) {
+    return {
+      baseGraph: nextGraph,
+      steps: nextStepsInput.map(step => cloneJson(step ?? {})),
+    };
+  }
+
+  if (objectType === 'node') {
+    const removedEdgeIds = new Set();
+    const nodes = (nextGraph.nodes ?? []).filter(
+      node => !ids.has(String(node.id))
+    );
+    const edges = (nextGraph.edges ?? []).filter(edge => {
+      const shouldRemove =
+        ids.has(String(edge.from)) || ids.has(String(edge.to));
+      if (shouldRemove) removedEdgeIds.add(String(edge.id));
+      return !shouldRemove;
+    });
+    const nextSteps = nextStepsInput.map(step => {
+      const nextStep = cloneJson(step ?? {});
+      const nodeOverrides = isRecord(nextStep.nodeOverrides)
+        ? { ...nextStep.nodeOverrides }
+        : {};
+      const edgeOverrides = isRecord(nextStep.edgeOverrides)
+        ? { ...nextStep.edgeOverrides }
+        : {};
+      ids.forEach(id => {
+        delete nodeOverrides[id];
+      });
+      removedEdgeIds.forEach(edgeId => {
+        delete edgeOverrides[edgeId];
+      });
+      return { ...nextStep, nodeOverrides, edgeOverrides };
+    });
+
+    return {
+      baseGraph: { ...nextGraph, nodes, edges },
+      steps: nextSteps,
+    };
+  }
+
+  if (objectType === 'edge') {
+    const edges = (nextGraph.edges ?? []).filter(
+      edge => !ids.has(String(edge.id))
+    );
+    const nextSteps = nextStepsInput.map(step => {
+      const nextStep = cloneJson(step ?? {});
+      const edgeOverrides = isRecord(nextStep.edgeOverrides)
+        ? { ...nextStep.edgeOverrides }
+        : {};
+      ids.forEach(id => {
+        delete edgeOverrides[id];
+      });
+      return { ...nextStep, edgeOverrides };
+    });
+
+    return {
+      baseGraph: { ...nextGraph, edges },
+      steps: nextSteps,
+    };
+  }
+
+  return {
+    baseGraph: nextGraph,
+    steps: nextStepsInput.map(step => cloneJson(step ?? {})),
+  };
 };
 
 export const applyPropertyToAllFrames = ({

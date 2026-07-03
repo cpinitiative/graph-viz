@@ -11,6 +11,9 @@ import {
   applyFrameOverride,
   applyPropertyToAllFrames,
   applyTemporalVisibilityFromFrame,
+  applyVisibilityFromFrame,
+  applyVisibilityToStep,
+  deleteObjectsFromProject,
   removeFrameOverrideProperties,
 } from '../lib/temporalGraphState';
 
@@ -131,6 +134,36 @@ export const useGraphStudioGraphModel = ({
     [baseGraph, currentFrame, replaceTimeline, steps]
   );
 
+  const setTemporalVisibility = useCallback(
+    (objectType, objectId, visible) => {
+      updateStep(currentFrame, step =>
+        applyVisibilityToStep({
+          baseGraph,
+          step,
+          objectType,
+          objectId,
+          visible,
+        })
+      );
+    },
+    [baseGraph, currentFrame, updateStep]
+  );
+
+  const setTemporalVisibilityFromFrame = useCallback(
+    (objectType, objectId, visible) => {
+      const nextSteps = applyVisibilityFromFrame({
+        baseGraph,
+        steps,
+        objectType,
+        objectId,
+        frameIndex: currentFrame,
+        visible,
+      });
+      replaceTimeline(baseGraph, nextSteps, currentFrame);
+    },
+    [baseGraph, currentFrame, replaceTimeline, steps]
+  );
+
   const addNodeAt = useCallback(
     point => {
       const id = nextNodeIdRef.current;
@@ -226,55 +259,36 @@ export const useGraphStudioGraphModel = ({
 
   const deleteSelection = useCallback(() => {
     if (selectedNodeIds.length > 0) {
-      const selectedSet = new Set(selectedNodeIds.map(String));
-      const nextBaseGraph = {
-        nodes: baseGraph.nodes.filter(
-          node => !selectedSet.has(String(node.id))
-        ),
-        edges: baseGraph.edges.filter(
-          edge =>
-            !selectedSet.has(String(edge.from)) &&
-            !selectedSet.has(String(edge.to))
-        ),
-      };
-      const nextSteps = steps.map(step => {
-        const nodeOverrides = { ...(step.nodeOverrides ?? {}) };
-        const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
-        selectedSet.forEach(nodeId => {
-          delete nodeOverrides[nodeId];
-        });
-        Object.keys(edgeOverrides).forEach(edgeId => {
-          const stillExists = nextBaseGraph.edges.some(
-            edge => String(edge.id) === String(edgeId)
-          );
-          if (!stillExists) delete edgeOverrides[edgeId];
-        });
-        return { ...step, nodeOverrides, edgeOverrides };
+      const next = deleteObjectsFromProject({
+        baseGraph,
+        steps,
+        objectType: 'node',
+        objectIds: selectedNodeIds,
       });
-      replaceTimeline(nextBaseGraph, nextSteps);
+      replaceTimeline(next.baseGraph, next.steps, currentFrame);
       setSelectedNodeIds([]);
       setSelectedObject(null);
-      setStatus('Selection deleted from project');
+      setStatus(
+        selectedNodeIds.length === 1
+          ? `Node ${selectedNodeIds[0]} deleted from project`
+          : `${selectedNodeIds.length} nodes deleted from project`
+      );
       return;
     }
     if (selectedEdge) {
-      const nextBaseGraph = {
-        ...baseGraph,
-        edges: baseGraph.edges.filter(
-          edge => String(edge.id) !== String(selectedEdge.id)
-        ),
-      };
-      const nextSteps = steps.map(step => {
-        const edgeOverrides = { ...(step.edgeOverrides ?? {}) };
-        delete edgeOverrides[String(selectedEdge.id)];
-        return { ...step, edgeOverrides };
+      const next = deleteObjectsFromProject({
+        baseGraph,
+        steps,
+        objectType: 'edge',
+        objectIds: selectedEdge.id,
       });
-      replaceTimeline(nextBaseGraph, nextSteps);
+      replaceTimeline(next.baseGraph, next.steps, currentFrame);
       setSelectedObject(null);
       setStatus(`Edge ${selectedEdge.id} deleted from project`);
     }
   }, [
     baseGraph,
+    currentFrame,
     replaceTimeline,
     selectedEdge,
     selectedNodeIds,
@@ -316,6 +330,8 @@ export const useGraphStudioGraphModel = ({
     setFrameOverride,
     resetFrameOverride,
     applyTemporalPropertyToAllFrames,
+    setTemporalVisibility,
+    setTemporalVisibilityFromFrame,
     addNodeAt,
     addNode,
     addEdge,
