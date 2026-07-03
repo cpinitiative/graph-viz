@@ -44,7 +44,7 @@ const dataButtonClass =
 const sidebarControlLabelClass =
   'text-[11px] font-medium text-[#475569] dark:text-[#CBD5E1]';
 const compactNumberInputClass =
-  'h-6 w-10 rounded-sm border border-[#E2E8F0] bg-transparent px-1 text-right font-mono text-[11px] font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:border-[#334155] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]';
+  'h-6 w-10 rounded-sm border border-[#E2E8F0] bg-transparent px-1 text-center font-mono text-[11px] font-semibold tabular-nums leading-none text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:border-[#334155] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]';
 const helpButtonClass =
   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-[9px] font-bold leading-none text-[#94A3B8] transition-colors hover:border-[#CBD5E1] hover:text-[#475569] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#64748B] dark:hover:border-[#475569] dark:hover:text-[#CBD5E1] dark:focus-visible:ring-[#60A5FA]';
 
@@ -151,7 +151,10 @@ const SidebarRangeControl = ({
   };
 
   return (
-    <div className="grid grid-cols-[max-content_minmax(64px,1fr)_2.5rem] items-center gap-2 px-1 py-0.5">
+    <div
+      className="grid grid-cols-[max-content_minmax(64px,88px)_2.5rem] items-center justify-start gap-2 px-1 py-0.5"
+      data-testid={`${label.toLowerCase().replace(/\s+/g, '-')}-control`}
+    >
       <span className="flex min-w-0 items-center gap-1.5">
         <span id={labelId} className={sidebarControlLabelClass}>
           {label}
@@ -235,68 +238,61 @@ const SidebarRangeControl = ({
 };
 
 const ZoomValueInput = ({ value, disabled, onCommit }) => {
-  const [draft, setDraft] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const displayValue = isEditing ? draft : String(value);
+  const [draft, setDraft] = useState(null);
+  const displayValue = draft ?? String(value);
 
   const reset = () => {
-    setDraft('');
-    setIsEditing(false);
+    setDraft(null);
   };
-  const commit = () => {
-    const parsed = Number(displayValue);
+  const commit = rawValue => {
+    const parsed = Number(String(rawValue).replace(/%/g, '').trim());
     if (!Number.isFinite(parsed)) {
       reset();
       return;
     }
     const nextValue = Math.round(Math.max(5, Math.min(260, parsed)));
-    setDraft('');
-    setIsEditing(false);
+    setDraft(null);
     onCommit?.(nextValue);
   };
 
   return (
     <span
       className={joinClasses(
-        'box-border flex h-8 w-full min-w-0 items-center justify-center overflow-hidden rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-[#334155] transition-colors focus-within:border-[#0F2747] focus-within:ring-1 focus-within:ring-[#0F2747] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus-within:border-[#60A5FA] dark:focus-within:ring-[#60A5FA]',
+        'relative box-border flex h-8 w-14 min-w-0 items-center justify-center overflow-hidden rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-1 text-[#334155] transition-colors focus-within:border-[#0F2747] focus-within:ring-1 focus-within:ring-[#0F2747] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:focus-within:border-[#60A5FA] dark:focus-within:ring-[#60A5FA]',
         disabled &&
           'bg-[#F8F9FA] text-[#94A3B8] dark:bg-[#111827] dark:text-[#64748B]'
       )}
       data-testid="zoom-percent-field"
     >
-      <span
-        className="inline-grid grid-cols-[3ch_auto] items-baseline justify-center gap-0.5 font-mono text-xs font-semibold tabular-nums leading-none text-inherit"
-        data-testid="zoom-percent-unit"
-      >
-        <input
-          aria-label="Zoom percent"
-          className="w-[3ch] bg-transparent text-right font-mono text-xs font-semibold tabular-nums leading-none text-inherit focus:outline-none disabled:cursor-not-allowed"
-          disabled={disabled}
-          inputMode="numeric"
-          onBlur={commit}
-          onChange={event => {
-            setIsEditing(true);
-            setDraft(event.target.value);
-          }}
-          onFocus={() => {
-            setIsEditing(true);
-            setDraft(String(value));
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.currentTarget.blur();
-            } else if (event.key === 'Escape') {
-              reset();
-              event.currentTarget.blur();
-            }
-          }}
-          type="text"
-          value={displayValue}
-        />
-        <span aria-hidden="true" className="text-inherit">
-          %
+      <input
+        aria-label="Zoom percent"
+        className="peer h-full w-full bg-transparent text-center font-mono text-xs font-semibold tabular-nums leading-none text-transparent focus:text-inherit focus:outline-none disabled:cursor-not-allowed"
+        disabled={disabled}
+        inputMode="numeric"
+        onBlur={event => commit(event.currentTarget.value)}
+        onChange={event => {
+          setDraft(event.target.value);
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur();
+          } else if (event.key === 'Escape') {
+            reset();
+            event.currentTarget.blur();
+          }
+        }}
+        type="text"
+        value={displayValue}
+      />
+      {draft === null && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-xs font-semibold tabular-nums leading-none text-inherit peer-focus:hidden"
+          data-testid="zoom-percent-value"
+        >
+          {value}%
         </span>
-      </span>
+      )}
     </span>
   );
 };
@@ -461,7 +457,7 @@ const LeftSidebar = ({
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
         <div
-          className="grid grid-cols-[minmax(64px,1fr)_32px_54px_32px] items-center gap-1 px-2 py-1.5"
+          className="grid grid-cols-[minmax(64px,1fr)_32px_56px_32px] items-center gap-1 px-2 py-1.5"
           data-testid="view-canvas-zoom-row"
         >
           <button
