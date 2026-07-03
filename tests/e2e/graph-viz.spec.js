@@ -220,10 +220,14 @@ const setRangeValue = async (page, label, value) => {
     }, value);
 };
 
-const commitInputValue = async (locator, value) => {
+const commitInputValue = async (
+  locator,
+  value,
+  expectedValue = String(value)
+) => {
   await locator.fill(String(value));
   await locator.press('Enter');
-  await expect(locator).toHaveValue(String(value));
+  await expect(locator).toHaveValue(expectedValue);
 };
 
 const expectDownloadFrom = async ({ page, locator, filenamePattern }) => {
@@ -661,7 +665,12 @@ test.describe('Graph Studio desktop smoke', () => {
     const zoomInButton = page.getByRole('button', { name: 'Zoom In' });
     const zoomRow = page.getByTestId('view-canvas-zoom-row');
     const zoomField = page.getByTestId('zoom-percent-field');
-    const zoomUnit = page.getByTestId('zoom-percent-unit');
+    const zoomValue = page.getByTestId('zoom-percent-value');
+    const forceStrengthControl = page.getByTestId('force-strength-control');
+    const forceStrengthSlider = page.getByRole('slider', {
+      name: 'Force strength',
+    });
+    const forceStrengthValue = page.getByLabel('Force strength value');
     await expect(lockView).not.toBeChecked();
     await expect(showGrid).toBeChecked();
     await expect(snapToGrid).toBeChecked();
@@ -673,7 +682,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(snapToGrid).toBeChecked();
     await expect(fitViewButton).toBeEnabled();
     await expect(zoomValueInput).toBeVisible();
-    await expect(zoomField.getByText('%', { exact: true })).toBeVisible();
+    await expect(zoomValue).toHaveText(/%$/);
     await expect
       .poll(() =>
         zoomRow.evaluate(element => {
@@ -691,13 +700,15 @@ test.describe('Graph Studio desktop smoke', () => {
       await expect
         .poll(async () => {
           const rowBox = await zoomRow.boundingBox();
-          const zoomUnitBox = await zoomUnit.boundingBox();
+          const zoomValueBox = await zoomValue.boundingBox();
           const boxes = await Promise.all(
             [fitViewButton, zoomOutButton, zoomField, zoomInButton].map(
               locator => locator.boundingBox()
             )
           );
-          if (!rowBox || !zoomUnitBox || boxes.some(box => !box)) return false;
+          if (!rowBox || !zoomValueBox || boxes.some(box => !box)) {
+            return false;
+          }
           const centers = boxes.map(box => box.y + box.height / 2);
           const minCenter = Math.min(...centers);
           const maxCenter = Math.max(...centers);
@@ -705,7 +716,7 @@ test.describe('Graph Studio desktop smoke', () => {
           const rowRightInset =
             rowBox.x + rowBox.width - (boxes[3].x + boxes[3].width);
           const zoomFieldCenter = boxes[2].x + boxes[2].width / 2;
-          const zoomUnitCenter = zoomUnitBox.x + zoomUnitBox.width / 2;
+          const zoomValueCenter = zoomValueBox.x + zoomValueBox.width / 2;
           const controlsInsideRow = boxes.every(
             box =>
               box.x >= rowBox.x &&
@@ -717,19 +728,80 @@ test.describe('Graph Studio desktop smoke', () => {
             controlsInsideRow &&
             maxCenter - minCenter <= 3 &&
             boxes[0].width >= 60 &&
-            boxes[0].height <= 34 &&
+            boxes[0].height >= 35 &&
+            boxes[0].height <= 38 &&
             Math.abs(boxes[1].width - boxes[3].width) <= 1 &&
-            boxes[2].width >= 52 &&
-            boxes[2].width <= 64 &&
-            Math.abs(zoomFieldCenter - zoomUnitCenter) <= 1 &&
-            rowLeftInset >= 7 &&
-            rowRightInset >= 7 &&
-            Math.abs(rowLeftInset - rowRightInset) <= 2
+            boxes[1].width >= 35 &&
+            boxes[1].width <= 38 &&
+            boxes[2].width >= 63 &&
+            boxes[2].width <= 65 &&
+            Math.abs(zoomFieldCenter - zoomValueCenter) <= 1 &&
+            rowLeftInset <= 1 &&
+            rowRightInset <= 1
+          );
+        })
+        .toBe(true);
+    };
+    const assertForceStrengthLayout = async () => {
+      await expect
+        .poll(async () => {
+          const rowBox = await forceStrengthControl.boundingBox();
+          const labelBox = await forceStrengthControl
+            .getByText('Force strength')
+            .boundingBox();
+          const sliderBox = await forceStrengthSlider.boundingBox();
+          const valueBox = await forceStrengthValue.boundingBox();
+          if (!rowBox || !labelBox || !sliderBox || !valueBox) return false;
+          const labelCenter = labelBox.y + labelBox.height / 2;
+          const sliderCenter = sliderBox.y + sliderBox.height / 2;
+          const valueCenter = valueBox.y + valueBox.height / 2;
+          const valueTextAlign = await forceStrengthValue.evaluate(
+            element => window.getComputedStyle(element).textAlign
+          );
+          const sliderValueGap = valueBox.x - (sliderBox.x + sliderBox.width);
+          const controlsInsideRow = [labelBox, sliderBox, valueBox].every(
+            box =>
+              box.x >= rowBox.x &&
+              box.y >= rowBox.y &&
+              box.x + box.width <= rowBox.x + rowBox.width &&
+              box.y + box.height <= rowBox.y + rowBox.height
+          );
+          return (
+            controlsInsideRow &&
+            valueTextAlign === 'center' &&
+            valueBox.width >= 39 &&
+            valueBox.width <= 41 &&
+            sliderBox.width >= 56 &&
+            sliderBox.width <= 90 &&
+            sliderValueGap >= 6 &&
+            sliderValueGap <= 10 &&
+            Math.abs(labelCenter - valueCenter) <= 7 &&
+            Math.abs(sliderCenter - valueCenter) <= 2 &&
+            valueBox.x + valueBox.width - rowBox.x <= 230
           );
         })
         .toBe(true);
     };
     await assertZoomRowLayout();
+    await assertForceStrengthLayout();
+    const initialZoomFieldBox = await getRequiredBox(zoomField);
+    const initialZoomOutBox = await getRequiredBox(zoomOutButton);
+    const initialZoomInBox = await getRequiredBox(zoomInButton);
+    for (const zoomPercent of [100, 124, 250]) {
+      await commitInputValue(zoomValueInput, zoomPercent);
+      await expect(zoomValue).toHaveText(`${zoomPercent}%`);
+      const zoomFieldBox = await getRequiredBox(zoomField);
+      const zoomOutBox = await getRequiredBox(zoomOutButton);
+      const zoomInBox = await getRequiredBox(zoomInButton);
+      expect(
+        Math.abs(zoomFieldBox.width - initialZoomFieldBox.width)
+      ).toBeLessThanOrEqual(1);
+      expect(Math.abs(zoomOutBox.x - initialZoomOutBox.x)).toBeLessThanOrEqual(
+        1
+      );
+      expect(Math.abs(zoomInBox.x - initialZoomInBox.x)).toBeLessThanOrEqual(1);
+      await assertZoomRowLayout();
+    }
     const html = page.locator('html');
     const initiallyDark = await html.evaluate(element =>
       element.classList.contains('dark')
