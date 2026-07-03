@@ -4,6 +4,10 @@ import {
   insetSegment,
   measureLabelRect,
 } from '../graphCanvasUtils';
+import {
+  getVisibleNodes,
+  isEdgeEffectivelyVisible,
+} from './effectiveVisibility';
 
 const compareStableStrings = (left, right) => {
   if (left === right) return 0;
@@ -128,10 +132,13 @@ export const getEdgeRenderData = ({
   nodeRadius,
   edgeLabelSize = 12,
 }) => {
-  const visibleEdges = edges.filter(edge => edge.visible !== false);
+  const visibleNodes = getVisibleNodes(nodes);
+  const visibleEdges = edges.filter(edge =>
+    isEdgeEffectivelyVisible(edge, nodeMap)
+  );
   const segmentsById = new Map();
   const placedLabelRects = [];
-  const edgePairMetadata = buildEdgePairMetadata(edges);
+  const edgePairMetadata = buildEdgePairMetadata(visibleEdges);
 
   visibleEdges.forEach(edge => {
     const from = nodeMap.get(String(edge.from));
@@ -157,7 +164,7 @@ export const getEdgeRenderData = ({
         from,
         to,
         routing: edgeRouting,
-        nodes,
+        nodes: visibleNodes,
         edgeCurvature,
         nodeRadius,
         ...pairMetadata,
@@ -168,7 +175,7 @@ export const getEdgeRenderData = ({
             edge,
             labelText,
             labelOptions: geometry.labelOptions,
-            nodes,
+            nodes: visibleNodes,
             segmentsById,
             placedLabelRects,
             nodeRadius,
