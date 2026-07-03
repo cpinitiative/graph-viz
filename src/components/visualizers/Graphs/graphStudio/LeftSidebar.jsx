@@ -42,11 +42,11 @@ const checkboxClass =
 const dataButtonClass =
   'min-h-[44px] rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9';
 const sidebarControlLabelClass =
-  'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
+  'text-[11px] font-medium text-[#475569] dark:text-[#CBD5E1]';
 const compactNumberInputClass =
-  'h-7 w-12 rounded-sm border border-[#E2E8F0] bg-[#F8FAFC] px-1.5 text-right font-mono text-xs font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
+  'h-6 w-10 rounded-sm border border-[#E2E8F0] bg-transparent px-1 text-right font-mono text-[11px] font-semibold tabular-nums text-[#475569] focus:border-[#0F2747] focus:bg-[#FFFFFF] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:text-[#94A3B8] dark:border-[#334155] dark:text-[#CBD5E1] dark:focus:border-[#60A5FA] dark:focus:bg-[#0F172A] dark:focus:ring-[#60A5FA] dark:disabled:text-[#64748B]';
 const helpButtonClass =
-  'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[#CBD5E1] bg-transparent text-[9px] font-bold leading-none text-[#64748B] transition-colors hover:border-[#94A3B8] hover:text-[#334155] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:text-[#94A3B8] dark:hover:text-[#E2E8F0] dark:focus-visible:ring-[#60A5FA]';
+  'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-[9px] font-bold leading-none text-[#94A3B8] transition-colors hover:border-[#CBD5E1] hover:text-[#475569] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#64748B] dark:hover:border-[#475569] dark:hover:text-[#CBD5E1] dark:focus-visible:ring-[#60A5FA]';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -151,72 +151,44 @@ const SidebarRangeControl = ({
   };
 
   return (
-    <div className="space-y-1 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-2.5 dark:border-[#475569] dark:bg-[#1E293B]">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <span className="flex min-w-0 items-center gap-2">
-          <span id={labelId} className={`${sidebarControlLabelClass} truncate`}>
-            {label}
-          </span>
-          {helpText && (
-            <span className="relative inline-flex">
-              <button
-                type="button"
-                aria-describedby={helpId}
-                aria-expanded={isHelpOpen}
-                aria-label={`${label} help`}
-                className={helpButtonClass}
-                onBlur={() => setIsHelpOpen(false)}
-                onClick={() => setIsHelpOpen(true)}
-                onFocus={() => setIsHelpOpen(true)}
-                onKeyDown={event => {
-                  if (event.key === 'Escape') setIsHelpOpen(false);
-                }}
-                onMouseEnter={() => setIsHelpOpen(true)}
-                onMouseLeave={() => setIsHelpOpen(false)}
+    <div className="grid grid-cols-[max-content_minmax(64px,1fr)_2.5rem] items-center gap-2 px-1 py-0.5">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span id={labelId} className={sidebarControlLabelClass}>
+          {label}
+        </span>
+        {helpText && (
+          <span className="relative inline-flex">
+            <button
+              type="button"
+              aria-describedby={helpId}
+              aria-expanded={isHelpOpen}
+              aria-label={`${label} help`}
+              className={helpButtonClass}
+              onBlur={() => setIsHelpOpen(false)}
+              onClick={() => setIsHelpOpen(true)}
+              onFocus={() => setIsHelpOpen(true)}
+              onKeyDown={event => {
+                if (event.key === 'Escape') setIsHelpOpen(false);
+              }}
+              onMouseEnter={() => setIsHelpOpen(true)}
+              onMouseLeave={() => setIsHelpOpen(false)}
+            >
+              ?
+            </button>
+            <span id={helpId} className="sr-only">
+              {helpText}
+            </span>
+            {isHelpOpen && (
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-0 top-full z-20 mt-1 w-36 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
               >
-                ?
-              </button>
-              <span id={helpId} className="sr-only">
                 {helpText}
               </span>
-              {isHelpOpen && (
-                <span
-                  role="tooltip"
-                  className="pointer-events-none absolute right-0 top-full z-20 mt-1 w-36 rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-2 text-[10px] font-medium normal-case leading-relaxed tracking-normal text-[#334155] shadow-[0_8px_24px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#E2E8F0]"
-                >
-                  {helpText}
-                </span>
-              )}
-            </span>
-          )}
-        </span>
-        <input
-          aria-label={`${label} value`}
-          className={compactNumberInputClass}
-          disabled={disabled}
-          inputMode="decimal"
-          onBlur={commitDraftValue}
-          onChange={event => {
-            setIsEditing(true);
-            setDraftValue(event.target.value);
-          }}
-          onFocus={() => {
-            setIsEditing(true);
-            setDraftValue(String(value));
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.currentTarget.blur();
-            } else if (event.key === 'Escape') {
-              setDraftValue('');
-              setIsEditing(false);
-              event.currentTarget.blur();
-            }
-          }}
-          type="text"
-          value={displayValue}
-        />
-      </div>
+            )}
+          </span>
+        )}
+      </span>
       <input
         type="range"
         min={min}
@@ -231,6 +203,32 @@ const SidebarRangeControl = ({
           disabled &&
             'cursor-not-allowed accent-[#94A3B8] dark:accent-[#64748B]'
         )}
+      />
+      <input
+        aria-label={`${label} value`}
+        className={compactNumberInputClass}
+        disabled={disabled}
+        inputMode="decimal"
+        onBlur={commitDraftValue}
+        onChange={event => {
+          setIsEditing(true);
+          setDraftValue(event.target.value);
+        }}
+        onFocus={() => {
+          setIsEditing(true);
+          setDraftValue(String(value));
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.currentTarget.blur();
+          } else if (event.key === 'Escape') {
+            setDraftValue('');
+            setIsEditing(false);
+            event.currentTarget.blur();
+          }
+        }}
+        type="text"
+        value={displayValue}
       />
     </div>
   );
