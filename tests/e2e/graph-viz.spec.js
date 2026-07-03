@@ -572,7 +572,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Project-wide')).toBeVisible();
+    await expect(propertyPanel(page).getByText('Project')).toBeVisible();
     await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
       'straight'
     );
