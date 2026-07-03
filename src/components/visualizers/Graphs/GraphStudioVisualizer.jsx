@@ -59,6 +59,18 @@ const ERROR_STATUS_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 const isOwnPatchKey = (patch, key) =>
   Object.prototype.hasOwnProperty.call(patch, key);
 
+const isRecord = value =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const getOverrideEntry = (step, mapKey, objectId) => {
+  const overrideMap = isRecord(step?.[mapKey]) ? step[mapKey] : {};
+  const entry = overrideMap[String(objectId)];
+  return isRecord(entry) ? entry : {};
+};
+
+const getObjectName = (objectType, objectId) =>
+  `${objectType === 'node' ? 'Node' : 'Edge'} ${objectId}`;
+
 const isAutoFontSize = (value, autoValue) =>
   !Number.isFinite(Number(value)) || Math.abs(Number(value) - autoValue) < 0.01;
 
@@ -464,6 +476,91 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () => steps[currentFrame] ?? {},
     [currentFrame, steps]
   );
+  const currentNodeMap = useMemo(
+    () => new Map(computedGraph.nodes.map(node => [String(node.id), node])),
+    [computedGraph.nodes]
+  );
+  const presenceRecoveryEntries = useMemo(() => {
+    const entries = [];
+    computedGraph.nodes.forEach(node => {
+      const override = getOverrideEntry(currentStep, 'nodeOverrides', node.id);
+      const hasVisibleOverride = isOwnPatchKey(override, 'visible');
+      const isOwnNotShown =
+        override.visible === false ||
+        (!hasVisibleOverride && node.visible === false);
+
+      if (!isOwnNotShown) return;
+      entries.push({
+        type: 'node',
+        id: node.id,
+        label: getObjectName('node', node.id),
+      });
+    });
+
+    computedGraph.edges.forEach(edge => {
+      const override = getOverrideEntry(currentStep, 'edgeOverrides', edge.id);
+      const hasVisibleOverride = isOwnPatchKey(override, 'visible');
+      const isOwnNotShown =
+        override.visible === false ||
+        (!hasVisibleOverride && edge.visible === false);
+
+      if (!isOwnNotShown) return;
+
+      const endpointNodes = [
+        currentNodeMap.get(String(edge.from)),
+        currentNodeMap.get(String(edge.to)),
+      ].filter(Boolean);
+      const notShownEndpoints = endpointNodes.filter(
+        node => node.visible === false
+      );
+      const endpointNote =
+        notShownEndpoints.length === 1
+          ? `Also waiting on Node ${notShownEndpoints[0].id}`
+          : notShownEndpoints.length > 1
+            ? 'Also waiting on endpoints'
+            : '';
+
+      entries.push({
+        type: 'edge',
+        id: edge.id,
+        label: getObjectName('edge', edge.id),
+        note: endpointNote,
+      });
+    });
+
+    return entries;
+  }, [computedGraph.nodes, computedGraph.edges, currentNodeMap, currentStep]);
+  const hasSelectedNotShownObject = useMemo(() => {
+    const selectedNotShownNode =
+      selectedNode?.visible === false ||
+      selectedNodeIds.some(
+        id => currentNodeMap.get(String(id))?.visible === false
+      );
+    if (selectedNotShownNode) return true;
+    if (!selectedEdge) return false;
+    if (selectedEdge.visible === false) return true;
+    const fromNode = currentNodeMap.get(String(selectedEdge.from));
+    const toNode = currentNodeMap.get(String(selectedEdge.to));
+    return fromNode?.visible === false || toNode?.visible === false;
+  }, [currentNodeMap, selectedEdge, selectedNode, selectedNodeIds]);
+  const showPresenceForFrame = useCallback(
+    (objectType, objectId) => {
+      setTemporalVisibility?.(objectType, objectId, true);
+      setStatus(
+        `${getObjectName(objectType, objectId)} shown on Frame ${currentFrame + 1}`
+      );
+    },
+    [currentFrame, setStatus, setTemporalVisibility]
+  );
+  const showPresenceFromFrame = useCallback(
+    (objectType, objectId) => {
+      setTemporalVisibilityFromFrame?.(objectType, objectId, true);
+      setStatus(
+        `${getObjectName(objectType, objectId)} shown from Frame ${currentFrame + 1} onward`
+      );
+    },
+    [currentFrame, setStatus, setTemporalVisibilityFromFrame]
+  );
   const selectedNodeFrameOverrides = useMemo(
     () =>
       selectedNode
@@ -529,6 +626,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   );
 
   const layoutProps = {
+    presenceRecovery: {
+      entries: hasSelectedNotShownObject ? [] : presenceRecoveryEntries,
+      onShowHere: showPresenceForFrame,
+      onShowOnward: showPresenceFromFrame,
+    },
     sidebar: {
       mode,
       setMode: handleSetMode,

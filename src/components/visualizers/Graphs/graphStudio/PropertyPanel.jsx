@@ -292,44 +292,51 @@ const DeleteButton = ({ children, onClick, title, ariaLabel }) => (
   </button>
 );
 
-const VisibilityActions = ({
+const PresenceNotice = ({ children }) => (
+  <div
+    className="border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-xs font-semibold leading-snug text-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]"
+    data-testid="presence-status-notice"
+  >
+    {children}
+  </div>
+);
+
+const PresenceActions = ({
   onSetVisibilityForFrame,
   onSetVisibilityFromFrame,
 }) => (
   <div className="space-y-2">
     <div className="flex min-w-0 items-center justify-between gap-2">
-      <span className={`${fieldLabelClass} min-w-0 truncate`}>
-        Visibility actions
-      </span>
+      <span className={`${fieldLabelClass} min-w-0 truncate`}>Presence</span>
       <ScopeLabel scope="Frame" />
     </div>
     <div className="grid grid-cols-2 gap-2">
       <button
         type="button"
         className={visibilityActionButtonClass}
-        aria-label="Hide this frame"
-        title="Hide this frame"
+        aria-label="Not shown on this frame"
+        title="Not shown on this frame"
         onClick={() => onSetVisibilityForFrame?.(false)}
       >
-        Hide frame
+        Not shown here
       </button>
       <button
         type="button"
         className={visibilityActionButtonClass}
-        aria-label="Hide from this frame onward"
-        title="Hide from this frame onward"
+        aria-label="Not shown from this frame onward"
+        title="Not shown from this frame onward"
         onClick={() => onSetVisibilityFromFrame?.(false)}
       >
-        Hide onward
+        Not shown onward
       </button>
       <button
         type="button"
         className={visibilityActionButtonClass}
-        aria-label="Show this frame"
-        title="Show this frame"
+        aria-label="Show on this frame"
+        title="Show on this frame"
         onClick={() => onSetVisibilityForFrame?.(true)}
       >
-        Show frame
+        Show here
       </button>
       <button
         type="button"
@@ -635,6 +642,11 @@ const NodeInspector = ({
       }
     >
       <div className="space-y-4">
+        {!nodeVisible && (
+          <PresenceNotice>
+            Node {selectedNode.id} is not shown on this frame
+          </PresenceNotice>
+        )}
         <Field label="Label" scope="All frames">
           <TextInput
             value={selectedNode.label ?? ''}
@@ -685,7 +697,7 @@ const NodeInspector = ({
           onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
           onChange={checked => onUpdateNode({ visible: checked })}
         />
-        <VisibilityActions
+        <PresenceActions
           onSetVisibilityForFrame={onSetVisibilityForFrame}
           onSetVisibilityFromFrame={onSetVisibilityFromFrame}
         />
@@ -735,6 +747,18 @@ const EdgeInspector = ({
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
   const edgeVisible = selectedEdge.visible !== false;
+  const notShownEndpointNodes = connectedNodes.filter(
+    node => node?.visible === false
+  );
+  const endpointLabel =
+    notShownEndpointNodes.length === 1
+      ? `Node ${notShownEndpointNodes[0].id}`
+      : 'an endpoint';
+  const edgePresenceNotice = !edgeVisible
+    ? `Edge ${selectedEdge.id} is not shown on this frame`
+    : notShownEndpointNodes.length > 0
+      ? `Edge ${selectedEdge.id} is not shown because ${endpointLabel} is not shown on this frame`
+      : '';
 
   return (
     <PanelShell
@@ -748,6 +772,9 @@ const EdgeInspector = ({
       }
     >
       <div className="space-y-4">
+        {edgePresenceNotice && (
+          <PresenceNotice>{edgePresenceNotice}</PresenceNotice>
+        )}
         <Field label="Weight / Label" scope="All frames">
           <TextInput
             value={selectedEdge.label ?? ''}
@@ -782,7 +809,7 @@ const EdgeInspector = ({
           onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
           onChange={checked => onUpdateEdge({ visible: checked })}
         />
-        <VisibilityActions
+        <PresenceActions
           onSetVisibilityForFrame={onSetVisibilityForFrame}
           onSetVisibilityFromFrame={onSetVisibilityFromFrame}
         />

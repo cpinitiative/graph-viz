@@ -41,7 +41,7 @@ test('resolves node and edge visibility overrides for a frame', () => {
   assert.equal(frameGraph.edges.find(edge => edge.id === 'e1').visible, false);
 });
 
-test('new nodes are hidden before the insertion frame and visible onward', () => {
+test('new nodes are not shown before the insertion frame and visible onward', () => {
   const steps = [
     { id: 'frame-1', nodeOverrides: {}, edgeOverrides: {} },
     { id: 'frame-2', nodeOverrides: {}, edgeOverrides: {} },
@@ -54,7 +54,7 @@ test('new nodes are hidden before the insertion frame and visible onward', () =>
   assert.equal(nextSteps[2].nodeOverrides.C, undefined);
 });
 
-test('new edges are hidden before the insertion frame and visible onward', () => {
+test('new edges are not shown before the insertion frame and visible onward', () => {
   const steps = [
     { id: 'frame-1', nodeOverrides: {}, edgeOverrides: {} },
     { id: 'frame-2', nodeOverrides: {}, edgeOverrides: {} },
@@ -67,7 +67,7 @@ test('new edges are hidden before the insertion frame and visible onward', () =>
   assert.equal(nextSteps[2].edgeOverrides.e2, undefined);
 });
 
-test('hide this frame only changes the current frame', () => {
+test('not shown here only changes the current frame', () => {
   const steps = [
     { id: 'frame-1', nodeOverrides: {}, edgeOverrides: {} },
     { id: 'frame-2', nodeOverrides: {}, edgeOverrides: {} },
@@ -87,7 +87,7 @@ test('hide this frame only changes the current frame', () => {
   assert.equal(nextSteps[2].nodeOverrides.B, undefined);
 });
 
-test('hide from this frame onward changes current and later frames only', () => {
+test('not shown onward changes current and later frames only', () => {
   const steps = [
     { id: 'frame-1', nodeOverrides: {}, edgeOverrides: {} },
     { id: 'frame-2', nodeOverrides: {}, edgeOverrides: {} },
@@ -107,7 +107,7 @@ test('hide from this frame onward changes current and later frames only', () => 
   assert.equal(nextSteps[2].nodeOverrides.B.visible, false);
 });
 
-test('show this frame restores visibility on the current frame only', () => {
+test('show here restores visibility on the current frame only', () => {
   const steps = [
     {
       id: 'frame-1',
@@ -155,7 +155,7 @@ test('show this frame restores visibility on the current frame only', () => {
   assert.equal(hasFrameOverride(nextSteps[1], 'node', 'B', 'visible'), false);
 });
 
-test('show from this frame onward restores visibility on current and later frames', () => {
+test('show onward restores visibility on current and later frames', () => {
   const steps = [
     {
       id: 'frame-1',
