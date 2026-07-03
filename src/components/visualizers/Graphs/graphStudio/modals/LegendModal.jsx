@@ -28,7 +28,7 @@ const dataButtonClass =
 const dangerButtonClass =
   'min-h-8 rounded-sm border border-[#B91C1C] bg-transparent px-2 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#B91C1C] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:ring-[#F87171]';
 const reorderButtonClass =
-  'flex h-8 w-8 items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] text-xs font-bold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-35 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
+  'flex h-8 w-8 items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] text-xs font-bold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:border-[#E2E8F0] disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] disabled:hover:bg-[#F1F5F9] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA] dark:disabled:border-[#334155] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B] dark:disabled:hover:bg-[#111827]';
 
 const LEGEND_ENTRY_ID_FIELD = '__legendEntryEditorId';
 const legendEntryIdCache = new WeakMap();
@@ -271,13 +271,11 @@ const LegendModal = ({
     });
   };
 
-  const resetLegendDefaults = () => {
+  const resetLegendPosition = () => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
-      enabled: Boolean(prev?.enabled),
-      entries: DEFAULT_CUSTOM_LEGEND.entries.map(entry =>
-        withLegendEntryId(entry, getNextLegendEntryId())
-      ),
+      ...(prev ?? {}),
+      position: DEFAULT_CUSTOM_LEGEND.position,
     }));
   };
 
@@ -287,7 +285,7 @@ const LegendModal = ({
       testId="custom-legend-modal"
       titleId="custom-legend-modal-title"
       title="Edit Legend"
-      description="Control legend entries, section groups, swatches, and placement."
+      description="Control legend entries, section groups, swatches, and position."
       maxWidthClass="max-w-4xl"
       onClose={onClose}
       bodyClassName="graphstudio-scroll-panel space-y-4"
@@ -297,9 +295,9 @@ const LegendModal = ({
             type="button"
             className={modalSecondaryButtonClass}
             data-testid="custom-legend-reset"
-            onClick={resetLegendDefaults}
+            onClick={resetLegendPosition}
           >
-            Reset Default
+            Reset to Auto
           </button>
           <button
             type="button"

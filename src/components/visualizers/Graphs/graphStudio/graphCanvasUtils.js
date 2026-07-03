@@ -528,7 +528,11 @@ export const getRectSelection = (rect, nodes) => {
   return nodes
     .filter(
       node =>
-        node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY
+        node.visible !== false &&
+        node.x >= minX &&
+        node.x <= maxX &&
+        node.y >= minY &&
+        node.y <= maxY
     )
     .map(node => String(node.id));
 };
