@@ -514,7 +514,6 @@ const LeftSidebar = ({
         </div>
         <SidebarRangeControl
           label="Force strength"
-          helpText="Changes the next Force layout pass."
           value={forceStrength}
           min="0.2"
           max="2"

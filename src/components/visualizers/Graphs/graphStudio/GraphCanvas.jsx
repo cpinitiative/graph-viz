@@ -1208,9 +1208,19 @@ const GraphCanvas = ({
             height="28"
             patternUnits="userSpaceOnUse"
           >
-            <path
-              d="M 28 0 L 0 0 0 28"
-              fill="none"
+            <line
+              x1="0"
+              y1="0"
+              x2="28"
+              y2="0"
+              stroke={gridPalette.minor}
+              strokeWidth="1"
+            />
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="28"
               stroke={gridPalette.minor}
               strokeWidth="1"
             />
@@ -1221,9 +1231,19 @@ const GraphCanvas = ({
             height="140"
             patternUnits="userSpaceOnUse"
           >
-            <path
-              d="M 140 0 L 0 0 0 140"
-              fill="none"
+            <line
+              x1="0"
+              y1="0"
+              x2="140"
+              y2="0"
+              stroke={gridPalette.major}
+              strokeWidth="1.2"
+            />
+            <line
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="140"
               stroke={gridPalette.major}
               strokeWidth="1.2"
             />
