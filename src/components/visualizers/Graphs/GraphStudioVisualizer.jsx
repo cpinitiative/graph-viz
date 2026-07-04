@@ -145,6 +145,24 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setShowGrid(nextVisible);
     if (!nextVisible) setSnapEnabled(false);
   }, []);
+  const updateLockCanvas = useCallback(
+    locked => {
+      const nextLocked = Boolean(locked);
+      setLockCanvas(nextLocked);
+      setStatus(nextLocked ? 'View locked' : 'View unlocked');
+    },
+    [setLockCanvas, setStatus]
+  );
+  const handleCenterView = useCallback(() => {
+    if (lockCanvas) {
+      setStatus('Unlock view to change the viewport');
+      return;
+    }
+    const didFit = centerViewOnContent();
+    setStatus(
+      didFit ? 'View fit to graph' : 'Unlock view to change the viewport'
+    );
+  }, [centerViewOnContent, lockCanvas, setStatus]);
   const [globalSettings, setGlobalSettings] = useState({
     forceStrength: 1,
     edgeCurvature: 46,
@@ -643,7 +661,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       customLegend,
       setCustomLegend,
       lockCanvas,
-      setLockCanvas,
+      setLockCanvas: updateLockCanvas,
       onAutoLayout: handleAutoLayout,
       forceStrength: globalSettings.forceStrength,
       onForceStrengthChange: forceStrength =>
@@ -671,7 +689,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       totalFrames: frameCount,
       steps,
       getFrameGraph,
-      onCenterView: centerViewOnContent,
+      onCenterView: handleCenterView,
       zoomPercent,
       onZoomIn: zoomIn,
       onZoomOut: zoomOut,

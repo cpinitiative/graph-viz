@@ -605,6 +605,9 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
+    const modeIndicator = page.getByTestId('current-mode-indicator');
+    await expect(modeIndicator).toContainText('Select');
+    await expect(modeIndicator).toContainText('Selection/editing mode');
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -633,6 +636,10 @@ test.describe('Graph Studio desktop smoke', () => {
         'Click canvas to add a node from Frame 1 onward.'
       )
     ).toBeVisible();
+    await expect(modeIndicator).toContainText('Add Node');
+    await expect(modeIndicator).toContainText(
+      'Click canvas to add a node from Frame 1 onward.'
+    );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
@@ -652,9 +659,14 @@ test.describe('Graph Studio desktop smoke', () => {
       /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
     );
     await expect(drawEdgeHelper).toBeVisible();
+    await expect(modeIndicator).toContainText('Draw Edge');
+    await expect(modeIndicator).toContainText(
+      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
+    );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
     await expect(drawEdgeHelper).toBeHidden();
+    await expect(modeIndicator).toContainText('Select');
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
     const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
@@ -671,15 +683,21 @@ test.describe('Graph Studio desktop smoke', () => {
       name: 'Force strength',
     });
     const forceStrengthValue = page.getByLabel('Force strength value');
+    const gridLayer = graphCanvas(page).locator('[data-testid="graph-grid"]');
     await expect(lockView).not.toBeChecked();
     await expect(showGrid).toBeChecked();
     await expect(snapToGrid).toBeChecked();
+    await expect(gridLayer).toBeVisible();
+    await expect(gridLayer).toHaveAttribute('data-snap-enabled', 'true');
     await showGrid.uncheck();
     await expect(showGrid).not.toBeChecked();
     await expect(snapToGrid).not.toBeChecked();
+    await expect(gridLayer).toHaveCount(0);
     await snapToGrid.check();
     await expect(showGrid).toBeChecked();
     await expect(snapToGrid).toBeChecked();
+    await expect(gridLayer).toBeVisible();
+    await expect(gridLayer).toHaveAttribute('data-snap-enabled', 'true');
     await expect(fitViewButton).toBeEnabled();
     await expect(zoomValueInput).toBeVisible();
     await expect(zoomValue).toHaveText(/%$/);
@@ -826,9 +844,22 @@ test.describe('Graph Studio desktop smoke', () => {
       .toBeGreaterThan(zoomBefore);
     await fitViewButton.click();
     await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'View fit to graph'
+    );
     await lockView.check();
     await expect(fitViewButton).toBeDisabled();
+    await expect(fitViewButton).toHaveAttribute(
+      'title',
+      'Unlock view to change the viewport'
+    );
     await expect(zoomInButton).toBeDisabled();
+    await expect(page.getByTestId('view-lock-indicator')).toHaveText(
+      'View locked'
+    );
+    await expect(page.getByTestId('viewport-lock-helper')).toHaveText(
+      'Unlock view to change the viewport'
+    );
     const lockedViewBeforeAdd = await getCanvasViewSnapshot(page);
     const nodeCountBeforeLockedAdd = await graphNodes.count();
     await page.getByRole('button', { name: 'Add Node' }).click();
@@ -839,9 +870,12 @@ test.describe('Graph Studio desktop smoke', () => {
       .poll(() => getCanvasViewSnapshot(page))
       .toEqual(lockedViewBeforeAdd);
     await lockView.uncheck();
+    await expect(page.getByTestId('view-lock-indicator')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
+    await expect(modeIndicator).toContainText('Pan');
+    await expect(modeIndicator).toContainText('Drag to move view');
     const viewBeforePan = [
       await graphCanvas(page).getAttribute('data-view-x'),
       await graphCanvas(page).getAttribute('data-view-y'),
@@ -865,6 +899,11 @@ test.describe('Graph Studio desktop smoke', () => {
     for (const layout of ['Circle', 'Tree', 'Force']) {
       await page.getByRole('button', { name: layout, exact: true }).click();
       await expect(graphCanvas(page)).toBeVisible();
+      if (layout === 'Force') {
+        await expect(page.getByTestId('graph-studio-status')).toHaveText(
+          'Applied Force layout'
+        );
+      }
     }
 
     await choosePreset(page, 'bfs');

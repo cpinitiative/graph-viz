@@ -28,6 +28,16 @@ const CANVAS_BACKGROUND_COLORS = {
   light: '#FFFFFF',
   dark: '#121212',
 };
+const GRID_PALETTES = {
+  light: {
+    minor: '#D7DEE8',
+    major: '#AEB8C4',
+  },
+  dark: {
+    minor: '#334155',
+    major: '#64748B',
+  },
+};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -863,6 +873,9 @@ const GraphCanvas = ({
     [edgeRenderData, effectiveSelectedObject, edgeWidth]
   );
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
+  const gridMinorPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid-minor`;
+  const gridMajorPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid-major`;
+  const gridPalette = GRID_PALETTES[theme] ?? GRID_PALETTES.light;
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
@@ -1190,12 +1203,30 @@ const GraphCanvas = ({
       >
         <defs>
           <pattern
-            id={`${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-dot-grid`}
+            id={gridMinorPatternId}
             width="28"
             height="28"
             patternUnits="userSpaceOnUse"
           >
-            <circle cx="1.2" cy="1.2" r="1.2" fill="#e2e2e2" />
+            <path
+              d="M 28 0 L 0 0 0 28"
+              fill="none"
+              stroke={gridPalette.minor}
+              strokeWidth="1"
+            />
+          </pattern>
+          <pattern
+            id={gridMajorPatternId}
+            width="140"
+            height="140"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 140 0 L 0 0 0 140"
+              fill="none"
+              stroke={gridPalette.major}
+              strokeWidth="1.2"
+            />
           </pattern>
           <filter
             id={captionShadowFilterId}
@@ -1226,13 +1257,25 @@ const GraphCanvas = ({
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
         >
           {showGrid && (
-            <rect
-              x="-10000"
-              y="-10000"
-              width="20000"
-              height="20000"
-              fill={`url(#${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-dot-grid)`}
-            />
+            <g
+              data-testid="graph-grid"
+              data-snap-enabled={snapEnabled ? 'true' : 'false'}
+            >
+              <rect
+                x="-10000"
+                y="-10000"
+                width="20000"
+                height="20000"
+                fill={`url(#${gridMinorPatternId})`}
+              />
+              <rect
+                x="-10000"
+                y="-10000"
+                width="20000"
+                height="20000"
+                fill={`url(#${gridMajorPatternId})`}
+              />
+            </g>
           )}
           <g data-export-content="true">
             {edgeVisualData.map(
