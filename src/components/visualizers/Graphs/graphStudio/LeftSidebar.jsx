@@ -31,12 +31,18 @@ const actionButtonBaseClass =
   'min-h-[44px] rounded-sm border px-2.5 py-2.5 text-xs font-semibold transition-colors md:min-h-9 md:py-2';
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
+const toolButtonClass =
+  'relative flex items-center justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
+const toolButtonActiveClass =
+  'border-[#1D4ED8] bg-[#0F2747] font-bold text-[#FFFFFF] shadow-none ring-1 ring-inset ring-[#93C5FD] hover:bg-[#12345F] dark:border-[#60A5FA] dark:bg-[#1E3A8A] dark:text-[#FFFFFF] dark:ring-[#3B82F6] dark:hover:bg-[#1D4ED8]';
 const iconButtonClass =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
   'flex h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const toggleRowClass =
   'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 transition-colors hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:hover:bg-[#334155] md:min-h-9';
+const lockRowBaseClass =
+  'flex min-h-[44px] cursor-pointer items-center justify-between rounded-sm border px-3 py-2 transition-colors md:min-h-10';
 const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const dataButtonClass =
@@ -90,6 +96,36 @@ const ToggleRow = ({ label, checked, onChange }) => (
   <label className={toggleRowClass}>
     <span className="text-xs text-on-surface dark:text-dark-on-surface">
       {label}
+    </span>
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={event => onChange(event.target.checked)}
+      className={checkboxClass}
+    />
+  </label>
+);
+
+const LockViewControl = ({ checked, onChange }) => (
+  <label
+    className={joinClasses(
+      lockRowBaseClass,
+      checked
+        ? 'border-[#A66A00] bg-[#FFF7ED] text-[#0F2747] shadow-[inset_3px_0_0_#A66A00] dark:border-[#F59E0B] dark:bg-[#1E293B] dark:text-[#F8FAFC]'
+        : 'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]'
+    )}
+    data-testid="lock-view-control"
+  >
+    <span className="min-w-0">
+      <span className="block text-xs font-semibold">Lock View</span>
+      {checked && (
+        <span
+          className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.12em] text-[#A66A00] dark:text-[#FBBF24]"
+          data-testid="view-lock-indicator"
+        >
+          View locked
+        </span>
+      )}
     </span>
     <input
       type="checkbox"
@@ -340,7 +376,6 @@ const LeftSidebar = ({
   lockCanvas,
   setLockCanvas,
   onDrawEdge,
-  drawFrom,
   onAutoLayout,
   forceStrength = 1,
   onForceStrengthChange,
@@ -350,20 +385,15 @@ const LeftSidebar = ({
   isLegendEditorOpen = false,
   onOpenScript,
   onApplyPreset,
-  currentFrame = 0,
   onCenterView,
   zoomPercent,
   onZoomIn,
   onZoomOut,
   onZoomCommit,
 }) => {
-  const frameNumber = currentFrame + 1;
-  const addNodeHelpText = `Click canvas to add a node from Frame ${frameNumber} onward.`;
-  const drawEdgeHelpText = `Connect nodes to add an edge from Frame ${frameNumber} onward.`;
-  const drawHelpText =
-    drawFrom !== null && drawFrom !== undefined
-      ? `Source node ${drawFrom} selected. ${drawEdgeHelpText}`
-      : drawEdgeHelpText;
+  const fitViewTitle = lockCanvas
+    ? 'Unlock view to change the viewport'
+    : 'Fit View';
   const patchCustomLegend = patch => {
     setCustomLegend?.(prev => ({
       ...DEFAULT_CUSTOM_LEGEND,
@@ -386,30 +416,22 @@ const LeftSidebar = ({
               type="button"
               className={joinClasses(
                 actionButtonBaseClass,
+                toolButtonClass,
                 mode === tool.id
-                  ? 'border-[#0F2747] bg-[#0F2747] text-[#FFFFFF] dark:border-[#2563EB] dark:bg-[#2563EB] dark:text-[#FFFFFF]'
+                  ? toolButtonActiveClass
                   : actionButtonDefaultClass
               )}
               aria-pressed={mode === tool.id}
+              data-active={mode === tool.id ? 'true' : 'false'}
               data-testid={`tool-button-${tool.id}`}
               onClick={() =>
                 tool.id === 'draw' ? onDrawEdge() : setMode(tool.id)
               }
             >
-              {tool.label}
+              <span className="truncate">{tool.label}</span>
             </button>
           ))}
         </div>
-        {mode === 'add' && (
-          <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-            {addNodeHelpText}
-          </p>
-        )}
-        {mode === 'draw' && (
-          <p className="text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-            {drawHelpText}
-          </p>
-        )}
       </SidebarSection>
 
       <SidebarSection>
@@ -456,6 +478,7 @@ const LeftSidebar = ({
 
       <SidebarSection>
         <SectionTitle>View &amp; Canvas</SectionTitle>
+        <LockViewControl checked={lockCanvas} onChange={setLockCanvas} />
         <div
           className="grid grid-cols-[minmax(72px,1fr)_36px_64px_36px] items-center gap-1 py-1.5"
           data-testid="view-canvas-zoom-row"
@@ -464,7 +487,7 @@ const LeftSidebar = ({
             type="button"
             className={fitViewButtonClass}
             aria-label="Fit View"
-            title="Fit View"
+            title={fitViewTitle}
             data-testid="fit-view-button"
             disabled={lockCanvas}
             onClick={onCenterView}
@@ -487,6 +510,14 @@ const LeftSidebar = ({
             <ZoomInIcon />
           </IconButton>
         </div>
+        {lockCanvas && (
+          <p
+            className="text-[10px] font-semibold leading-relaxed text-[#A66A00] dark:text-[#FBBF24]"
+            data-testid="viewport-lock-helper"
+          >
+            Unlock view to change the viewport
+          </p>
+        )}
         <div className="space-y-2">
           <ToggleRow
             label="Show Grid"
@@ -497,11 +528,6 @@ const LeftSidebar = ({
             label="Snap to Grid"
             checked={snapEnabled}
             onChange={setSnapEnabled}
-          />
-          <ToggleRow
-            label="Lock View"
-            checked={lockCanvas}
-            onChange={setLockCanvas}
           />
         </div>
       </SidebarSection>

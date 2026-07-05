@@ -1,5 +1,5 @@
-import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants';
-import { clampNodePosition } from './graphGeometry';
+import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants.js';
+import { clampNodePosition } from './graphGeometry.js';
 
 export const circularLayout = graph => {
   const nodes = graph.nodes ?? [];
@@ -96,11 +96,11 @@ export const forceDirectedLayout = (graph, iterations = 120, strength = 1) => {
   );
   const k =
     Math.sqrt((VIEWBOX_WIDTH * VIEWBOX_HEIGHT) / nodes.length) *
-    (0.32 + normalizedStrength * 0.16);
-  const repulsionScale = 0.72 + normalizedStrength * 0.28;
-  const attractionScale = 0.01 + normalizedStrength * 0.007;
-  const velocityScale = 0.028 + normalizedStrength * 0.012;
-  const damping = 0.78;
+    (0.16 + normalizedStrength * 0.12);
+  const repulsionScale = 0.3 + normalizedStrength * 0.18;
+  const attractionScale = 0.02 + normalizedStrength * 0.016;
+  const velocityScale = 0.009 + normalizedStrength * 0.004;
+  const damping = 0.72;
   const velocities = new Map(
     nodes.map(node => [String(node.id), { x: 0, y: 0 }])
   );

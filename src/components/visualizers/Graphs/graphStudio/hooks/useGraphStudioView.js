@@ -34,8 +34,9 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
   }, []);
 
   const centerViewOnContent = useCallback(() => {
-    if (lockCanvas) return;
+    if (lockCanvas) return false;
     setViewResetCounter(count => count + 1);
+    return true;
   }, [lockCanvas]);
 
   const adjustZoom = useCallback(

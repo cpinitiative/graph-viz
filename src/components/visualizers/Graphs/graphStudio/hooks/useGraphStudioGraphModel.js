@@ -17,6 +17,12 @@ import {
   removeFrameOverrideProperties,
 } from '../lib/temporalGraphState';
 
+const LAYOUT_STATUS_LABELS = {
+  circle: 'Circle',
+  tree: 'Tree',
+  force: 'Force',
+};
+
 const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
   nextNodeIdRef.current =
     Math.max(
@@ -305,10 +311,14 @@ export const useGraphStudioGraphModel = ({
       if (type === 'tree')
         nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
       if (type === 'force') {
-        const normalizedStrength = Number.isFinite(Number(forceStrength))
-          ? Number(forceStrength)
-          : 1;
-        const iterations = Math.round(80 + 60 * normalizedStrength);
+        const normalizedStrength = Math.max(
+          0.2,
+          Math.min(
+            2,
+            Number.isFinite(Number(forceStrength)) ? Number(forceStrength) : 1
+          )
+        );
+        const iterations = Math.round(70 + 35 * normalizedStrength);
         nextGraph = forceDirectedLayout(
           baseGraph,
           iterations,
@@ -316,7 +326,7 @@ export const useGraphStudioGraphModel = ({
         );
       }
       setBaseGraph(nextGraph);
-      setStatus(`Applied ${type} layout`);
+      setStatus(`Applied ${LAYOUT_STATUS_LABELS[type] ?? type} layout`);
       return nextGraph;
     },
     [baseGraph, forceStrength, setBaseGraph, setStatus]
