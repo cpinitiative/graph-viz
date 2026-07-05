@@ -51,6 +51,10 @@ const actionButtonBaseClass =
   'min-h-[44px] rounded-sm border px-2.5 py-2.5 text-xs font-semibold transition-colors md:min-h-9 md:py-2';
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
+const toolButtonClass =
+  'relative flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
+const toolButtonActiveClass =
+  'border-[#0F2747] bg-[#FFFFFF] text-[#0F2747] shadow-[inset_3px_0_0_#A66A00] hover:bg-[#F8F9FA] dark:border-[#94A3B8] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:shadow-[inset_3px_0_0_#F59E0B] dark:hover:bg-[#243244]';
 const iconButtonClass =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
@@ -448,8 +452,9 @@ const LeftSidebar = ({
               type="button"
               className={joinClasses(
                 actionButtonBaseClass,
+                toolButtonClass,
                 mode === tool.id
-                  ? 'border-[#A66A00] bg-[#0F2747] text-[#FFFFFF] shadow-[inset_3px_0_0_#A66A00] dark:border-[#F59E0B] dark:bg-[#1E3A8A] dark:text-[#FFFFFF]'
+                  ? toolButtonActiveClass
                   : actionButtonDefaultClass
               )}
               aria-pressed={mode === tool.id}
@@ -459,23 +464,29 @@ const LeftSidebar = ({
                 tool.id === 'draw' ? onDrawEdge() : setMode(tool.id)
               }
             >
-              {tool.label}
+              <span className="truncate">{tool.label}</span>
+              {mode === tool.id && (
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 shrink-0 bg-[#A66A00] dark:bg-[#F59E0B]"
+                />
+              )}
             </button>
           ))}
         </div>
         <div
-          className="border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 py-2 text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]"
+          className="border border-[#E2E8F0] bg-transparent px-2.5 py-1.5 text-[#475569] dark:border-[#334155] dark:text-[#CBD5E1]"
           data-testid="current-mode-indicator"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#64748B] dark:text-[#94A3B8]">
               Current mode
             </span>
-            <span className="text-xs font-bold text-[#0F2747] dark:text-[#F8FAFC]">
+            <span className="text-[11px] font-semibold text-[#334155] dark:text-[#E2E8F0]">
               {activeModeLabel}
             </span>
           </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-[#475569] dark:text-[#CBD5E1]">
+          <p className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
             {activeModeHelp}
           </p>
         </div>
