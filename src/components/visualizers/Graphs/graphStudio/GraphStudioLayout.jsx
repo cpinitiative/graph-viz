@@ -45,20 +45,8 @@ const getStatusClassName = status => {
   return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
 };
 
-const MODE_LABELS = {
-  select: 'Select',
-  pan: 'Pan',
-  add: 'Add Node',
-  draw: 'Draw Edge',
-};
-const canvasHudStackClass =
-  'pointer-events-none absolute right-3 top-3 z-30 flex w-80 max-w-[calc(100%-1.5rem)] flex-col items-end gap-2';
-const canvasModeHudClass =
-  'pointer-events-none max-w-[180px] border border-[#CBD5E1] bg-[#FFFFFF] px-2.5 py-1.5 text-[#334155] shadow-[0_4px_12px_#0F172A0D] dark:border-[#475569] dark:bg-[#111827] dark:text-[#E2E8F0]';
-const canvasLockHudClass =
-  'mt-1 inline-flex border border-[#D7A955] bg-[#FFF7ED] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8A5400] dark:border-[#F59E0B] dark:bg-[#1E293B] dark:text-[#FBBF24]';
 const recoveryShellClass =
-  'pointer-events-auto w-80 max-w-full border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
+  'absolute right-3 top-3 z-30 w-80 max-w-[90%] border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryToggleClass =
   'flex min-h-8 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold text-[#334155] transition-colors hover:bg-[#F8F9FA] focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:text-[#E2E8F0] dark:hover:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA]';
 const recoveryActionClass =
@@ -68,36 +56,6 @@ const getRecoverySignature = entries =>
   (entries ?? [])
     .map(entry => `${entry.type}:${entry.id}:${entry.note ?? ''}`)
     .join('|');
-
-const CanvasModeHud = ({ mode, lockCanvas }) => {
-  const modeLabel = MODE_LABELS[mode] ?? MODE_LABELS.select;
-
-  return (
-    <div
-      className={canvasModeHudClass}
-      data-testid="canvas-mode-hud"
-      aria-label={`Canvas mode: ${modeLabel}`}
-    >
-      <div className="flex min-w-0 items-center gap-1.5">
-        <span className="h-1.5 w-1.5 shrink-0 bg-[#A66A00] dark:bg-[#F59E0B]" />
-        <span
-          className="truncate text-[11px] font-bold leading-tight text-[#0F2747] dark:text-[#F8FAFC]"
-          data-testid="canvas-mode-label"
-        >
-          {modeLabel}
-        </span>
-      </div>
-      {lockCanvas && (
-        <div
-          className={canvasLockHudClass}
-          data-testid="canvas-view-lock-indicator"
-        >
-          View locked
-        </div>
-      )}
-    </div>
-  );
-};
 
 const PresenceRecoveryAffordance = ({ recovery }) => {
   const entries = Array.isArray(recovery?.entries) ? recovery.entries : [];
@@ -262,10 +220,7 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
 const CanvasStage = ({ canvas, status, presenceRecovery }) => (
   <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
     <GraphCanvas {...canvas} />
-    <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
-      <CanvasModeHud mode={canvas.mode} lockCanvas={canvas.lockCanvas} />
-      <PresenceRecoveryAffordance recovery={presenceRecovery} />
-    </div>
+    <PresenceRecoveryAffordance recovery={presenceRecovery} />
     {status && (
       <div
         className={getStatusClassName(status)}

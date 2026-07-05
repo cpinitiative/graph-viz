@@ -52,9 +52,9 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const toolButtonClass =
-  'relative flex items-center justify-between gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
+  'relative flex items-center justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
 const toolButtonActiveClass =
-  'border-[#0F2747] bg-[#FFFFFF] text-[#0F2747] shadow-[inset_3px_0_0_#A66A00] hover:bg-[#F8F9FA] dark:border-[#94A3B8] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:shadow-[inset_3px_0_0_#F59E0B] dark:hover:bg-[#243244]';
+  'border-[#1D4ED8] bg-[#0F2747] font-bold text-[#FFFFFF] shadow-none ring-1 ring-inset ring-[#93C5FD] hover:bg-[#12345F] dark:border-[#60A5FA] dark:bg-[#1E3A8A] dark:text-[#FFFFFF] dark:ring-[#3B82F6] dark:hover:bg-[#1D4ED8]';
 const iconButtonClass =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] p-1.5 text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const fitViewButtonClass =
@@ -465,26 +465,20 @@ const LeftSidebar = ({
               }
             >
               <span className="truncate">{tool.label}</span>
-              {mode === tool.id && (
-                <span
-                  aria-hidden="true"
-                  className="h-1.5 w-1.5 shrink-0 bg-[#A66A00] dark:bg-[#F59E0B]"
-                />
-              )}
             </button>
           ))}
         </div>
         <div
-          className="border border-[#E2E8F0] bg-transparent px-2.5 py-1.5 text-[#475569] dark:border-[#334155] dark:text-[#CBD5E1]"
+          className="border border-[#E2E8F0] bg-[#FFFFFF] px-2.5 py-1.5 text-center text-[#475569] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1]"
           data-testid="current-mode-indicator"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#64748B] dark:text-[#94A3B8]">
+          <div className="space-y-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748B] dark:text-[#94A3B8]">
               Current mode
-            </span>
-            <span className="text-[11px] font-semibold text-[#334155] dark:text-[#E2E8F0]">
+            </div>
+            <div className="text-[11px] font-semibold text-[#334155] dark:text-[#E2E8F0]">
               {activeModeLabel}
-            </span>
+            </div>
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
             {activeModeHelp}
