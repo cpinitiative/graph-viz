@@ -8,26 +8,6 @@ const TOOL_OPTIONS = [
   { id: 'add', label: 'Add Node' },
   { id: 'draw', label: 'Draw Edge' },
 ];
-const MODE_COPY = {
-  select: {
-    label: 'Select',
-    help: 'Selection/editing mode',
-  },
-  pan: {
-    label: 'Pan',
-    help: 'Drag to move view',
-  },
-  add: {
-    label: 'Add Node',
-    getHelp: frameNumber =>
-      `Click canvas to add a node from Frame ${frameNumber} onward.`,
-  },
-  draw: {
-    label: 'Draw Edge',
-    getHelp: frameNumber =>
-      `Connect nodes to add an edge from Frame ${frameNumber} onward.`,
-  },
-};
 const LAYOUT_OPTIONS = [
   ['circle', 'Circle'],
   ['tree', 'Tree'],
@@ -396,7 +376,6 @@ const LeftSidebar = ({
   lockCanvas,
   setLockCanvas,
   onDrawEdge,
-  drawFrom,
   onAutoLayout,
   forceStrength = 1,
   onForceStrengthChange,
@@ -406,27 +385,12 @@ const LeftSidebar = ({
   isLegendEditorOpen = false,
   onOpenScript,
   onApplyPreset,
-  currentFrame = 0,
   onCenterView,
   zoomPercent,
   onZoomIn,
   onZoomOut,
   onZoomCommit,
 }) => {
-  const frameNumber = currentFrame + 1;
-  const drawEdgeHelpText = MODE_COPY.draw.getHelp(frameNumber);
-  const drawHelpText =
-    drawFrom !== null && drawFrom !== undefined
-      ? `Source node ${drawFrom} selected. ${drawEdgeHelpText}`
-      : drawEdgeHelpText;
-  const modeCopy = MODE_COPY[mode] ?? MODE_COPY.select;
-  const activeModeLabel = modeCopy.label;
-  const activeModeHelp =
-    mode === 'draw'
-      ? drawHelpText
-      : modeCopy.getHelp
-        ? modeCopy.getHelp(frameNumber)
-        : modeCopy.help;
   const fitViewTitle = lockCanvas
     ? 'Unlock view to change the viewport'
     : 'Fit View';
@@ -467,22 +431,6 @@ const LeftSidebar = ({
               <span className="truncate">{tool.label}</span>
             </button>
           ))}
-        </div>
-        <div
-          className="border border-[#E2E8F0] bg-[#FFFFFF] px-2.5 py-1.5 text-center text-[#475569] dark:border-[#334155] dark:bg-[#111827] dark:text-[#CBD5E1]"
-          data-testid="current-mode-indicator"
-        >
-          <div className="space-y-1">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748B] dark:text-[#94A3B8]">
-              Current mode
-            </div>
-            <div className="text-[11px] font-semibold text-[#334155] dark:text-[#E2E8F0]">
-              {activeModeLabel}
-            </div>
-          </div>
-          <p className="mt-1 text-[10px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-            {activeModeHelp}
-          </p>
         </div>
       </SidebarSection>
 

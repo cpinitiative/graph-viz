@@ -609,10 +609,11 @@ test.describe('Graph Studio desktop smoke', () => {
       'background-color',
       'rgb(15, 39, 71)'
     );
-    const modeIndicator = page.getByTestId('current-mode-indicator');
+    const modeIndicator = page.getByTestId('canvas-mode-indicator');
+    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
+    await expect(modeIndicator).toBeVisible();
     await expect(modeIndicator).toContainText('Select');
-    await expect(modeIndicator).toContainText('Selection/editing mode');
-    await expect(page.getByTestId('canvas-mode-hud')).toHaveCount(0);
+    await expect(page.getByTestId('current-mode-indicator')).toHaveCount(0);
     await expect
       .poll(() =>
         modeIndicator.evaluate(
@@ -643,15 +644,7 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(
-      leftSidebar(page).getByText(
-        'Click canvas to add a node from Frame 1 onward.'
-      )
-    ).toBeVisible();
     await expect(modeIndicator).toContainText('Add Node');
-    await expect(modeIndicator).toContainText(
-      'Click canvas to add a node from Frame 1 onward.'
-    );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
@@ -667,17 +660,9 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    const drawEdgeHelper = leftSidebar(page).getByText(
-      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-    );
-    await expect(drawEdgeHelper).toBeVisible();
     await expect(modeIndicator).toContainText('Draw Edge');
-    await expect(modeIndicator).toContainText(
-      /Connect nodes to add an edge from Frame \d+ onward\.|Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-    );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(drawEdgeHelper).toBeHidden();
     await expect(modeIndicator).toContainText('Select');
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
@@ -887,7 +872,6 @@ test.describe('Graph Studio desktop smoke', () => {
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
     await expect(modeIndicator).toContainText('Pan');
-    await expect(modeIndicator).toContainText('Drag to move view');
     const viewBeforePan = [
       await graphCanvas(page).getAttribute('data-view-x'),
       await graphCanvas(page).getAttribute('data-view-y'),
@@ -2299,11 +2283,10 @@ while (true) {}
       'data-inspector-type',
       'canvas'
     );
-    await expect(
-      leftSidebar(page).getByText(
-        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
     await expect(drawSourceRing).toHaveAttribute('r', '26');
@@ -2402,11 +2385,10 @@ while (true) {}
       'canvas'
     );
     await expect(selectionRing).toHaveCount(0);
-    await expect(
-      leftSidebar(page).getByText(
-        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
     const edgeCountBeforeSelfLoop = await graphCanvas(page)
@@ -2433,26 +2415,19 @@ while (true) {}
     await expect(drawSourceRing).toBeVisible();
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
-    await expect(
-      leftSidebar(page).getByText(
-        /Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
     );
-    await expect(
-      leftSidebar(page).getByText(
-        /Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
-    await expect(
-      leftSidebar(page).getByText(
-        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toHaveCount(0);
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
     await expect(drawSourceRing).toHaveCount(0);
 
     await page.getByTestId('tool-button-select').click();
@@ -2754,10 +2729,18 @@ while (true) {}
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
+    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
+    const modeIndicator = page.getByTestId('canvas-mode-indicator');
+    await expect(modeIndicator).toContainText('Select');
     const recoveryAffordance = page.getByTestId('presence-recovery-affordance');
     await expect(
       recoveryAffordance.getByText('1 object not shown this frame')
     ).toBeVisible();
+    const modeIndicatorBox = await getRequiredBox(modeIndicator);
+    const recoveryBox = await getRequiredBox(recoveryAffordance);
+    expect(modeIndicatorBox.y + modeIndicatorBox.height).toBeLessThanOrEqual(
+      recoveryBox.y
+    );
     await recoveryAffordance
       .getByRole('button', { name: /1 object not shown this frame/i })
       .click();
@@ -3163,12 +3146,14 @@ while (true) {}
 
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
-    await expect(
-      leftSidebar(page).getByText(
-        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
     exportMenu = await openExportMenu(page);
+    await expect(exportMenu.getByTestId('canvas-mode-indicator')).toHaveCount(
+      0
+    );
     previewState = await getSvgPresentationState(
       page,
       await getPreviewSvgText(page)
@@ -3179,11 +3164,10 @@ while (true) {}
     });
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
-    await expect(
-      leftSidebar(page).getByText(
-        /Source node .* selected\. Connect nodes to add an edge from Frame \d+ onward\./
-      )
-    ).toBeVisible();
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
+    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
+      'Draw Edge'
+    );
 
     await page.getByTestId('tool-button-select').click();
     await firstNode.click();
