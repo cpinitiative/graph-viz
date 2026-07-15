@@ -1,6 +1,11 @@
+import {
+  TEMPORAL_EDGE_OVERRIDE_KEYS,
+  TEMPORAL_NODE_OVERRIDE_KEYS,
+} from './temporalOverrideSchema.js';
+
 /** Per-frame animation properties (step overrides). */
-export const STEP_NODE_PROPS = new Set(['status', 'color', 'visible']);
-export const STEP_EDGE_PROPS = new Set(['status', 'color', 'visible']);
+export const STEP_NODE_PROPS = new Set(TEMPORAL_NODE_OVERRIDE_KEYS);
+export const STEP_EDGE_PROPS = new Set(TEMPORAL_EDGE_OVERRIDE_KEYS);
 
 export const splitNodePatch = patch => {
   const basePatch = {};

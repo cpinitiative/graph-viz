@@ -1,4 +1,5 @@
 import * as Mp4Muxer from 'mp4-muxer';
+import { normalizeFrameDuration } from './frameDuration';
 import {
   DEFAULT_SVG_ELEMENT_ID,
   createCaptureCanvas,
@@ -89,7 +90,7 @@ export async function exportTimelineVideo({
       height: canvas.height,
     });
 
-    const stepDurationMs = steps[i].durationMs || 600;
+    const stepDurationMs = normalizeFrameDuration(steps[i].durationMs);
     const framesForStep = Math.round((stepDurationMs / 1000) * fps);
     for (let f = 0; f < framesForStep; f++) {
       ctx.fillStyle = '#ffffff';

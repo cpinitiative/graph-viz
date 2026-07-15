@@ -1,4 +1,12 @@
-import { GRAPH_STATE_COLORS } from './stateColors';
+import {
+  DEFAULT_FRAME_DURATION_MS,
+  normalizeFrameDuration,
+} from './frameDuration.js';
+import { GRAPH_STATE_COLORS } from './stateColors.js';
+import {
+  sanitizeTemporalOverrideMap,
+  sanitizeTemporalOverridePatch,
+} from './temporalOverrideSchema.js';
 
 const SCRIPT_MAX_LENGTH = 20000;
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
@@ -12,8 +20,6 @@ const SCRIPT_NODE_STATUSES = new Set([
   'visited',
   'discarded',
 ]);
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const cloneSerializable = (value, label) => {
   try {
@@ -60,10 +66,10 @@ const normalizeScriptDuration = durationMs => {
   if (!Number.isFinite(value)) {
     throw new Error('durationMs must be a finite number');
   }
-  return clamp(value, 80, 8000);
+  return normalizeFrameDuration(durationMs);
 };
 
-const validateOverrideMap = ({ label, overrides, knownIds }) => {
+const validateOverrideMap = ({ label, overrides, knownIds, objectType }) => {
   if (overrides === undefined || overrides === null) return {};
   if (
     typeof overrides !== 'object' ||
@@ -73,16 +79,26 @@ const validateOverrideMap = ({ label, overrides, knownIds }) => {
     throw new Error(`${label} must be an object keyed by id`);
   }
 
-  return Object.entries(overrides).reduce((acc, [id, patch]) => {
-    if (!knownIds.has(String(id))) {
-      throw new Error(`${label} references unknown id "${id}"`);
-    }
-    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
-      throw new Error(`${label}.${id} must be an object`);
-    }
-    acc[String(id)] = cloneSerializable(patch, `${label}.${id}`);
-    return acc;
-  }, {});
+  const sanitizedEntries = Object.entries(overrides).reduce(
+    (entries, [id, patch]) => {
+      if (!knownIds.has(String(id))) {
+        throw new Error(`${label} references unknown id "${id}"`);
+      }
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        throw new Error(`${label}.${id} must be an object`);
+      }
+      const sanitizedPatch = sanitizeTemporalOverridePatch(
+        objectType,
+        cloneSerializable(patch, `${label}.${id}`)
+      );
+      if (Object.keys(sanitizedPatch).length > 0) {
+        entries.push([String(id), sanitizedPatch]);
+      }
+      return entries;
+    },
+    []
+  );
+  return Object.fromEntries(sanitizedEntries);
 };
 
 const validateScriptTraceEntry = (entry, context) => {
@@ -140,11 +156,13 @@ const validateScriptTraceEntry = (entry, context) => {
         label: 'nodeOverrides',
         overrides: entry.nodeOverrides,
         knownIds: context.nodeIds,
+        objectType: 'node',
       }),
       edgeOverrides: validateOverrideMap({
         label: 'edgeOverrides',
         overrides: entry.edgeOverrides,
         knownIds: context.edgeIds,
+        objectType: 'edge',
       }),
     };
   }
@@ -216,12 +234,12 @@ const runScriptTraceWorker = ({ source, graph, timeoutMs }) =>
     worker.postMessage({ code: source, graph });
   });
 
-const buildTimelineSteps = trace => {
+export const buildTimelineSteps = trace => {
   const steps = [
     {
       id: 'step-0',
       description: 'Initial',
-      durationMs: 600,
+      durationMs: DEFAULT_FRAME_DURATION_MS,
       nodeOverrides: {},
       edgeOverrides: {},
     },
@@ -231,7 +249,9 @@ const buildTimelineSteps = trace => {
     const next = {
       id: `step-${index + 1}`,
       description: String(entry.description ?? `${entry.type} ${entry.id}`),
-      durationMs: clamp(Number(entry.durationMs ?? 650), 80, 8000),
+      durationMs: normalizeFrameDuration(
+        entry.durationMs === undefined ? 650 : entry.durationMs
+      ),
       nodeOverrides: JSON.parse(JSON.stringify(previous.nodeOverrides ?? {})),
       edgeOverrides: JSON.parse(JSON.stringify(previous.edgeOverrides ?? {})),
     };
@@ -251,11 +271,11 @@ const buildTimelineSteps = trace => {
     if (entry.type === 'patch') {
       next.nodeOverrides = {
         ...next.nodeOverrides,
-        ...(entry.nodeOverrides ?? {}),
+        ...sanitizeTemporalOverrideMap('node', entry.nodeOverrides),
       };
       next.edgeOverrides = {
         ...next.edgeOverrides,
-        ...(entry.edgeOverrides ?? {}),
+        ...sanitizeTemporalOverrideMap('edge', entry.edgeOverrides),
       };
     }
     steps.push(next);

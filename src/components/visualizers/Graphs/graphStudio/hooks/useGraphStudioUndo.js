@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { HISTORY_LIMIT, snapshotTimelineState } from '../lib/undoUtils';
+import {
+  HISTORY_LIMIT,
+  isTextEditingUndoTarget,
+  snapshotTimelineState,
+} from '../lib/undoUtils';
 
 export const useGraphStudioUndo = ({
   baseGraph,
   steps,
+  settings,
   currentFrame,
   replaceTimeline,
-  setCurrentFrame,
+  restoreSettings,
   setStatus,
 }) => {
   const undoHistoryRef = useRef([]);
@@ -23,7 +28,7 @@ export const useGraphStudioUndo = ({
     const currentSnapshot = snapshotTimelineState({
       baseGraph,
       steps,
-      currentFrame,
+      settings,
     });
     const signature = JSON.stringify(currentSnapshot);
     const previous = historyMetaRef.current;
@@ -43,7 +48,7 @@ export const useGraphStudioUndo = ({
       }
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
     }
-  }, [baseGraph, steps, currentFrame]);
+  }, [baseGraph, settings, steps]);
 
   const undoLastAction = useCallback(() => {
     const previousSnapshot = undoHistoryRef.current.pop();
@@ -52,10 +57,14 @@ export const useGraphStudioUndo = ({
       return;
     }
     applyingUndoRef.current = true;
-    replaceTimeline(previousSnapshot.baseGraph, previousSnapshot.steps);
-    setCurrentFrame(previousSnapshot.currentFrame);
+    replaceTimeline(
+      previousSnapshot.baseGraph,
+      previousSnapshot.steps,
+      currentFrame
+    );
+    restoreSettings?.(previousSnapshot.settings);
     setStatus('Undid last action');
-  }, [replaceTimeline, setCurrentFrame, setStatus]);
+  }, [currentFrame, replaceTimeline, restoreSettings, setStatus]);
 
   useEffect(() => {
     const onKeyDown = event => {
@@ -64,16 +73,7 @@ export const useGraphStudioUndo = ({
         !event.shiftKey &&
         String(event.key).toLowerCase() === 'z';
       if (!isUndo) return;
-      const target = event.target;
-      const tagName = String(target?.tagName ?? '').toLowerCase();
-      if (
-        tagName === 'input' ||
-        tagName === 'textarea' ||
-        tagName === 'select' ||
-        target?.isContentEditable
-      ) {
-        return;
-      }
+      if (isTextEditingUndoTarget(event.target)) return;
       event.preventDefault();
       undoLastAction();
     };

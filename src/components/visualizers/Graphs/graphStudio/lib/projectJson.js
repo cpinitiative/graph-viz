@@ -1,9 +1,12 @@
-import { EDGE_ROUTING } from '../constants';
+import { EDGE_ROUTING } from '../constants.js';
 import {
   DEFAULT_CAPTION_OVERLAY,
   normalizeCaptionOverlay,
-} from './captionOverlay';
-import { DEFAULT_CUSTOM_LEGEND, normalizeCustomLegend } from './customLegend';
+} from './captionOverlay.js';
+import {
+  DEFAULT_CUSTOM_LEGEND,
+  normalizeCustomLegend,
+} from './customLegend.js';
 import {
   DEFAULT_EDGE_WIDTH,
   DEFAULT_NODE_SIZE,
@@ -11,14 +14,22 @@ import {
   getDefaultEdgeLabelFontSize,
   getDefaultNodeLabelFontSize,
   NODE_LABEL_FONT_SIZE_RANGE,
-} from './fontSizing';
+} from './fontSizing.js';
+import {
+  DEFAULT_FRAME_DURATION_MS,
+  normalizeFrameDuration,
+} from './frameDuration.js';
+import {
+  sanitizeTemporalOverrideMap,
+  sanitizeTemporalOverridePatch,
+} from './temporalOverrideSchema.js';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
 const DEFAULT_STEP = {
   id: 'step-0',
   description: 'Imported project',
-  durationMs: 600,
+  durationMs: DEFAULT_FRAME_DURATION_MS,
   nodeOverrides: {},
   edgeOverrides: {},
 };
@@ -88,20 +99,29 @@ const sanitizeEdge = (edge, index, nodeIds) => {
   };
 };
 
-const sanitizeOverrideMap = (value, validIds, label) => {
+const sanitizeOverrideMap = (value, validIds, label, objectType) => {
   if (value === undefined || value === null) return {};
   if (!isRecord(value)) throw new Error(`${label} must be an object`);
-  return Object.fromEntries(
-    Object.entries(value).map(([id, patch]) => {
+  const sanitizedEntries = Object.entries(value).reduce(
+    (entries, [id, patch]) => {
       if (!validIds.has(String(id))) {
         throw new Error(`${label} references missing id "${id}"`);
       }
       if (!isRecord(patch)) {
         throw new Error(`${label} entry "${id}" must be an object`);
       }
-      return [String(id), cloneJson(patch)];
-    })
+      const sanitizedPatch = sanitizeTemporalOverridePatch(
+        objectType,
+        cloneJson(patch)
+      );
+      if (Object.keys(sanitizedPatch).length > 0) {
+        entries.push([String(id), sanitizedPatch]);
+      }
+      return entries;
+    },
+    []
   );
+  return Object.fromEntries(sanitizedEntries);
 };
 
 const sanitizeStep = (step, index, nodeIds, edgeIds) => {
@@ -115,18 +135,18 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
     ...cloneJson(step),
     id: String(step.id ?? `step-${index}`),
     description: String(step.description ?? `Step ${index + 1}`),
-    durationMs: Number.isFinite(Number(step.durationMs))
-      ? Number(step.durationMs)
-      : 600,
+    durationMs: normalizeFrameDuration(step.durationMs),
     nodeOverrides: sanitizeOverrideMap(
       step.nodeOverrides,
       nodeIds,
-      `Timeline step ${index + 1} nodeOverrides`
+      `Timeline step ${index + 1} nodeOverrides`,
+      'node'
     ),
     edgeOverrides: sanitizeOverrideMap(
       step.edgeOverrides,
       edgeIds,
-      `Timeline step ${index + 1} edgeOverrides`
+      `Timeline step ${index + 1} edgeOverrides`,
+      'edge'
     ),
   };
   delete sanitized.showCaption;
@@ -247,6 +267,15 @@ const normalizeStepForExport = step => {
   } else {
     delete cloned.captionVisible;
   }
+  cloned.nodeOverrides = sanitizeTemporalOverrideMap(
+    'node',
+    cloned.nodeOverrides
+  );
+  cloned.edgeOverrides = sanitizeTemporalOverrideMap(
+    'edge',
+    cloned.edgeOverrides
+  );
+  cloned.durationMs = normalizeFrameDuration(cloned.durationMs);
   return cloned;
 };
 
