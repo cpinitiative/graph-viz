@@ -1,7 +1,7 @@
 /* global process */
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4173';
 const useLocalServer = !process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
@@ -18,8 +18,8 @@ export default defineConfig({
   },
   webServer: useLocalServer
     ? {
-        command: 'npm run dev -- --host 127.0.0.1',
-        url: 'http://127.0.0.1:5173',
+        command: 'npm run build && npm run preview -- --host 127.0.0.1',
+        url: 'http://127.0.0.1:4173',
         reuseExistingServer: !process.env.CI,
       }
     : undefined,
@@ -33,6 +33,11 @@ export default defineConfig({
       name: 'mobile-chromium',
       testMatch: /mobile\.spec\.js/,
       use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'smoke-chromium',
+      testMatch: /deployed-smoke\.spec\.js/,
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
 });
