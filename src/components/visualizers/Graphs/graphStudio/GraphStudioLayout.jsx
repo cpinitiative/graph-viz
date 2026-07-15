@@ -7,6 +7,7 @@ import {
   Group as PanelGroup,
   Separator as PanelResizeHandle,
 } from 'react-resizable-panels';
+import ExportFrameRenderer from './ExportFrameRenderer';
 import GraphCanvas from './GraphCanvas';
 import LeftSidebar from './LeftSidebar';
 import PropertyPanel from './PropertyPanel';
@@ -272,12 +273,20 @@ const ModalStack = ({
   modals,
   sidebar,
   canvas,
+  exportCapture,
   isImportMenuOpen,
   isExportMenuOpen,
   onCloseImportMenu,
   onCloseExportMenu,
 }) => (
   <>
+    <ExportFrameRenderer
+      frameIndex={exportCapture?.frameIndex}
+      captureToken={exportCapture?.captureToken}
+      graph={exportCapture?.graph}
+      step={exportCapture?.step}
+      canvas={exportCapture?.canvas ?? canvas}
+    />
     <ImportModal
       open={isImportMenuOpen}
       onClose={onCloseImportMenu}
@@ -302,9 +311,11 @@ const ModalStack = ({
       onExportFrameRangeChange={sidebar.onExportFrameRangeChange}
       totalFrames={sidebar.totalFrames}
       currentFrame={sidebar.currentFrame}
+      previewFrameIndex={sidebar.exportFrameIndex}
+      onPreviewFrameChange={sidebar.onExportFrameChange}
+      previewCaptureToken={exportCapture?.captureToken}
+      isExporting={sidebar.isVisualExporting}
       steps={sidebar.steps}
-      getFrameGraph={sidebar.getFrameGraph}
-      previewCanvas={canvas}
     />
     <ParserModal
       open={modals.parser.open}
@@ -353,6 +364,7 @@ const GraphStudioLayout = ({
   timeline,
   modals,
   presenceRecovery,
+  exportCapture,
   status,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -363,16 +375,24 @@ const GraphStudioLayout = ({
   const sidebarProps = {
     ...sidebar,
     onOpenImportMenu: () => setIsImportMenuOpen(true),
-    onOpenExportMenu: () => setIsExportMenuOpen(true),
+    onOpenExportMenu: () => {
+      if (sidebar.onBeginExportReview?.() === false) return;
+      setIsExportMenuOpen(true);
+    },
+  };
+  const closeExportMenu = () => {
+    sidebar.onEndExportReview?.();
+    setIsExportMenuOpen(false);
   };
   const modalStackProps = {
     modals,
     sidebar,
     canvas,
+    exportCapture,
     isImportMenuOpen,
     isExportMenuOpen,
     onCloseImportMenu: () => setIsImportMenuOpen(false),
-    onCloseExportMenu: () => setIsExportMenuOpen(false),
+    onCloseExportMenu: closeExportMenu,
   };
 
   useEffect(() => {

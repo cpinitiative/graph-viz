@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import JSZip from 'jszip';
+import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'url';
 
@@ -247,6 +249,75 @@ const readPngDimensions = async download => {
     height: buffer.readUInt32BE(20),
   };
 };
+
+const readPptxPresentation = async download => {
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  const zip = await JSZip.loadAsync(await fs.readFile(path));
+  const slidePaths = Object.keys(zip.files)
+    .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort(
+      (left, right) =>
+        Number(left.match(/slide(\d+)\.xml$/)?.[1]) -
+        Number(right.match(/slide(\d+)\.xml$/)?.[1])
+    );
+
+  const slides = [];
+  for (const slidePath of slidePaths) {
+    const slideNumber = Number(slidePath.match(/slide(\d+)\.xml$/)?.[1]);
+    const slideXml = await zip.file(slidePath)?.async('string');
+    const relationshipsPath = `ppt/slides/_rels/slide${slideNumber}.xml.rels`;
+    const relationshipsXml = await zip.file(relationshipsPath)?.async('string');
+    expect(slideXml).toBeTruthy();
+    expect(relationshipsXml).toBeTruthy();
+
+    const imageTargets = Array.from(
+      relationshipsXml.matchAll(/Target="\.\.\/media\/([^"]+)"/g),
+      match => match[1]
+    );
+    expect(imageTargets).toHaveLength(1);
+    const imageBytes = Buffer.from(
+      await zip.file(`ppt/media/${imageTargets[0]}`)?.async('uint8array')
+    );
+    expect(imageBytes.subarray(1, 4).toString('ascii')).toBe('PNG');
+
+    slides.push({
+      description: slideXml.match(/\sdescr="([^"]*)"/)?.[1] ?? '',
+      image: {
+        width: imageBytes.readUInt32BE(16),
+        height: imageBytes.readUInt32BE(20),
+      },
+    });
+  }
+
+  return slides;
+};
+
+const getRasterPixelHash = async (page, imageSource) =>
+  page.evaluate(async source => {
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = source;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let hash = 2166136261;
+    for (let index = 0; index < pixels.length; index += 1) {
+      hash ^= pixels[index];
+      hash = Math.imul(hash, 16777619);
+    }
+    return {
+      hash: hash >>> 0,
+      width: canvas.width,
+      height: canvas.height,
+    };
+  }, imageSource);
 
 const readJsonDownload = async download => {
   const path = await download.path();
@@ -1778,7 +1849,7 @@ while (true) {}
     const previewSvgText = await previewImage.evaluate(async image =>
       (await fetch(image.src)).text()
     );
-    expect(previewSvgText).toContain('data-testid="frame-caption-overlay"');
+    expect(previewSvgText).not.toContain('data-testid="frame-caption-overlay"');
     expect(previewSvgText).toContain('data-caption-overlay="true"');
     expect(previewSvgText).toContain('data-caption-style="dark"');
     expect(previewSvgText).toContain('data-caption-size="medium"');
@@ -1793,7 +1864,7 @@ while (true) {}
     const svgPath = await svgDownload.path();
     expect(svgPath).not.toBeNull();
     const svgText = await fs.readFile(svgPath, 'utf8');
-    expect(svgText).toContain('data-testid="frame-caption-overlay"');
+    expect(svgText).not.toContain('data-testid="frame-caption-overlay"');
     expect(svgText).toContain('data-caption-overlay="true"');
     expect(svgText).toContain('data-caption-style="dark"');
     expect(svgText).toContain('data-caption-size="medium"');
@@ -2767,12 +2838,12 @@ while (true) {}
         `data-edge-path-id="${edgeId}"`,
         `data-edge-arrowhead-id="${edgeId}"`,
         `data-edge-label-id="${edgeId}"`,
-        `data-edge-hit-target-id="${edgeId}"`,
       ];
       fragments.forEach(fragment => {
         if (visible) expect(svgText).toContain(fragment);
         else expect(svgText).not.toContain(fragment);
       });
+      expect(svgText).not.toContain(`data-edge-hit-target-id="${edgeId}"`);
     };
 
     await page.goto('/');
@@ -2872,9 +2943,11 @@ while (true) {}
         'Edge eAB is not shown because Node B is not shown on this frame'
       )
     ).toBeVisible();
-    await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
-      0
-    );
+    await expect(
+      page
+        .getByTestId('presence-recovery-affordance')
+        .getByText('1 object not shown this frame')
+    ).toBeVisible();
 
     await propertyPanel(page).getByTestId('inspector-clear-selection').click();
     await expect(
@@ -2906,6 +2979,140 @@ while (true) {}
     await expect(
       graphCanvas(page).locator('[data-edge-path-id="eBC"]')
     ).toHaveCount(1);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps multi-selection presence recovery available across frames', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(page.getByText(/^Frame \d+$/)).toHaveCount(3);
+    await page.getByText('Frame 1', { exact: true }).click();
+
+    const graphNodes = graphNodeCircles(page);
+    await graphNodes.nth(0).click();
+    await graphNodes.nth(1).click({ modifiers: ['Shift'] });
+    await graphNodes.nth(2).click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'selection'
+    );
+    await expect(
+      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+    ).toBeVisible();
+
+    await propertyPanel(page)
+      .getByRole('button', { name: 'Not shown selected here' })
+      .click();
+    await expect(graphNodeCircles(page)).toHaveCount(2);
+    await expect(
+      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+    ).toBeVisible();
+    await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
+      0
+    );
+    await expect(
+      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByRole('button', { name: 'Show selected onward' })
+    ).toBeVisible();
+
+    await page.getByText('Frame 2', { exact: true }).click();
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+    await expect(
+      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+    ).toBeVisible();
+    await propertyPanel(page)
+      .getByRole('button', { name: 'Not shown selected onward' })
+      .click();
+    await expect(graphNodeCircles(page)).toHaveCount(2);
+    await expect(
+      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+    ).toBeVisible();
+    await page.getByText('Frame 3', { exact: true }).click();
+    await expect(graphNodeCircles(page)).toHaveCount(2);
+    await page.getByText('Frame 2', { exact: true }).click();
+    await propertyPanel(page)
+      .getByRole('button', { name: 'Show selected onward' })
+      .click();
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+    await page.getByText('Frame 3', { exact: true }).click();
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+    await page.getByText('Frame 1', { exact: true }).click();
+    await expect(graphNodeCircles(page)).toHaveCount(2);
+    await expect(
+      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+    ).toBeVisible();
+    await propertyPanel(page)
+      .getByRole('button', { name: 'Show selected here' })
+      .click();
+    await expect(graphNodeCircles(page)).toHaveCount(5);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('reports hidden-node incident edges from the project graph', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await openImportMenu(page);
+    await page
+      .getByTestId('project-import-input')
+      .setInputFiles(fixturePath('effective-edge-visibility.graphviz.json'));
+    await expect(page.getByText('Project imported')).toBeVisible();
+
+    await page.getByText('Frame 2', { exact: true }).click();
+    await graphCanvas(page)
+      .locator('[data-node-label-id="B"]')
+      .locator('..')
+      .click();
+    await page.getByText('Frame 1', { exact: true }).click();
+
+    await expect(
+      propertyPanel(page).getByText('Node B is not shown on this frame')
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Connected edges (2)', { exact: true })
+    ).toBeVisible();
+    await expect(propertyPanel(page).getByText(/^eAB:/)).toBeVisible();
+    await expect(propertyPanel(page).getByText(/^eBC:/)).toBeVisible();
+    await expect(
+      propertyPanel(page).getByRole('button', {
+        name: 'Delete node and 2 connected edges from project',
+      })
+    ).toHaveAttribute(
+      'title',
+      'Remove this node and its 2 connected edges from the entire project.'
+    );
+    await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
+      0
+    );
+
+    await page.getByText('Frame 2', { exact: true }).click();
+    await graphCanvas(page).locator('[data-edge-hit-target-id="eAB"]').click({
+      force: true,
+    });
+    await page.getByText('Frame 1', { exact: true }).click();
+    await expect(
+      propertyPanel(page).getByText(
+        'Edge eAB is not shown because Node B is not shown on this frame'
+      )
+    ).toBeVisible();
+    await expect(
+      page
+        .getByTestId('presence-recovery-affordance')
+        .getByText('1 object not shown this frame')
+    ).toBeVisible();
 
     expect(errors).toEqual([]);
   });
@@ -3419,6 +3626,224 @@ while (true) {}
     ).toHaveCount(0);
     await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
+    expect(errors).toEqual([]);
+  });
+
+  test('exports the preview-selected frame and isolates capture from playback', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'dfs');
+
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    await expect(frameCounter).toHaveText('1 / 9');
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+
+    const editorFrameAtExportStart = await frameCounter.textContent();
+    const exportMenu = await openExportMenu(page);
+    await expect(
+      page.getByRole('button', { name: 'Play timeline' })
+    ).toBeVisible();
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+
+    await exportMenu.getByTestId('png-scale-select').selectOption('1');
+    await exportMenu.getByTestId('image-framing-select').selectOption('slide');
+    await exportMenu.getByTestId('export-preview-frame-item-2').click();
+    await expect(
+      exportMenu.getByTestId('export-preview-frame-item-2')
+    ).toHaveAttribute('aria-current', 'true');
+    await expect(
+      exportMenu.getByTestId('export-preview-panel')
+    ).toHaveAttribute('data-preview-frame-index', '2');
+    await expect
+      .poll(async () =>
+        getSvgRootAttribute(
+          await getPreviewSvgText(page),
+          'data-export-frame-index'
+        )
+      )
+      .toBe('2');
+
+    const previewImage = await expectExportPreview(page);
+    const previewSource = await previewImage.getAttribute('src');
+    expect(previewSource).not.toBeNull();
+    const previewSvgText = await getPreviewSvgText(page);
+    expectSlideFramedSvg(previewSvgText);
+    expect(previewSvgText).toContain('data-export-frame-index="2"');
+    expect(previewSvgText).toContain('data-edge-path-id=');
+    expect(previewSvgText).toContain('data-edge-arrowhead-id=');
+    expect(previewSvgText).toContain('data-node-label-id=');
+    for (const editorOnlyMarker of [
+      'data-edge-hit-target-id=',
+      'data-node-selection-ring-id=',
+      'data-node-draw-source-ring-id=',
+      'data-edge-selection-underlay-id=',
+      'data-testid=',
+      'data-frame-navigation-surface=',
+      'data-mode=',
+      'data-view-x=',
+      'data-view-y=',
+      'data-view-zoom=',
+      'data-export-mode=',
+      'data-export-capture-token=',
+      'data-snap-enabled=',
+      'graphstudio-grid-minor',
+      'graphstudio-grid-major',
+      'pointer-events=',
+      'pointer-events:',
+      'tabindex=',
+      'cursor:',
+      'touch-action:',
+    ]) {
+      expect(previewSvgText).not.toContain(editorOnlyMarker);
+    }
+
+    await page.waitForTimeout(850);
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    const exportedSvgText = await fs.readFile(svgPath, 'utf8');
+    expect(exportedSvgText).toBe(previewSvgText);
+    expect(
+      getSvgRootAttribute(exportedSvgText, 'data-export-frame-index')
+    ).toBe('2');
+
+    const pngDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('png-export-button'),
+      filenamePattern: /\.png$/,
+    });
+    const pngPath = await pngDownload.path();
+    expect(pngPath).not.toBeNull();
+    const pngDataUrl = `data:image/png;base64,${(
+      await fs.readFile(pngPath)
+    ).toString('base64')}`;
+    expect(await getRasterPixelHash(page, pngDataUrl)).toEqual(
+      await getRasterPixelHash(page, previewSource)
+    );
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+
+    await closeExportMenu(page);
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
+      0
+    );
+    await expect(page.locator('#unavailable-export-capture-svg')).toHaveCount(
+      0
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('recovers export controls and capture DOM after a missing-canvas failure', async ({
+    page,
+  }) => {
+    const developerErrors = [];
+    page.on('console', message => {
+      if (message.type() === 'error') developerErrors.push(message.text());
+    });
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    let exportMenu = await openExportMenu(page);
+    await expectExportPreview(page);
+    await expect(exportMenu.getByTestId('svg-export-button')).toBeEnabled();
+    await page.evaluate(() => {
+      document
+        .getElementById('graph-studio-export-capture-svg')
+        ?.setAttribute('id', 'unavailable-export-capture-svg');
+    });
+    await exportMenu.getByTestId('svg-export-button').click();
+    await expect(page.getByText(/SVG export error:/)).toContainText(
+      'did not become ready'
+    );
+
+    await closeExportMenu(page);
+    await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
+      0
+    );
+    await expect(page.locator('#unavailable-export-capture-svg')).toHaveCount(
+      0
+    );
+    exportMenu = await openExportMenu(page);
+    await expectExportPreview(page);
+    await expect(exportMenu.getByTestId('svg-export-button')).toBeEnabled();
+    await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    await expect(page.getByText('SVG exported')).toBeVisible();
+    expect(
+      developerErrors.some(message => message.includes('did not become ready'))
+    ).toBe(true);
+  });
+
+  test('smoke exports MP4 when Chromium exposes a supported AVC encoder', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    const supportsAvc = await page.evaluate(async () => {
+      if (typeof VideoEncoder === 'undefined') return false;
+      try {
+        const result = await VideoEncoder.isConfigSupported({
+          codec: 'avc1.42E01F',
+          width: 1040,
+          height: 584,
+          avc: { format: 'avc' },
+          bitrate: 5_000_000,
+          framerate: 30,
+        });
+        return result.supported;
+      } catch {
+        return false;
+      }
+    });
+    test.skip(!supportsAvc, 'Chromium AVC VideoEncoder is unavailable');
+
+    await choosePreset(page, 'bfs');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    await expect(frameCounter).toHaveText('1 / 5');
+    await commitInputValue(page.getByTestId('frame-duration-input'), 80);
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+
+    const exportMenu = await openExportMenu(page);
+    await expect(
+      page.getByRole('button', { name: 'Play timeline' })
+    ).toBeVisible();
+    const editorFrameAtExportStart = await frameCounter.textContent();
+    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
+    await expect(page.getByText('Export MP4 Video')).toBeVisible();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('graph-export.mp4');
+    const videoPath = await download.path();
+    expect(videoPath).not.toBeNull();
+    expect((await fs.stat(videoPath)).size).toBeGreaterThan(0);
+    await expect(page.getByText('Video exported successfully')).toBeVisible();
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
+      0
+    );
     expect(errors).toEqual([]);
   });
 
@@ -4218,6 +4643,9 @@ api.edge('e0', '#f59e0b');
 
     const frameCounter = page.getByText(/^\d+ \/ \d+$/).first();
     const initialFrameCounter = await frameCounter.textContent();
+    const [initialFrameNumber, initialFrameCount] = initialFrameCounter
+      .split('/')
+      .map(value => Number(value.trim()));
 
     await openExportMenu(page);
     await expect(page.getByTestId('slideshow-export-button')).toBeVisible();
@@ -4328,7 +4756,7 @@ api.edge('e0', '#f59e0b');
     const customSvgText = await fs.readFile(customSvgPath, 'utf8');
     expect(customSvgText).toContain('data-legend-position="custom"');
     expect(customSvgText).toMatch(
-      /data-testid="custom-export-legend"[^>]+transform="translate\([^"]+\)"/
+      /data-legend-position="custom"[^>]+transform="translate\([^"]+\)"/
     );
     const threeXDownload = await expectDownloadFrom({
       page,
@@ -4389,10 +4817,21 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByText('Export MP4 Video')).toBeHidden();
 
     await openExportMenu(page);
-    await expectDownloadFrom({
+    const allFramesSlideshow = await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
       filenamePattern: /\.pptx$/,
+    });
+    const allFrameSlides = await readPptxPresentation(allFramesSlideshow);
+    expect(allFrameSlides).toHaveLength(initialFrameCount);
+    expect(allFrameSlides.map(slide => slide.image)).toEqual(
+      Array.from({ length: initialFrameCount }, () => ({
+        width: 1040,
+        height: 585,
+      }))
+    );
+    allFrameSlides.forEach((slide, index) => {
+      expect(slide.description).toContain(`Graph Studio Frame ${index + 1}:`);
     });
 
     await expect(page.getByText('Slideshow exported')).toBeVisible();
@@ -4401,11 +4840,22 @@ api.edge('e0', '#f59e0b');
 
     await page.getByRole('radio', { name: 'Current' }).check();
     await expect(page.getByRole('radio', { name: 'Current' })).toBeChecked();
-    await expectDownloadFrom({
+    const currentFrameSlideshow = await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
       filenamePattern: /\.pptx$/,
     });
+    const currentFrameSlides = await readPptxPresentation(
+      currentFrameSlideshow
+    );
+    expect(currentFrameSlides).toEqual([
+      expect.objectContaining({
+        description: expect.stringContaining(
+          `Graph Studio Frame ${initialFrameNumber}:`
+        ),
+        image: { width: 1040, height: 585 },
+      }),
+    ]);
     await expect(frameCounter).toHaveText(initialFrameCounter);
 
     await closeExportMenu(page);
@@ -4415,11 +4865,26 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByRole('radio', { name: 'Range' })).toBeChecked();
     await page.getByLabel('Export start frame').fill('1');
     await page.getByLabel('Export end frame').fill('2');
-    await expectDownloadFrom({
+    const rangeSlideshow = await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
       filenamePattern: /\.pptx$/,
     });
+    const rangeSlides = await readPptxPresentation(rangeSlideshow);
+    expect(rangeSlides).toEqual([
+      expect.objectContaining({
+        description: expect.stringContaining(
+          'Graph Studio Frame 1: Start BFS at A'
+        ),
+        image: { width: 1040, height: 585 },
+      }),
+      expect.objectContaining({
+        description: expect.stringContaining(
+          'Graph Studio Frame 2: Queue B and C'
+        ),
+        image: { width: 1040, height: 585 },
+      }),
+    ]);
     await expect(graphCanvas(page)).toBeVisible();
 
     expect(errors).toEqual([]);

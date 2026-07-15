@@ -54,10 +54,13 @@ const GraphNode = ({
   onPointerDown,
   onClick,
   mode,
+  isExporting = false,
+  themeOverride,
   nodeRadius = NODE_RADIUS,
   labelFontSize,
 }) => {
-  const { theme } = useTheme();
+  const { theme: contextTheme } = useTheme();
+  const theme = themeOverride ?? contextTheme;
   const palette = getNodePalette(node, theme);
   const ringColors = EDITOR_RING_COLORS[theme] ?? EDITOR_RING_COLORS.light;
   const selectionRingColor = selected
@@ -69,9 +72,13 @@ const GraphNode = ({
 
   return (
     <g
-      style={{ cursor: mode === 'draw' ? 'crosshair' : 'grab' }}
-      onClick={onClick}
-      onPointerDown={onPointerDown}
+      style={
+        isExporting
+          ? undefined
+          : { cursor: mode === 'draw' ? 'crosshair' : 'grab' }
+      }
+      onClick={isExporting ? undefined : onClick}
+      onPointerDown={isExporting ? undefined : onPointerDown}
     >
       <motion.circle
         cx={node.x}

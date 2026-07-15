@@ -1,27 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import GraphCanvas from '../GraphCanvas';
-import { resolveStepCaptionEnabled } from '../lib/captionOverlay';
 import {
   clampExportFrameRange,
   resolveExportFrameIndexes,
 } from '../lib/exportFrameRange';
 import { isEditableKeyboardTarget } from '../lib/keyboardTargets';
 import {
-  getGraphSvgElement,
+  EXPORT_CAPTURE_SVG_ELEMENT_ID,
   IMAGE_FRAMING,
   serializeCurrentFrameSvg,
-  waitForFrameRender,
+  waitForExportReady,
 } from '../lib/timelineFrameCapture';
 import NativeSelect from '../NativeSelect';
 import ModalFrame from './ModalFrame';
 
-const PREVIEW_SVG_ELEMENT_ID = 'graph-studio-export-preview-svg';
-const EMPTY_DIFF = {
-  changedNodes: new Set(),
-  changedEdges: new Set(),
-};
-const EMPTY_SELECTION = new Set();
-const noop = () => {};
 const PREVIEW_UPDATE_DELAY_MS = 400;
 const IMAGE_FRAMING_LABELS = {
   [IMAGE_FRAMING.viewport]: 'Viewport',
@@ -37,57 +28,6 @@ const primaryActionClass =
   'min-h-[42px] border border-[#0F2747] bg-[#0F2747] px-3 py-2.5 text-sm font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] disabled:cursor-not-allowed disabled:opacity-50';
 const numberInputClass =
   'h-10 w-full border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 text-sm font-medium text-[#1E293B] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F1F5F9] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:disabled:bg-[#0F172A]';
-
-const ExportPreviewRenderer = ({ graph, captionText, viewport, canvas }) => {
-  if (!graph || viewport.width <= 0 || viewport.height <= 0) return null;
-
-  return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none fixed left-[-10000px] top-0 overflow-hidden opacity-0"
-      style={{ width: viewport.width, height: viewport.height }}
-    >
-      <GraphCanvas
-        graph={graph}
-        diff={EMPTY_DIFF}
-        selectedObject={null}
-        selectedNodeIds={EMPTY_SELECTION}
-        drawFrom={null}
-        mode="select"
-        viewState={canvas?.viewState ?? { x: 0, y: 0, zoom: 1 }}
-        setViewState={noop}
-        showGrid={Boolean(canvas?.showGrid)}
-        captionOverlay={canvas?.captionOverlay}
-        captionText={captionText}
-        setCaptionOverlay={noop}
-        customLegend={canvas?.customLegend}
-        setCustomLegend={noop}
-        snapEnabled={false}
-        lockCanvas
-        edgeRouting={canvas?.edgeRouting}
-        edgeCurvature={canvas?.edgeCurvature}
-        nodeRadius={canvas?.nodeRadius}
-        edgeWidth={canvas?.edgeWidth}
-        nodeLabelFontSize={canvas?.nodeLabelFontSize}
-        edgeLabelFontSize={canvas?.edgeLabelFontSize}
-        svgElementId={PREVIEW_SVG_ELEMENT_ID}
-        svgTestId="export-preview-renderer-svg"
-        svgResourcePrefix="export-preview"
-        layoutIdPrefix="export-preview-"
-        onSelectNode={noop}
-        onSelectEdge={noop}
-        onSelectNodes={noop}
-        onBackgroundClear={noop}
-        onNodePointerDown={noop}
-        onNodeMove={noop}
-        onNodePointerUp={noop}
-        onNodeClickForDraw={noop}
-        onCanvasAddNode={noop}
-        isExporting
-      />
-    </div>
-  );
-};
 
 const ExportModal = ({
   open,
@@ -106,19 +46,17 @@ const ExportModal = ({
   onExportFrameRangeChange,
   totalFrames,
   currentFrame = 0,
+  previewFrameIndex = currentFrame,
+  onPreviewFrameChange,
+  previewCaptureToken,
+  isExporting = false,
   steps = [],
-  getFrameGraph,
-  previewCanvas,
 }) => {
-  const [previewFrameIndex, setPreviewFrameIndex] = useState(currentFrame);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [previewIdentity, setPreviewIdentity] = useState('');
   const [previewStatus, setPreviewStatus] = useState('idle');
   const [showDelayedPreviewStatus, setShowDelayedPreviewStatus] =
     useState(false);
-  const [editorViewport, setEditorViewport] = useState({
-    width: 0,
-    height: 0,
-  });
   const [rangeDraft, setRangeDraft] = useState({
     startFrame: String(exportFrameRange?.startFrame ?? 1),
     endFrame: String(exportFrameRange?.endFrame ?? Math.max(1, totalFrames)),
@@ -149,55 +87,22 @@ const ExportModal = ({
       }),
     [currentFrame, frameRange, totalFrames]
   );
-  const previewGraph = useMemo(
-    () => getFrameGraph?.(previewFrameIndex) ?? null,
-    [getFrameGraph, previewFrameIndex]
-  );
   const selectedStep = steps[previewFrameIndex];
-  const previewCaptionText = selectedStep?.description ?? '';
-  const baseCaptionOverlay =
-    previewCanvas?.baseCaptionOverlay ?? previewCanvas?.captionOverlay;
-  const previewCaptionOverlay = useMemo(
-    () => ({
-      ...(baseCaptionOverlay ?? {}),
-      enabled: resolveStepCaptionEnabled(selectedStep, baseCaptionOverlay),
-    }),
-    [baseCaptionOverlay, selectedStep]
-  );
-  const previewRenderKey = useMemo(
+  const isCustomFrameRange = frameRange.mode === 'range';
+  const requestedPreviewIdentity = useMemo(
     () =>
       JSON.stringify({
-        frame: previewFrameIndex,
-        graph: previewGraph,
-        viewState: previewCanvas?.viewState,
-        showGrid: Boolean(previewCanvas?.showGrid),
-        captionOverlay: previewCaptionOverlay,
-        captionText: previewCaptionText,
-        customLegend: previewCanvas?.customLegend,
-        edgeRouting: previewCanvas?.edgeRouting,
-        edgeCurvature: previewCanvas?.edgeCurvature,
-        nodeRadius: previewCanvas?.nodeRadius,
-        nodeLabelFontSize: previewCanvas?.nodeLabelFontSize,
-        edgeWidth: previewCanvas?.edgeWidth,
-        edgeLabelFontSize: previewCanvas?.edgeLabelFontSize,
+        frameIndex: previewFrameIndex,
+        captureToken: previewCaptureToken,
+        framing: imageFraming,
       }),
-    [
-      previewCanvas?.customLegend,
-      previewCanvas?.edgeCurvature,
-      previewCanvas?.edgeRouting,
-      previewCanvas?.edgeLabelFontSize,
-      previewCanvas?.edgeWidth,
-      previewCanvas?.nodeLabelFontSize,
-      previewCanvas?.nodeRadius,
-      previewCanvas?.showGrid,
-      previewCanvas?.viewState,
-      previewFrameIndex,
-      previewCaptionOverlay,
-      previewCaptionText,
-      previewGraph,
-    ]
+    [imageFraming, previewCaptureToken, previewFrameIndex]
   );
-  const isCustomFrameRange = frameRange.mode === 'range';
+  const previewMatchesSelection =
+    previewStatus === 'ready' &&
+    previewIdentity === requestedPreviewIdentity &&
+    Boolean(previewUrl);
+  const imageExportReady = previewMatchesSelection && !isExporting;
 
   useEffect(() => {
     setRangeDraft(previousDraft => ({
@@ -260,16 +165,20 @@ const ExportModal = ({
 
     if (!wasOpenRef.current) {
       wasOpenRef.current = true;
-      setPreviewFrameIndex(fallbackFrame);
+      onPreviewFrameChange?.(fallbackFrame);
       return;
     }
 
-    setPreviewFrameIndex(previousFrame =>
-      includedFrameIndexes.includes(previousFrame)
-        ? previousFrame
-        : fallbackFrame
-    );
-  }, [currentFrame, includedFrameIndexes, open]);
+    if (!includedFrameIndexes.includes(previewFrameIndex)) {
+      onPreviewFrameChange?.(fallbackFrame);
+    }
+  }, [
+    currentFrame,
+    includedFrameIndexes,
+    onPreviewFrameChange,
+    open,
+    previewFrameIndex,
+  ]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -283,35 +192,7 @@ const ExportModal = ({
   }, [onClose, open]);
 
   useEffect(() => {
-    if (!open) return undefined;
-
-    let resizeObserver = null;
-    const updateViewport = () => {
-      try {
-        const bounds = getGraphSvgElement().getBoundingClientRect();
-        setEditorViewport({
-          width: Math.max(2, Math.round(bounds.width)),
-          height: Math.max(2, Math.round(bounds.height)),
-        });
-      } catch {
-        setEditorViewport({ width: 0, height: 0 });
-      }
-    };
-
-    updateViewport();
-    try {
-      const svgElement = getGraphSvgElement();
-      resizeObserver = new ResizeObserver(updateViewport);
-      resizeObserver.observe(svgElement);
-    } catch {
-      // The preview fallback handles a missing editor canvas.
-    }
-
-    return () => resizeObserver?.disconnect();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !previewGraph || editorViewport.width <= 0) return undefined;
+    if (!open || isExporting) return undefined;
 
     let active = true;
     let delayedStatusTimer = null;
@@ -323,15 +204,20 @@ const ExportModal = ({
         delayedStatusTimer = window.setTimeout(() => {
           if (active) setShowDelayedPreviewStatus(true);
         }, PREVIEW_UPDATE_DELAY_MS);
-        await waitForFrameRender();
+        await waitForExportReady({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          frameIndex: previewFrameIndex,
+          captureToken: previewCaptureToken,
+        });
         const svgData = serializeCurrentFrameSvg({
-          svgElementId: PREVIEW_SVG_ELEMENT_ID,
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
           framingMode: imageFraming,
         });
         if (!active) return;
         setPreviewUrl(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgData)}`
         );
+        setPreviewIdentity(requestedPreviewIdentity);
         if (delayedStatusTimer !== null) {
           window.clearTimeout(delayedStatusTimer);
           delayedStatusTimer = null;
@@ -344,6 +230,7 @@ const ExportModal = ({
           window.clearTimeout(delayedStatusTimer);
           delayedStatusTimer = null;
         }
+        setPreviewIdentity('');
         setPreviewStatus('error');
         setShowDelayedPreviewStatus(false);
       }
@@ -357,12 +244,12 @@ const ExportModal = ({
       }
     };
   }, [
-    editorViewport.height,
-    editorViewport.width,
     imageFraming,
+    isExporting,
     open,
-    previewGraph,
-    previewRenderKey,
+    previewCaptureToken,
+    previewFrameIndex,
+    requestedPreviewIdentity,
   ]);
 
   if (!open) return null;
@@ -410,7 +297,7 @@ const ExportModal = ({
           data-testid="export-preview-panel"
           data-preview-chrome="true"
         >
-          {previewUrl ? (
+          {previewMatchesSelection ? (
             <div
               className="relative flex h-full w-full items-center justify-center"
               data-testid="export-preview-current-frame"
@@ -436,8 +323,10 @@ const ExportModal = ({
               data-testid="export-preview-status"
             >
               {previewStatus === 'error'
-                ? 'Preview unavailable. Export actions still work.'
-                : 'Preparing preview...'}
+                ? 'Preview unavailable. Select another frame or reopen export.'
+                : isExporting
+                  ? 'Exporting selected frames...'
+                  : 'Preparing preview...'}
             </div>
           )}
         </div>
@@ -475,7 +364,8 @@ const ExportModal = ({
                   }`}
                   data-selected={isSelected ? 'true' : 'false'}
                   data-testid={`export-preview-frame-item-${frameIndex}`}
-                  onClick={() => setPreviewFrameIndex(frameIndex)}
+                  disabled={isExporting}
+                  onClick={() => onPreviewFrameChange?.(frameIndex)}
                 >
                   <span className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold">
@@ -525,6 +415,7 @@ const ExportModal = ({
                     name="export-frame-range-mode"
                     value={value}
                     checked={frameRange.mode === value}
+                    disabled={isExporting}
                     onChange={() => onExportFrameRangeChange?.({ mode: value })}
                     className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
                   />
@@ -547,6 +438,7 @@ const ExportModal = ({
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={rangeDraft.startFrame}
+                    disabled={isExporting}
                     aria-label="Export start frame"
                     data-testid="export-frame-start-input"
                     onFocus={() => {
@@ -569,6 +461,7 @@ const ExportModal = ({
                     inputMode="numeric"
                     pattern="[0-9]*"
                     value={rangeDraft.endFrame}
+                    disabled={isExporting}
                     aria-label="Export end frame"
                     data-testid="export-frame-end-input"
                     onFocus={() => {
@@ -590,7 +483,7 @@ const ExportModal = ({
               type="button"
               className={primaryActionClass}
               data-testid="slideshow-export-button"
-              disabled={!totalFrames}
+              disabled={!totalFrames || isExporting}
               onClick={onExportSlideshow}
             >
               Export Slideshow
@@ -598,6 +491,7 @@ const ExportModal = ({
             <button
               type="button"
               className={actionClass}
+              disabled={isExporting}
               onClick={() => {
                 onClose?.();
                 onExportVideo?.();
@@ -625,6 +519,7 @@ const ExportModal = ({
                 value={pngScale}
                 aria-label="PNG Scale"
                 data-testid="png-scale-select"
+                disabled={isExporting}
                 onChange={event =>
                   onPngScaleChange?.(Number(event.target.value))
                 }
@@ -644,6 +539,7 @@ const ExportModal = ({
                 value={imageFraming}
                 aria-label="Image Framing"
                 data-testid="image-framing-select"
+                disabled={isExporting}
                 onChange={event => onImageFramingChange?.(event.target.value)}
                 size="regular"
               >
@@ -662,7 +558,10 @@ const ExportModal = ({
               type="button"
               className={primaryActionClass}
               data-testid="png-export-button"
-              onClick={onExportPng}
+              disabled={!imageExportReady}
+              onClick={() => {
+                if (imageExportReady) onExportPng?.(previewFrameIndex);
+              }}
             >
               Export PNG
             </button>
@@ -670,7 +569,10 @@ const ExportModal = ({
               type="button"
               className={actionClass}
               data-testid="svg-export-button"
-              onClick={onExportSvg}
+              disabled={!imageExportReady}
+              onClick={() => {
+                if (imageExportReady) onExportSvg?.(previewFrameIndex);
+              }}
             >
               Export SVG
             </button>
@@ -700,16 +602,6 @@ const ExportModal = ({
           </div>
         </section>
       </aside>
-
-      <ExportPreviewRenderer
-        graph={previewGraph}
-        captionText={previewCaptionText}
-        viewport={editorViewport}
-        canvas={{
-          ...previewCanvas,
-          captionOverlay: previewCaptionOverlay,
-        }}
-      />
     </ModalFrame>
   );
 };

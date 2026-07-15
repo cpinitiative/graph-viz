@@ -1,11 +1,11 @@
 import {
+  CAPTURE_MODE,
   createCaptureCanvas,
-  DEFAULT_SVG_ELEMENT_ID,
+  EXPORT_CAPTURE_SVG_ELEMENT_ID,
   getGraphSvgElement,
   IMAGE_FRAMING,
   loadSvgImageFromElement,
-  waitForFrameRender,
-} from './timelineFrameCapture';
+} from './timelineFrameCapture.js';
 
 const SLIDE_WIDTH = 13.333;
 const SLIDE_HEIGHT = 7.5;
@@ -45,14 +45,13 @@ const getFittedImageRect = ({ imageWidth, imageHeight }) => {
 
 /**
  * Renders each timeline step as a raster image slide.
- * Depends on GraphCanvas exposing `id="graph-studio-canvas-svg"`.
+ * Captures an explicit resolved-frame surface without navigating the editor.
  */
 export async function exportTimelineSlideshow({
   steps,
-  currentFrame,
-  setCurrentFrame,
   frameIndexes,
-  svgElementId = DEFAULT_SVG_ELEMENT_ID,
+  renderFrame,
+  svgElementId = EXPORT_CAPTURE_SVG_ELEMENT_ID,
 }) {
   if (!steps?.length) {
     throw new Error('No timeline frames to export');
@@ -64,6 +63,9 @@ export async function exportTimelineSlideshow({
     : steps.map((_, index) => index);
   if (!selectedFrameIndexes.length) {
     throw new Error('No timeline frames selected for export');
+  }
+  if (typeof renderFrame !== 'function') {
+    throw new Error('Slideshow export renderer is unavailable');
   }
 
   const { default: PptxGenJS } = await import('pptxgenjs');
@@ -80,42 +82,44 @@ export async function exportTimelineSlideshow({
     lang: 'en-US',
   };
 
-  const svgEl = getGraphSvgElement(svgElementId);
   const slideshowFramingMode = IMAGE_FRAMING.slide;
-  const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, {
-    framingMode: IMAGE_FRAMING.slide,
-  });
+  let captureSurface = null;
 
-  try {
-    for (const i of selectedFrameIndexes) {
-      setCurrentFrame(i);
-      await waitForFrameRender();
-
-      const img = await loadSvgImageFromElement({
-        svgEl,
-        width: canvas.width,
-        height: canvas.height,
-        viewportWidth: viewport.width,
-        viewportHeight: viewport.height,
-        framingMode: slideshowFramingMode,
-      });
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      const slide = pptx.addSlide();
-      slide.background = { color: 'FFFFFF' };
-      slide.addImage({
-        data: canvas.toDataURL('image/png'),
-        ...getFittedImageRect({
-          imageWidth: canvas.width,
-          imageHeight: canvas.height,
-        }),
+  for (const i of selectedFrameIndexes) {
+    const renderedSvg = await renderFrame(i);
+    const svgEl = renderedSvg ?? getGraphSvgElement(svgElementId);
+    if (!captureSurface) {
+      captureSurface = createCaptureCanvas(svgEl, {
+        framingMode: IMAGE_FRAMING.slide,
+        captureMode: CAPTURE_MODE.slide,
       });
     }
-  } finally {
-    setCurrentFrame(currentFrame);
-    await waitForFrameRender();
+    const { canvas, ctx, viewport } = captureSurface;
+
+    const img = await loadSvgImageFromElement({
+      svgEl,
+      width: canvas.width,
+      height: canvas.height,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      framingMode: slideshowFramingMode,
+    });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const slide = pptx.addSlide();
+    slide.background = { color: 'FFFFFF' };
+    slide.addImage({
+      data: canvas.toDataURL('image/png'),
+      altText: `Graph Studio Frame ${i + 1}: ${String(
+        steps[i]?.description ?? ''
+      )}`,
+      ...getFittedImageRect({
+        imageWidth: canvas.width,
+        imageHeight: canvas.height,
+      }),
+    });
   }
 
   await pptx.writeFile({ fileName: getDatedFilename() });

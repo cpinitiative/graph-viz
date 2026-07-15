@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTheme } from '../../../context/useTheme';
 import { EDGE_ROUTING } from './graphStudio/constants';
 import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
 import GraphStudioLayout from './graphStudio/GraphStudioLayout';
@@ -75,6 +76,7 @@ const isAutoFontSize = (value, autoValue) =>
   !Number.isFinite(Number(value)) || Math.abs(Number(value) - autoValue) < 0.01;
 
 const GraphStudioVisualizer = ({ snapshot }) => {
+  const { theme } = useTheme();
   const seedTimeline = useMemo(
     () =>
       normalizeTimelinePayload(
@@ -119,7 +121,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   };
   const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const {
     viewState,
     setViewState,
@@ -284,7 +285,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     nodeConnectedEdges,
     edgeConnectedNodes,
     clearSelection,
-  } = useGraphStudioSelection({ computedGraph });
+  } = useGraphStudioSelection({ baseGraph, computedGraph });
   const {
     updateBaseNode,
     updateBaseNodesBulk,
@@ -294,6 +295,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     applyTemporalPropertyToAllFrames,
     setTemporalVisibility,
     setTemporalVisibilityFromFrame,
+    setTemporalVisibilityForObjects,
+    setTemporalVisibilityForObjectsFromFrame,
     addNodeAt,
     addEdge,
     deleteSelection,
@@ -323,6 +326,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     applySelectedEdgeToAllFrames,
     setSelectedNodeVisibilityForFrame,
     setSelectedNodeVisibilityFromFrame,
+    setSelectedNodesVisibilityForFrame,
+    setSelectedNodesVisibilityFromFrame,
     setSelectedEdgeVisibilityForFrame,
     setSelectedEdgeVisibilityFromFrame,
   } = useGraphStudioSelectionPatchers({
@@ -336,13 +341,14 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     applyTemporalPropertyToAllFrames,
     setTemporalVisibility,
     setTemporalVisibilityFromFrame,
+    setTemporalVisibilityForObjects,
+    setTemporalVisibilityForObjectsFromFrame,
     currentFrame,
     setStatus,
   });
   const {
     drawFrom,
     clearDrawState,
-    restoreDrawState,
     handleSetMode,
     startDrawEdge,
     onSelectNode,
@@ -406,6 +412,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setImageFraming,
     exportFrameRange,
     updateExportFrameRange,
+    exportCapture,
+    exportFrameIndex,
+    setExportFrameIndex,
+    isVisualExporting,
+    beginExportReview,
+    endExportReview,
     importProjectFile,
     openExportVideoModal,
     closeExportVideoModal,
@@ -414,7 +426,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     baseGraph,
     steps,
     currentFrame,
-    setCurrentFrame,
+    getFrameGraph,
     replaceTimeline,
     setStatus,
     edgeRouting,
@@ -434,18 +446,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setViewFromNodes,
     bumpViewReset,
     globalSettings,
+    theme,
     setGlobalSettings,
-    mode,
     setMode,
-    selectedObject,
-    setSelectedObject,
-    selectedNodeIds,
-    setSelectedNodeIds,
-    drawFrom,
-    restoreDrawState,
     clearSelection,
     clearDrawState,
-    setIsExporting,
     resetUndoHistory,
     stopTimeline,
   });
@@ -601,19 +606,35 @@ const GraphStudioVisualizer = ({ snapshot }) => {
 
     return entries;
   }, [computedGraph.nodes, computedGraph.edges, currentNodeMap, currentStep]);
-  const hasSelectedNotShownObject = useMemo(() => {
-    const selectedNotShownNode =
-      selectedNode?.visible === false ||
-      selectedNodeIds.some(
-        id => currentNodeMap.get(String(id))?.visible === false
-      );
-    if (selectedNotShownNode) return true;
-    if (!selectedEdge) return false;
-    if (selectedEdge.visible === false) return true;
-    const fromNode = currentNodeMap.get(String(selectedEdge.from));
-    const toNode = currentNodeMap.get(String(selectedEdge.to));
-    return fromNode?.visible === false || toNode?.visible === false;
-  }, [currentNodeMap, selectedEdge, selectedNode, selectedNodeIds]);
+  const selectedNotShownNodeCount = useMemo(
+    () =>
+      selectedNodeIds.reduce(
+        (count, id) =>
+          count + (currentNodeMap.get(String(id))?.visible === false ? 1 : 0),
+        0
+      ),
+    [currentNodeMap, selectedNodeIds]
+  );
+  const inspectorPresenceRecoveryKeys = useMemo(() => {
+    const keys = new Set();
+    if (selectedNodeIds.length > 1) {
+      selectedNodeIds.forEach(id => keys.add(`node:${String(id)}`));
+      return keys;
+    }
+    if (selectedNode) keys.add(`node:${String(selectedNode.id)}`);
+    if (selectedEdge) keys.add(`edge:${String(selectedEdge.id)}`);
+    return keys;
+  }, [selectedEdge, selectedNode, selectedNodeIds]);
+  const compactPresenceRecoveryEntries = useMemo(
+    () =>
+      presenceRecoveryEntries.filter(
+        entry =>
+          !inspectorPresenceRecoveryKeys.has(
+            `${entry.type}:${String(entry.id)}`
+          )
+      ),
+    [inspectorPresenceRecoveryKeys, presenceRecoveryEntries]
+  );
   const showPresenceForFrame = useCallback(
     (objectType, objectId) => {
       setTemporalVisibility?.(objectType, objectId, true);
@@ -697,8 +718,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   );
 
   const layoutProps = {
+    exportCapture,
     presenceRecovery: {
-      entries: hasSelectedNotShownObject ? [] : presenceRecoveryEntries,
+      entries: compactPresenceRecoveryEntries,
       onShowHere: showPresenceForFrame,
       onShowOnward: showPresenceFromFrame,
     },
@@ -730,6 +752,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onImageFramingChange: setImageFraming,
       exportFrameRange,
       onExportFrameRangeChange: updateExportFrameRange,
+      exportFrameIndex,
+      onExportFrameChange: setExportFrameIndex,
+      isVisualExporting,
+      onBeginExportReview: beginExportReview,
+      onEndExportReview: endExportReview,
       onImportProjectFile: importProjectFile,
       onOpenProjectJsonPaste: openProjectJsonPasteModal,
       onExportVideo: openExportVideoModal,
@@ -783,7 +810,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       baseCaptionOverlay: normalizedCaptionOverlay,
       setCaptionOverlay,
       captionText: steps[currentFrame]?.description ?? '',
-      isExporting,
     },
     property: {
       selectedNode,
@@ -791,6 +817,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       connectedEdges: nodeConnectedEdges,
       connectedNodes: edgeConnectedNodes,
       multiSelection: selectedNodeIds,
+      multiSelectionNotShownCount: selectedNotShownNodeCount,
       globalSettings,
       edgeRouting,
       nodeFrameOverrides: selectedNodeFrameOverrides,
@@ -805,6 +832,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onSetNodeVisibilityFromFrame: setSelectedNodeVisibilityFromFrame,
       onSetEdgeVisibilityForFrame: setSelectedEdgeVisibilityForFrame,
       onSetEdgeVisibilityFromFrame: setSelectedEdgeVisibilityFromFrame,
+      onSetSelectionVisibilityForFrame: setSelectedNodesVisibilityForFrame,
+      onSetSelectionVisibilityFromFrame: setSelectedNodesVisibilityFromFrame,
       onSelectEdge: edgeId => onSelectEdge(edgeId),
       onSelectNode: nodeId => onSelectNode(nodeId, false),
       onApplyToSelection: applyPatchToSelectedNodes,
