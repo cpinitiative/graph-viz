@@ -114,7 +114,9 @@ Use the Node version in `.nvmrc`.
 ```bash
 npm ci
 npm run dev
+npm run test:unit
 npm run check
+npm run test:e2e:smoke
 npm run test:e2e
 npm run test:e2e:headed
 npm run test:e2e:ui
@@ -123,19 +125,42 @@ npm run check:e2e
 
 `npm run dev` starts the local Vite development server.
 
-`npm run check` runs formatting checks, ESLint, and the production build.
+`npm run check` runs formatting checks, ESLint, and the production build. Unit
+tests name the current test files explicitly so the command works on the
+recommended Node 20.19 release and on newer Node releases that no longer accept
+a test directory. Local Playwright builds and serves the production bundle
+through Vite preview.
 
-To run E2E tests against the deployed site:
+To run the focused smoke test against the deployed site:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e
+PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e:smoke
 ```
+
+The deployment is public, so this command needs no secret. To also prove that a
+specific commit is deployed, set the optional expected 7–40 character SHA:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide EXPECTED_GRAPH_STUDIO_COMMIT_SHA=$(git rev-parse HEAD) npm run test:e2e:smoke
+```
+
+The smoke checks the document and core asset responses, the Graph Studio shell,
+the graph canvas, theme toggling, browser errors, and the build marker. A
+regular production build writes commit, build timestamp, and deployment label
+metadata to `data-build-*` attributes on `graph-studio-root`. Build systems can
+override the detected values with `GRAPH_STUDIO_COMMIT_SHA`,
+`GRAPH_STUDIO_BUILD_TIMESTAMP`, and `GRAPH_STUDIO_DEPLOYMENT`. If a build has
+neither repository metadata nor an injected commit, the marker reports
+`unknown`; setting `EXPECTED_GRAPH_STUDIO_COMMIT_SHA` makes that a smoke
+failure.
 
 ## Validation and CI
 
 GitHub Actions runs CI and E2E workflows on pull requests and pushes to `main`.
 
 - `npm run check` verifies formatting, linting, and production build output.
+- `npm run test:unit` runs the deterministic graph-state and layout unit tests.
+- `npm run test:e2e:smoke` runs the local/deployed shell smoke path.
 - `npm run test:e2e` runs Playwright tests for core user flows.
 - The E2E suite covers app load, graph editing, presets, timeline editing,
   project import/export, Script Mode timeout protection, self-loop rendering,
