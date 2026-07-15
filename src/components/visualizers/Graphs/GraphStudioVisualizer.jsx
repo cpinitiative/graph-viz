@@ -82,6 +82,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       ),
     [snapshot]
   );
+  const playbackStopRef = useRef(null);
+  const stopPlaybackBeforeTimelineMutation = useCallback(() => {
+    playbackStopRef.current?.();
+  }, []);
   const {
     baseGraph,
     setBaseGraph,
@@ -97,7 +101,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     removeStep,
     moveStep,
     replaceTimeline,
-  } = useGraphAnimation(seedTimeline.baseGraph, seedTimeline.steps);
+  } = useGraphAnimation(seedTimeline.baseGraph, seedTimeline.steps, {
+    onBeforeTimelineMutation: stopPlaybackBeforeTimelineMutation,
+  });
   const [mode, setMode] = useState('select');
   const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -206,21 +212,67 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       return next;
     });
   }, []);
+  const undoSettings = useMemo(
+    () => ({
+      edgeRouting,
+      snapEnabled,
+      showGrid,
+      captionOverlay,
+      customLegend,
+      lockCanvas,
+      globalSettings,
+    }),
+    [
+      captionOverlay,
+      customLegend,
+      edgeRouting,
+      globalSettings,
+      lockCanvas,
+      showGrid,
+      snapEnabled,
+    ]
+  );
+  const restoreUndoSettings = useCallback(
+    settings => {
+      if (!isRecord(settings)) return;
+      setEdgeRouting(settings.edgeRouting);
+      setSnapEnabled(Boolean(settings.snapEnabled));
+      setShowGrid(Boolean(settings.showGrid));
+      setCaptionOverlay(settings.captionOverlay);
+      setCustomLegend(settings.customLegend);
+      setLockCanvas(Boolean(settings.lockCanvas));
+      setGlobalSettings(settings.globalSettings);
+    },
+    [setLockCanvas]
+  );
   const { resetUndoHistory } = useGraphStudioUndo({
     baseGraph,
     steps,
+    settings: undoSettings,
     currentFrame,
     replaceTimeline,
-    setCurrentFrame,
+    restoreSettings: restoreUndoSettings,
     setStatus,
   });
-  const { isPlaying, togglePlayback } = useGraphStudioPlayback({
+  const { isPlaying, stopTimeline, togglePlayback } = useGraphStudioPlayback({
     steps,
-    frameCount,
     currentFrame,
     setCurrentFrame,
     setStatus,
   });
+  useEffect(() => {
+    playbackStopRef.current = stopTimeline;
+    return () => {
+      playbackStopRef.current = null;
+    };
+  }, [stopTimeline]);
+  const navigateToFrame = useCallback(
+    (frame, nextFrameCount) => {
+      stopTimeline();
+      setCurrentFrame(frame, nextFrameCount);
+    },
+    [setCurrentFrame, stopTimeline]
+  );
   const {
     selectedObject,
     setSelectedObject,
@@ -395,6 +447,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     clearDrawState,
     setIsExporting,
     resetUndoHistory,
+    stopTimeline,
   });
   useEffect(() => {
     replaceTimeline(seedTimeline.baseGraph, seedTimeline.steps);
@@ -443,12 +496,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
 
       event.preventDefault();
       const frameDelta = event.key === 'ArrowLeft' ? -1 : 1;
-      setCurrentFrame(currentFrame + frameDelta);
+      navigateToFrame(currentFrame + frameDelta);
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentFrame, setCurrentFrame]);
+  }, [currentFrame, navigateToFrame]);
   useEffect(() => {
     const onKeyDown = event => {
       if (
@@ -763,7 +816,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     timeline: {
       steps,
       currentFrame,
-      onFrameChange: setCurrentFrame,
+      onFrameChange: navigateToFrame,
       onStepDurationChange: (index, value) =>
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>

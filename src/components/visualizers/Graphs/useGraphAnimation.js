@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { normalizeFrameDuration } from './graphStudio/lib/frameDuration';
 import { resolveFrameGraph } from './graphStudio/lib/temporalGraphState';
 
 const clampFrame = (frame, count) => {
@@ -18,9 +19,7 @@ const normalizeAnimationStep = (step = {}, index = 0) => {
     ...cloned,
     id: String(cloned?.id ?? createStepId()),
     description: String(cloned?.description ?? `Step ${index + 1}`),
-    durationMs: Number.isFinite(Number(cloned?.durationMs))
-      ? Number(cloned.durationMs)
-      : 600,
+    durationMs: normalizeFrameDuration(cloned?.durationMs),
     nodeOverrides:
       cloned?.nodeOverrides && typeof cloned.nodeOverrides === 'object'
         ? cloned.nodeOverrides
@@ -109,7 +108,11 @@ export const computeGraphAtStep = (baseGraph, step) => {
   return resolveFrameGraph(baseGraph, step);
 };
 
-export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
+export const useGraphAnimation = (
+  initialBaseGraph,
+  initialSteps = [],
+  { onBeforeTimelineMutation } = {}
+) => {
   const [baseGraph, setBaseGraph] = useState(initialBaseGraph);
   const [steps, setSteps] = useState(() => {
     const normalized = normalizeAnimationSteps(initialSteps);
@@ -129,83 +132,104 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
       ),
     [baseGraph, steps, frameCount]
   );
-  const addStep = useCallback(index => {
-    setSteps(prev => {
-      const next = prev.length ? [...prev] : [normalizeAnimationStep({}, 0)];
-      const frameIndex = clampFrame(index, next.length);
-      const insertAt = frameIndex + 1;
-      const carriedStep = normalizeAnimationStep(
-        {
-          ...cloneStep(next[frameIndex]),
-          id: createStepId(),
-          description: '',
-        },
-        insertAt
-      );
-      next.splice(insertAt, 0, carriedStep);
-      return next;
-    });
-  }, []);
-  const updateStep = useCallback((index, property, value) => {
-    setSteps(prev => {
-      if (!prev.length) return prev;
-      const frameIndex = clampFrame(index, prev.length);
-      const next = [...prev];
-      const draft = cloneStep(next[frameIndex]);
-      if (typeof property === 'function') {
-        const produced = property(draft);
-        next[frameIndex] = normalizeAnimationStep(
-          produced ?? draft,
-          frameIndex
+  const addStep = useCallback(
+    index => {
+      onBeforeTimelineMutation?.();
+      setSteps(prev => {
+        const next = prev.length ? [...prev] : [normalizeAnimationStep({}, 0)];
+        const frameIndex = clampFrame(index, next.length);
+        const insertAt = frameIndex + 1;
+        const carriedStep = normalizeAnimationStep(
+          {
+            ...cloneStep(next[frameIndex]),
+            id: createStepId(),
+            description: '',
+          },
+          insertAt
         );
+        next.splice(insertAt, 0, carriedStep);
         return next;
-      }
-      if (typeof property === 'string') {
-        setByPath(draft, property, value);
-      } else if (property && typeof property === 'object') {
-        Object.assign(draft, property);
-      }
-      next[frameIndex] = draft;
-      return next;
-    });
-  }, []);
-  const duplicateStep = useCallback(index => {
-    setSteps(prev => {
-      if (!prev.length) return prev;
-      const frameIndex = clampFrame(index, prev.length);
-      const next = [...prev];
-      const duplicated = normalizeAnimationStep(
-        cloneStep(next[frameIndex]),
-        frameIndex + 1
-      );
-      duplicated.id = createStepId();
-      next.splice(frameIndex + 1, 0, duplicated);
-      return next;
-    });
-  }, []);
-  const removeStep = useCallback(index => {
-    setSteps(prev => {
-      if (prev.length <= 1) return prev;
-      const frameIndex = clampFrame(index, prev.length);
-      const next = [...prev];
-      next.splice(frameIndex, 1);
-      return next.length ? next : [normalizeAnimationStep({}, 0)];
-    });
-  }, []);
-  const moveStep = useCallback((fromIndex, toIndex) => {
-    setSteps(prev => {
-      if (prev.length <= 1) return prev;
-      const from = clampFrame(fromIndex, prev.length);
-      const to = clampFrame(toIndex, prev.length);
-      if (from === to) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  }, []);
+      });
+    },
+    [onBeforeTimelineMutation]
+  );
+  const updateStep = useCallback(
+    (index, property, value) => {
+      onBeforeTimelineMutation?.();
+      setSteps(prev => {
+        if (!prev.length) return prev;
+        const frameIndex = clampFrame(index, prev.length);
+        const next = [...prev];
+        const draft = cloneStep(next[frameIndex]);
+        if (typeof property === 'function') {
+          const produced = property(draft);
+          next[frameIndex] = normalizeAnimationStep(
+            produced ?? draft,
+            frameIndex
+          );
+          return next;
+        }
+        if (typeof property === 'string') {
+          setByPath(draft, property, value);
+        } else if (property && typeof property === 'object') {
+          Object.assign(draft, property);
+        }
+        next[frameIndex] = normalizeAnimationStep(draft, frameIndex);
+        return next;
+      });
+    },
+    [onBeforeTimelineMutation]
+  );
+  const duplicateStep = useCallback(
+    index => {
+      onBeforeTimelineMutation?.();
+      setSteps(prev => {
+        if (!prev.length) return prev;
+        const frameIndex = clampFrame(index, prev.length);
+        const next = [...prev];
+        const duplicated = normalizeAnimationStep(
+          cloneStep(next[frameIndex]),
+          frameIndex + 1
+        );
+        duplicated.id = createStepId();
+        next.splice(frameIndex + 1, 0, duplicated);
+        return next;
+      });
+    },
+    [onBeforeTimelineMutation]
+  );
+  const removeStep = useCallback(
+    index => {
+      onBeforeTimelineMutation?.();
+      setSteps(prev => {
+        if (prev.length <= 1) return prev;
+        const frameIndex = clampFrame(index, prev.length);
+        const next = [...prev];
+        next.splice(frameIndex, 1);
+        return next.length ? next : [normalizeAnimationStep({}, 0)];
+      });
+    },
+    [onBeforeTimelineMutation]
+  );
+  const moveStep = useCallback(
+    (fromIndex, toIndex) => {
+      onBeforeTimelineMutation?.();
+      setSteps(prev => {
+        if (prev.length <= 1) return prev;
+        const from = clampFrame(fromIndex, prev.length);
+        const to = clampFrame(toIndex, prev.length);
+        if (from === to) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return next;
+      });
+    },
+    [onBeforeTimelineMutation]
+  );
   const replaceTimeline = useCallback(
     (nextBaseGraph, nextSteps = [{}], nextFrame = 0) => {
+      onBeforeTimelineMutation?.();
       setBaseGraph(nextBaseGraph);
       const normalized = normalizeAnimationSteps(nextSteps);
       const safeSteps = normalized.length
@@ -214,7 +238,7 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
       setSteps(safeSteps);
       setCurrentFrame(clampFrame(Number(nextFrame), safeSteps.length));
     },
-    []
+    [onBeforeTimelineMutation]
   );
   const setFrame = useCallback(
     (nextFrame, nextFrameCount = frameCount) => {
@@ -226,7 +250,6 @@ export const useGraphAnimation = (initialBaseGraph, initialSteps = []) => {
     baseGraph,
     setBaseGraph,
     steps,
-    setSteps,
     frameCount,
     currentFrame,
     setCurrentFrame: setFrame,

@@ -4,6 +4,7 @@ import {
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
 } from './constants';
+import { normalizeFrameDuration } from './lib/frameDuration';
 import { clamp, clampNodePosition } from './lib/graphGeometry';
 
 export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry';
@@ -70,7 +71,7 @@ const normalizeStep = (step, index) => {
   return {
     id: String(step?.id ?? `step-${index}`),
     description: String(step?.description ?? `Step ${index + 1}`),
-    durationMs: clamp(Number(step?.durationMs ?? 600), 80, 8000),
+    durationMs: normalizeFrameDuration(step?.durationMs),
     ...(typeof captionVisible === 'boolean' ? { captionVisible } : {}),
     nodeOverrides:
       step?.nodeOverrides && typeof step.nodeOverrides === 'object'

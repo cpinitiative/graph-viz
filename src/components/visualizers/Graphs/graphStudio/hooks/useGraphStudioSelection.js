@@ -142,14 +142,23 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedNode) return;
       const { basePatch, stepUpdates } = splitNodePatch(patch);
       if (stepUpdates.length > 0) {
-        const stepPatch = Object.fromEntries(
-          stepUpdates.map(({ key, value }) => [key, value])
-        );
         const visibilityUpdate = stepUpdates.find(
           ({ key }) => key === 'visible'
         );
-        setFrameOverride('node', selectedNode.id, stepPatch);
+        const stepPatch = Object.fromEntries(
+          stepUpdates
+            .filter(({ key }) => key !== 'visible')
+            .map(({ key, value }) => [key, value])
+        );
+        if (Object.keys(stepPatch).length > 0) {
+          setFrameOverride('node', selectedNode.id, stepPatch);
+        }
         if (visibilityUpdate) {
+          setTemporalVisibility?.(
+            'node',
+            selectedNode.id,
+            visibilityUpdate.value
+          );
           setStatus?.(
             `Node ${selectedNode.id} ${getPresenceLabel(
               visibilityUpdate.value
@@ -167,7 +176,14 @@ export const useGraphStudioSelectionPatchers = ({
         setStatus?.(`Node ${getPropertyLabel(key)} updated for all frames`);
       }
     },
-    [frameNumber, selectedNode, setFrameOverride, setStatus, updateBaseNode]
+    [
+      frameNumber,
+      selectedNode,
+      setFrameOverride,
+      setStatus,
+      setTemporalVisibility,
+      updateBaseNode,
+    ]
   );
 
   const updateSelectedEdge = useCallback(
@@ -175,14 +191,23 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedEdge) return;
       const { basePatch, stepUpdates } = splitEdgePatch(patch);
       if (stepUpdates.length > 0) {
-        const stepPatch = Object.fromEntries(
-          stepUpdates.map(({ key, value }) => [key, value])
-        );
         const visibilityUpdate = stepUpdates.find(
           ({ key }) => key === 'visible'
         );
-        setFrameOverride('edge', selectedEdge.id, stepPatch);
+        const stepPatch = Object.fromEntries(
+          stepUpdates
+            .filter(({ key }) => key !== 'visible')
+            .map(({ key, value }) => [key, value])
+        );
+        if (Object.keys(stepPatch).length > 0) {
+          setFrameOverride('edge', selectedEdge.id, stepPatch);
+        }
         if (visibilityUpdate) {
+          setTemporalVisibility?.(
+            'edge',
+            selectedEdge.id,
+            visibilityUpdate.value
+          );
           setStatus?.(
             `Edge ${selectedEdge.id} ${getPresenceLabel(
               visibilityUpdate.value
@@ -200,16 +225,34 @@ export const useGraphStudioSelectionPatchers = ({
         setStatus?.(`Edge ${getPropertyLabel(key)} updated for all frames`);
       }
     },
-    [frameNumber, selectedEdge, setFrameOverride, setStatus, updateBaseEdge]
+    [
+      frameNumber,
+      selectedEdge,
+      setFrameOverride,
+      setStatus,
+      setTemporalVisibility,
+      updateBaseEdge,
+    ]
   );
 
   const applyPatchToSelectedNodes = useCallback(
     patch => {
       if (!selectedNodeIds.length) return;
+      const hasVisibility = Object.prototype.hasOwnProperty.call(
+        patch ?? {},
+        'visible'
+      );
+      const framePatch = { ...(patch ?? {}) };
+      delete framePatch.visible;
       selectedNodeIds.forEach(id => {
-        setFrameOverride('node', id, patch);
+        if (Object.keys(framePatch).length > 0) {
+          setFrameOverride('node', id, framePatch);
+        }
+        if (hasVisibility) {
+          setTemporalVisibility?.('node', id, patch.visible);
+        }
       });
-      if (Object.prototype.hasOwnProperty.call(patch ?? {}, 'visible')) {
+      if (hasVisibility) {
         setStatus?.(
           `${selectedNodeIds.length} nodes ${getPresenceLabel(
             patch.visible
@@ -221,7 +264,13 @@ export const useGraphStudioSelectionPatchers = ({
         );
       }
     },
-    [frameNumber, selectedNodeIds, setFrameOverride, setStatus]
+    [
+      frameNumber,
+      selectedNodeIds,
+      setFrameOverride,
+      setStatus,
+      setTemporalVisibility,
+    ]
   );
 
   const resetSelectedNodeOverride = useCallback(

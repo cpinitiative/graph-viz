@@ -3,10 +3,11 @@ import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
 } from './lib/captionOverlay';
+import {
+  DEFAULT_FRAME_DURATION_MS,
+  normalizeFrameDuration,
+} from './lib/frameDuration';
 import NativeSelect from './NativeSelect';
-
-const MIN_DURATION_MS = 80;
-const MAX_DURATION_MS = 8000;
 
 const toolbarButtonClass =
   'min-h-[30px] whitespace-nowrap rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-2 py-1 text-xs font-medium text-[#334155] hover:bg-[#F8F9FA] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
@@ -170,9 +171,7 @@ const CaptionScopeHelp = () => (
 );
 
 const DurationInput = ({ durationMs, onCommit }) => {
-  const normalizedDuration = Number.isFinite(Number(durationMs))
-    ? Number(durationMs)
-    : 600;
+  const normalizedDuration = normalizeFrameDuration(durationMs);
   const [draft, setDraft] = useState(String(normalizedDuration));
 
   const reset = () => setDraft(String(normalizedDuration));
@@ -186,9 +185,7 @@ const DurationInput = ({ durationMs, onCommit }) => {
       reset();
       return;
     }
-    const nextDuration = Math.round(
-      Math.max(MIN_DURATION_MS, Math.min(MAX_DURATION_MS, parsed))
-    );
+    const nextDuration = Math.round(normalizeFrameDuration(parsed));
     setDraft(String(nextDuration));
     onCommit(nextDuration);
   };
@@ -448,7 +445,7 @@ const TimelinePanel = ({
                     Frame {index + 1}
                   </div>
                   <div className="font-mono text-[10px] font-semibold tabular-nums text-[#64748B] dark:text-[#CBD5E1]">
-                    {step.durationMs ?? 600} ms
+                    {normalizeFrameDuration(step.durationMs)} ms
                   </div>
                 </div>
                 <div
@@ -489,8 +486,8 @@ const TimelinePanel = ({
             <div className={detailLabelClass}>Duration</div>
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
               <DurationInput
-                key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? 600}`}
-                durationMs={steps[currentFrame]?.durationMs ?? 600}
+                key={`${steps[currentFrame]?.id ?? currentFrame}-${steps[currentFrame]?.durationMs ?? DEFAULT_FRAME_DURATION_MS}`}
+                durationMs={steps[currentFrame]?.durationMs}
                 onCommit={value => onStepDurationChange(currentFrame, value)}
               />
               <div className="hidden h-5 w-px bg-[#D7DEE8] dark:bg-[#334155] sm:block" />

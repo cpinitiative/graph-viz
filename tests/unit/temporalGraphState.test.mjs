@@ -204,6 +204,38 @@ test('show onward restores visibility on current and later frames', () => {
   assert.equal(hasFrameOverride(nextSteps[2], 'node', 'B', 'visible'), false);
 });
 
+test('showing an object keeps explicit true only when base visibility is false', () => {
+  const hiddenBaseGraph = {
+    ...baseGraph,
+    nodes: baseGraph.nodes.map(node =>
+      node.id === 'B' ? { ...node, visible: false } : node
+    ),
+  };
+  const steps = [
+    {
+      id: 'frame-1',
+      nodeOverrides: { B: { visible: false } },
+      edgeOverrides: {},
+    },
+  ];
+  const nextSteps = applyVisibilityToFrame({
+    baseGraph: hiddenBaseGraph,
+    steps,
+    objectType: 'node',
+    objectId: 'B',
+    frameIndex: 0,
+    visible: true,
+  });
+
+  assert.equal(nextSteps[0].nodeOverrides.B.visible, true);
+  assert.equal(
+    resolveFrameGraph(hiddenBaseGraph, nextSteps[0]).nodes.find(
+      node => node.id === 'B'
+    ).visible,
+    true
+  );
+});
+
 test('frame-local node color does not mutate other frames or global labels', () => {
   const steps = [
     applyFrameOverride(

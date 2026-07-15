@@ -1427,6 +1427,157 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('keeps navigation and playback out of undo history', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const cards = page.getByTestId('timeline-frame-card');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    await expect(cards).toHaveCount(5);
+    await cards.nth(1).click();
+
+    const nodeLabel = graphCanvas(page).locator('[data-node-label-id="0"]');
+    const nodeCircle = nodeLabel.locator('xpath=..').locator('circle').first();
+    await nodeCircle.click();
+    const colorInput = propertyPanel(page).getByLabel('Color', {
+      exact: true,
+    });
+    const originalColor = await colorInput.inputValue();
+    await colorInput.fill('#ff00ff');
+    await expect(colorInput).toHaveValue('#ff00ff');
+    await expect(nodeCircle).toHaveAttribute('fill', '#ff00ff');
+
+    for (let index = 0; index < 20; index += 1) {
+      await cards.nth(index % 4).click();
+    }
+
+    await cards.first().click();
+    const initialCounter = await frameCounter.textContent();
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+    await expect
+      .poll(() => frameCounter.textContent(), { timeout: 3000 })
+      .not.toBe(initialCounter);
+    await page.getByRole('button', { name: 'Pause timeline' }).click();
+
+    await cards.nth(1).click();
+    await expect(colorInput).toHaveValue('#ff00ff');
+    await page.keyboard.press('Control+z');
+
+    await expect(page.getByText('Undid last action')).toBeVisible();
+    await expect(colorInput).toHaveValue(originalColor);
+    await expect(nodeCircle).toHaveAttribute('fill', originalColor);
+
+    await cards.last().click();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(cards).toHaveCount(6);
+    await expect(frameCounter).toHaveText('6 / 6');
+    await page.keyboard.press('Control+z');
+    await expect(cards).toHaveCount(5);
+    await expect(frameCounter).toHaveText('5 / 5');
+    await expect(
+      page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
+    ).toHaveCount(1);
+
+    const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
+    const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
+    await expect(showGrid).toBeChecked();
+    await expect(snapToGrid).toBeChecked();
+    await showGrid.uncheck();
+    await expect(showGrid).not.toBeChecked();
+    await expect(snapToGrid).not.toBeChecked();
+    await page.keyboard.press('Control+z');
+    await expect(showGrid).toBeChecked();
+    await expect(snapToGrid).toBeChecked();
+    expect(errors).toEqual([]);
+  });
+
+  test('stops playback before timeline mutations and invalidates old ticks', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+
+    const cards = page.getByTestId('timeline-frame-card');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    const durationInput = page.getByTestId('frame-duration-input');
+    const playButton = page.getByRole('button', { name: 'Play timeline' });
+    const pauseButton = page.getByRole('button', { name: 'Pause timeline' });
+    const setLongDuration = async () => {
+      await durationInput.fill('1200');
+      await durationInput.press('Enter');
+      await expect(durationInput).toHaveValue('1200');
+    };
+    const startPlayback = async () => {
+      await playButton.click();
+      await expect(pauseButton).toBeVisible();
+    };
+
+    const initialCount = await cards.count();
+    await cards.nth(1).click();
+    await setLongDuration();
+    await startPlayback();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await expect(playButton).toBeVisible();
+    await expect(cards).toHaveCount(initialCount - 1);
+
+    await setLongDuration();
+    await startPlayback();
+    await page.getByRole('button', { name: '+ Keyframe' }).click();
+    await expect(playButton).toBeVisible();
+    await expect(cards).toHaveCount(initialCount);
+
+    await setLongDuration();
+    await startPlayback();
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(playButton).toBeVisible();
+    await expect(cards).toHaveCount(initialCount + 1);
+
+    await setLongDuration();
+    await startPlayback();
+    await page.getByTitle('Move keyframe left').click();
+    await expect(playButton).toBeVisible();
+
+    await setLongDuration();
+    await startPlayback();
+    await durationInput.fill('900');
+    await durationInput.press('Enter');
+    await expect(playButton).toBeVisible();
+    await expect(durationInput).toHaveValue('900');
+    const counterAfterMutations = await frameCounter.textContent();
+
+    await page.waitForTimeout(1300);
+    await expect(frameCounter).toHaveText(counterAfterMutations);
+    await expect(
+      page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
+    ).toHaveCount(1);
+    const [current, total] = (await frameCounter.textContent())
+      .split('/')
+      .map(value => Number(value.trim()));
+    expect(current).toBeGreaterThanOrEqual(1);
+    expect(current).toBeLessThanOrEqual(total);
+
+    await setLongDuration();
+    await startPlayback();
+    await choosePreset(page, 'dfs');
+    await expect(playButton).toBeVisible();
+    await page.waitForTimeout(1300);
+    await expect(
+      page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
+    ).toHaveCount(1);
+    expect(errors).toEqual([]);
+  });
+
   test('renders, moves, exports, and persists frame captions', async ({
     page,
   }) => {

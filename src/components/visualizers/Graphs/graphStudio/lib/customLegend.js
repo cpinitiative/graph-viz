@@ -1,4 +1,4 @@
-import { GRAPH_STATE_COLORS } from './stateColors';
+import { GRAPH_STATE_COLORS } from './stateColors.js';
 
 export const CUSTOM_LEGEND_POSITIONS = [
   'auto',

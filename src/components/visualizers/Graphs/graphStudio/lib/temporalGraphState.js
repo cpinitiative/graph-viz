@@ -1,3 +1,8 @@
+import {
+  sanitizeTemporalOverrideMap,
+  sanitizeTemporalOverridePatch,
+} from './temporalOverrideSchema.js';
+
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
 
 const OVERRIDE_MAP_BY_TYPE = {
@@ -25,7 +30,7 @@ const getObjectOverride = (step, objectType, objectId) => {
   if (!mapKey) return {};
   const overrideMap = isRecord(step?.[mapKey]) ? step[mapKey] : {};
   const override = overrideMap[String(objectId)];
-  return isRecord(override) ? override : {};
+  return sanitizeTemporalOverridePatch(objectType, override);
 };
 
 const getBaseObject = (baseGraph, objectType, objectId) => {
@@ -44,8 +49,14 @@ const isBaseObjectVisible = (baseGraph, objectType, objectId) => {
 };
 
 export const resolveFrameGraph = (baseGraph, step) => {
-  const nodeOverrides = isRecord(step?.nodeOverrides) ? step.nodeOverrides : {};
-  const edgeOverrides = isRecord(step?.edgeOverrides) ? step.edgeOverrides : {};
+  const nodeOverrides = sanitizeTemporalOverrideMap(
+    'node',
+    step?.nodeOverrides
+  );
+  const edgeOverrides = sanitizeTemporalOverrideMap(
+    'edge',
+    step?.edgeOverrides
+  );
   const nodes = (baseGraph?.nodes ?? []).map(node => ({
     ...node,
     ...(nodeOverrides[String(node.id)] ?? {}),
@@ -75,13 +86,22 @@ export const applyFrameOverride = (step, objectType, objectId, patch) => {
   const nextStep = cloneJson(step ?? {});
   const overrideMap = isRecord(nextStep[mapKey]) ? nextStep[mapKey] : {};
   const id = String(objectId);
-  nextStep[mapKey] = {
-    ...overrideMap,
-    [id]: {
-      ...(isRecord(overrideMap[id]) ? overrideMap[id] : {}),
-      ...cloneJson(patch),
-    },
-  };
+  const existingEntry = sanitizeTemporalOverridePatch(
+    objectType,
+    overrideMap[id]
+  );
+  const sanitizedPatch = sanitizeTemporalOverridePatch(
+    objectType,
+    cloneJson(patch)
+  );
+  const nextEntry = { ...existingEntry, ...sanitizedPatch };
+
+  nextStep[mapKey] = { ...overrideMap };
+  if (Object.keys(nextEntry).length > 0) {
+    nextStep[mapKey][id] = nextEntry;
+  } else {
+    delete nextStep[mapKey][id];
+  }
   return nextStep;
 };
 

@@ -14,6 +14,7 @@ import {
 } from '../lib/exportFrameRange';
 import { exportTimelineSlideshow } from '../lib/exportTimelineSlideshow';
 import { exportTimelineVideo } from '../lib/exportTimelineVideo';
+import { DEFAULT_FRAME_DURATION_MS } from '../lib/frameDuration';
 import {
   downloadProjectJson,
   exportProjectJson,
@@ -64,6 +65,7 @@ export const useGraphStudioImportExport = ({
   clearDrawState,
   setIsExporting,
   resetUndoHistory,
+  stopTimeline,
 }) => {
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
@@ -130,7 +132,7 @@ export const useGraphStudioImportExport = ({
         {
           id: 'step-0',
           description: 'Parsed input',
-          durationMs: 600,
+          durationMs: DEFAULT_FRAME_DURATION_MS,
           nodeOverrides: {},
           edgeOverrides: {},
         },
@@ -347,6 +349,7 @@ export const useGraphStudioImportExport = ({
   }, [importProjectJsonText, projectJsonPasteText, setStatus]);
 
   const exportVideo = useCallback(async () => {
+    stopTimeline?.();
     const frameIndexes = getExportFrameIndexes();
     if (!frameIndexes.length) {
       setStatus('Export failed: no timeline frames to export');
@@ -378,10 +381,12 @@ export const useGraphStudioImportExport = ({
     getExportFrameIndexes,
     setCurrentFrame,
     setStatus,
+    stopTimeline,
     steps,
   ]);
 
   const exportSlideshow = useCallback(async () => {
+    stopTimeline?.();
     if (!steps.length) {
       setStatus('Slideshow export error: no timeline frames to export');
       return;
@@ -446,6 +451,7 @@ export const useGraphStudioImportExport = ({
     setSelectedObject,
     setStatus,
     setViewState,
+    stopTimeline,
     steps,
     viewState,
   ]);
