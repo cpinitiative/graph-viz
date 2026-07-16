@@ -82,4 +82,13 @@ test('text editing targets retain their native undo behavior', () => {
   );
   assert.equal(isTextEditingUndoTarget({ tagName: 'TEXTAREA' }), true);
   assert.equal(isTextEditingUndoTarget({ isContentEditable: true }), true);
+  assert.equal(
+    isTextEditingUndoTarget({
+      closest: selector =>
+        selector === '[contenteditable]'
+          ? { getAttribute: () => 'true' }
+          : null,
+    }),
+    true
+  );
 });

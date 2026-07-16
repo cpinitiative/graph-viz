@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { hasOpenModal } from '../lib/keyboardTargets';
 import {
   HISTORY_LIMIT,
   isTextEditingUndoTarget,
@@ -68,12 +69,19 @@ export const useGraphStudioUndo = ({
 
   useEffect(() => {
     const onKeyDown = event => {
-      const isUndo =
-        (event.metaKey || event.ctrlKey) &&
-        !event.shiftKey &&
-        String(event.key).toLowerCase() === 'z';
-      if (!isUndo) return;
+      const key = String(event.key).toLowerCase();
+      const hasModifier = event.metaKey || event.ctrlKey;
+      const isUndo = hasModifier && !event.shiftKey && key === 'z';
+      const isRedo =
+        hasModifier && ((event.shiftKey && key === 'z') || key === 'y');
+      if (!isUndo && !isRedo) return;
       if (isTextEditingUndoTarget(event.target)) return;
+      if (hasOpenModal()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (!isUndo) return;
       event.preventDefault();
       undoLastAction();
     };

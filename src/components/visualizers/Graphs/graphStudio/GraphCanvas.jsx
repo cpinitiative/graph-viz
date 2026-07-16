@@ -15,6 +15,11 @@ import { normalizeCaptionOverlay } from './lib/captionOverlay';
 import { getLegendEntryGroup, normalizeCustomLegend } from './lib/customLegend';
 import { getEdgeRenderData } from './lib/edgeRenderData';
 import {
+  getLegendOrigin,
+  getNormalizedOverlayOrigin,
+  getOverlayPositionBounds,
+} from './lib/exportOverlayGeometry';
+import {
   getDefaultEdgeLabelFontSize,
   getDefaultNodeLabelFontSize,
   normalizeEdgeLabelFontSize,
@@ -186,38 +191,6 @@ const buildLegendRows = (
 const getLegendRowHeight = row =>
   row.type === 'group' ? (row.separated ? 22 : 16) : 22;
 
-const resolveLegendPosition = position =>
-  position === 'auto' ? 'bottom-right' : position;
-
-const getLegendOrigin = ({
-  canvasSize,
-  boxWidth,
-  boxHeight,
-  margin,
-  position,
-  customPosition,
-}) => {
-  const maxX = Math.max(0, canvasSize.width - boxWidth);
-  const maxY = Math.max(0, canvasSize.height - boxHeight);
-  const leftX = Math.min(margin, maxX);
-  const topY = Math.min(margin, maxY);
-  const rightX = Math.max(leftX, maxX - margin);
-  const bottomY = Math.max(topY, maxY - margin);
-  const resolvedPosition = resolveLegendPosition(position);
-
-  if (resolvedPosition === 'custom') {
-    return {
-      x: leftX + (rightX - leftX) * customPosition.x,
-      y: topY + (bottomY - topY) * customPosition.y,
-    };
-  }
-
-  return {
-    x: resolvedPosition.includes('right') ? rightX : leftX,
-    y: resolvedPosition.includes('bottom') ? bottomY : topY,
-  };
-};
-
 const LegendSwatch = ({ entry, nodeStroke }) => {
   if (entry.kind === 'edge') {
     return (
@@ -245,8 +218,16 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
   );
 };
 
-const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
-  const { theme } = useTheme();
+const Legend = ({
+  customLegend,
+  setCustomLegend,
+  canvasSize,
+  svgRef,
+  isExporting = false,
+  themeOverride,
+}) => {
+  const { theme: contextTheme } = useTheme();
+  const theme = themeOverride ?? contextTheme;
   const legend = normalizeCustomLegend(customLegend);
   const palette = LEGEND_PALETTES[theme] ?? LEGEND_PALETTES.light;
   const dragStateRef = useRef(null);
@@ -313,13 +294,12 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
     position: legend.position,
     customPosition: legend.customPosition,
   });
-  const leftX = Math.min(margin, Math.max(0, canvasSize.width - boxWidth));
-  const topY = Math.min(margin, Math.max(0, canvasSize.height - boxHeight));
-  const rightX = Math.max(0, Math.max(0, canvasSize.width - boxWidth) - margin);
-  const bottomY = Math.max(
-    0,
-    Math.max(0, canvasSize.height - boxHeight) - margin
-  );
+  const { leftX, topY, rightX, bottomY } = getOverlayPositionBounds({
+    canvasSize,
+    boxWidth,
+    boxHeight,
+    margin,
+  });
   const updateCustomPosition = event => {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) return;
@@ -362,36 +342,44 @@ const Legend = ({ customLegend, setCustomLegend, canvasSize, svgRef }) => {
 
   return (
     <g
-      data-testid="custom-export-legend"
+      data-testid={isExporting ? undefined : 'custom-export-legend'}
       data-legend-position={legend.position}
       data-custom-position-x={legend.customPosition.x}
       data-custom-position-y={legend.customPosition.y}
       data-legend-theme={theme}
       aria-label="Legend preview"
-      pointerEvents="all"
+      pointerEvents={isExporting ? 'none' : 'all'}
       transform={`translate(${x} ${y})`}
-      onPointerDown={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        dragStateRef.current = {
-          pointerId: event.pointerId,
-          startClientX: event.clientX,
-          startClientY: event.clientY,
-          originX: x,
-          originY: y,
-        };
-        setIsDragging(true);
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-      }}
-      onPointerMove={updateCustomPosition}
-      onPointerUp={finishDragging}
-      onPointerCancel={finishDragging}
-      style={{
-        cursor: isDragging ? 'grabbing' : 'grab',
-        touchAction: 'none',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-      }}
+      onPointerDown={
+        isExporting
+          ? undefined
+          : event => {
+              event.preventDefault();
+              event.stopPropagation();
+              dragStateRef.current = {
+                pointerId: event.pointerId,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                originX: x,
+                originY: y,
+              };
+              setIsDragging(true);
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            }
+      }
+      onPointerMove={isExporting ? undefined : updateCustomPosition}
+      onPointerUp={isExporting ? undefined : finishDragging}
+      onPointerCancel={isExporting ? undefined : finishDragging}
+      style={
+        isExporting
+          ? undefined
+          : {
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }
+      }
     >
       <rect
         x="0"
@@ -545,8 +533,11 @@ const FrameCaption = ({
   canvasSize,
   svgRef,
   shadowFilterId,
+  isExporting = false,
+  themeOverride,
 }) => {
-  const { theme } = useTheme();
+  const { theme: contextTheme } = useTheme();
+  const theme = themeOverride ?? contextTheme;
   const caption = normalizeCaptionOverlay(captionOverlay);
   const baseStylePreset =
     CAPTION_STYLE_PRESETS[caption.style] ?? CAPTION_STYLE_PRESETS.subtle;
@@ -631,14 +622,17 @@ const FrameCaption = ({
     maxBoxHeight,
     verticalPadding * 2 + lines.length * lineHeight
   );
-  const maxX = Math.max(0, canvasSize.width - boxWidth);
-  const maxY = Math.max(0, canvasSize.height - boxHeight);
-  const leftX = Math.min(margin, maxX);
-  const topY = Math.min(margin, maxY);
-  const rightX = Math.max(0, maxX - margin);
-  const bottomY = Math.max(0, maxY - margin);
-  const x = leftX + (rightX - leftX) * caption.position.x;
-  const y = topY + (bottomY - topY) * caption.position.y;
+  const overlayBounds = getOverlayPositionBounds({
+    canvasSize,
+    boxWidth,
+    boxHeight,
+    margin,
+  });
+  const { leftX, topY, rightX, bottomY } = overlayBounds;
+  const { x, y } = getNormalizedOverlayOrigin({
+    bounds: overlayBounds,
+    position: caption.position,
+  });
 
   const updatePosition = event => {
     const dragState = dragStateRef.current;
@@ -693,31 +687,39 @@ const FrameCaption = ({
       data-caption-theme={theme}
       data-caption-line-count={lines.length}
       data-caption-truncated={isTruncated}
-      data-testid="frame-caption-overlay"
-      pointerEvents="all"
+      data-testid={isExporting ? undefined : 'frame-caption-overlay'}
+      pointerEvents={isExporting ? 'none' : 'all'}
       transform={`translate(${x} ${y})`}
-      onPointerDown={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        dragStateRef.current = {
-          pointerId: event.pointerId,
-          startClientX: event.clientX,
-          startClientY: event.clientY,
-          originX: x,
-          originY: y,
-        };
-        setIsDragging(true);
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-      }}
-      onPointerMove={updatePosition}
-      onPointerUp={finishDragging}
-      onPointerCancel={finishDragging}
-      style={{
-        cursor: isDragging ? 'grabbing' : 'grab',
-        touchAction: 'none',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-      }}
+      onPointerDown={
+        isExporting
+          ? undefined
+          : event => {
+              event.preventDefault();
+              event.stopPropagation();
+              dragStateRef.current = {
+                pointerId: event.pointerId,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                originX: x,
+                originY: y,
+              };
+              setIsDragging(true);
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+            }
+      }
+      onPointerMove={isExporting ? undefined : updatePosition}
+      onPointerUp={isExporting ? undefined : finishDragging}
+      onPointerCancel={isExporting ? undefined : finishDragging}
+      style={
+        isExporting
+          ? undefined
+          : {
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }
+      }
     >
       <rect
         x="0"
@@ -800,10 +802,23 @@ const GraphCanvas = ({
   onCanvasAddNode,
   onViewportSizeChange,
   isExporting = false,
+  exportFrameIndex,
+  exportCaptureToken,
+  canvasSizeOverride,
+  themeOverride,
 }) => {
-  const { theme } = useTheme();
+  const { theme: contextTheme } = useTheme();
+  const theme = themeOverride ?? contextTheme;
   const svgRef = useRef(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const overlayCanvasSize =
+    Number(canvasSizeOverride?.width) > 0 &&
+    Number(canvasSizeOverride?.height) > 0
+      ? {
+          width: Number(canvasSizeOverride.width),
+          height: Number(canvasSizeOverride.height),
+        }
+      : canvasSize;
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
@@ -881,11 +896,14 @@ const GraphCanvas = ({
     if (!el) return undefined;
     const updateCanvasSize = () => {
       const bounds = el.getBoundingClientRect();
+      onViewportSizeChange?.({
+        width: Math.max(0, bounds.width),
+        height: Math.max(0, bounds.height),
+      });
       const next = {
         width: Math.max(0, Math.round(bounds.width)),
         height: Math.max(0, Math.round(bounds.height)),
       };
-      onViewportSizeChange?.(next);
       setCanvasSize(prev => {
         return prev.width === next.width && prev.height === next.height
           ? prev
@@ -982,7 +1000,7 @@ const GraphCanvas = ({
   }, [setViewState, viewState.zoom]);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg) return;
+    if (!svg || isExporting) return undefined;
     const handleWheel = event => {
       event.preventDefault();
       if (lockCanvas) return;
@@ -1013,7 +1031,7 @@ const GraphCanvas = ({
     };
     svg.addEventListener('wheel', handleWheel, { passive: false });
     return () => svg.removeEventListener('wheel', handleWheel);
-  }, [lockCanvas, viewState, setViewState]);
+  }, [isExporting, lockCanvas, viewState, setViewState]);
   const onPointerDownBackground = event => {
     svgRef.current?.focus();
     const bounds = svgRef.current?.getBoundingClientRect();
@@ -1180,26 +1198,34 @@ const GraphCanvas = ({
         ref={svgRef}
         className="h-full w-full"
         aria-label="Graph canvas"
-        data-frame-navigation-surface="true"
-        data-mode={mode}
-        data-view-x={viewState.x}
-        data-view-y={viewState.y}
-        data-view-zoom={viewState.zoom}
+        data-frame-navigation-surface={isExporting ? undefined : 'true'}
+        data-mode={isExporting ? undefined : mode}
+        data-view-x={isExporting ? undefined : viewState.x}
+        data-view-y={isExporting ? undefined : viewState.y}
+        data-view-zoom={isExporting ? undefined : viewState.zoom}
         data-export-mode={isExporting ? 'true' : 'false'}
-        tabIndex="0"
-        onPointerDown={onPointerDownBackground}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
-        style={{
-          touchAction: 'none',
-          cursor:
-            mode === 'pan'
-              ? 'grab'
-              : mode === 'add' || mode === 'draw'
-                ? 'crosshair'
-                : 'default',
-        }}
+        data-export-frame-index={
+          Number.isInteger(exportFrameIndex) ? exportFrameIndex : undefined
+        }
+        data-export-capture-token={exportCaptureToken}
+        tabIndex={isExporting ? undefined : 0}
+        onPointerDown={isExporting ? undefined : onPointerDownBackground}
+        onPointerMove={isExporting ? undefined : onPointerMove}
+        onPointerUp={isExporting ? undefined : onPointerUp}
+        onPointerLeave={isExporting ? undefined : onPointerUp}
+        style={
+          isExporting
+            ? undefined
+            : {
+                touchAction: 'none',
+                cursor:
+                  mode === 'pan'
+                    ? 'grab'
+                    : mode === 'add' || mode === 'draw'
+                      ? 'crosshair'
+                      : 'default',
+              }
+        }
       >
         <defs>
           <pattern
@@ -1276,7 +1302,7 @@ const GraphCanvas = ({
           data-graph-view-transform="true"
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
         >
-          {showGrid && (
+          {showGrid && !isExporting && (
             <g
               data-testid="graph-grid"
               data-snap-enabled={snapEnabled ? 'true' : 'false'}
@@ -1328,8 +1354,11 @@ const GraphCanvas = ({
                     strokeWidth={strokeWidth}
                     layoutIdPrefix={layoutIdPrefix}
                     shouldAnimate={
-                      endpointMoved || diff.changedEdges.has(String(edge.id))
+                      !isExporting &&
+                      (endpointMoved || diff.changedEdges.has(String(edge.id)))
                     }
+                    isExporting={isExporting}
+                    themeOverride={themeOverride}
                     onPointerDown={event => {
                       event.stopPropagation();
                       onSelectEdge(edge.id);
@@ -1360,7 +1389,11 @@ const GraphCanvas = ({
                     selected={selected}
                     multiSelected={multiSelected}
                     drawAnchor={String(effectiveDrawFrom) === String(node.id)}
-                    shouldAnimate={diff.changedNodes.has(String(node.id))}
+                    shouldAnimate={
+                      !isExporting && diff.changedNodes.has(String(node.id))
+                    }
+                    isExporting={isExporting}
+                    themeOverride={themeOverride}
                     layoutIdPrefix={layoutIdPrefix}
                     mode={mode}
                     onPointerDown={event =>
@@ -1395,17 +1428,21 @@ const GraphCanvas = ({
         <Legend
           customLegend={customLegend}
           setCustomLegend={setCustomLegend}
-          canvasSize={canvasSize}
+          canvasSize={overlayCanvasSize}
           svgRef={svgRef}
+          isExporting={isExporting}
+          themeOverride={themeOverride}
         />
         {/* Captions render above the legend so nearby overlays remain draggable. */}
         <FrameCaption
           captionOverlay={captionOverlay}
           captionText={captionText}
           setCaptionOverlay={setCaptionOverlay}
-          canvasSize={canvasSize}
+          canvasSize={overlayCanvasSize}
           svgRef={svgRef}
           shadowFilterId={captionShadowFilterId}
+          isExporting={isExporting}
+          themeOverride={themeOverride}
         />
       </svg>
     </div>

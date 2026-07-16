@@ -18,7 +18,8 @@ const deleteButtonClass =
 const moveButtonClass =
   'inline-flex min-h-[30px] min-w-[30px] items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
 const playbackButtonClass =
-  'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
+  'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] disabled:cursor-not-allowed disabled:border-[#94A3B8] disabled:bg-[#E2E8F0] disabled:text-[#64748B] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB] dark:disabled:border-[#475569] dark:disabled:bg-[#334155] dark:disabled:text-[#94A3B8]';
+const PLAYBACK_EXPORT_LOCK_MESSAGE = 'Playback is unavailable while exporting.';
 const detailLabelClass =
   'shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#334155] dark:text-[#CBD5E1]';
 const detailControlLabelClass =
@@ -282,6 +283,7 @@ const TimelinePanel = ({
   onMoveStep,
   onPlay,
   isPlaying,
+  playbackDisabled = false,
 }) => {
   const frameRefs = useRef([]);
   const moveFrameFocus = (index, delta) => {
@@ -311,6 +313,12 @@ const TimelinePanel = ({
             className={playbackButtonClass}
             onClick={onPlay}
             aria-label={isPlaying ? 'Pause timeline' : 'Play timeline'}
+            aria-describedby={
+              playbackDisabled ? 'timeline-playback-export-lock' : undefined
+            }
+            data-testid="timeline-playback-button"
+            disabled={playbackDisabled}
+            title={playbackDisabled ? PLAYBACK_EXPORT_LOCK_MESSAGE : undefined}
           >
             {isPlaying ? (
               <>
@@ -324,6 +332,9 @@ const TimelinePanel = ({
               </>
             )}
           </button>
+          <span id="timeline-playback-export-lock" className="sr-only">
+            {PLAYBACK_EXPORT_LOCK_MESSAGE}
+          </span>
           <div className="flex items-center gap-1 text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
             <span className="uppercase tracking-wide">Frame</span>
             <span className="tabular-nums" data-testid="timeline-frame-counter">

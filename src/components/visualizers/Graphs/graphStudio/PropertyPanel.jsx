@@ -304,52 +304,69 @@ const PresenceNotice = ({ children }) => (
 const PresenceActions = ({
   onSetVisibilityForFrame,
   onSetVisibilityFromFrame,
-}) => (
-  <div className="space-y-2">
-    <div className="flex min-w-0 items-center justify-between gap-2">
-      <span className={`${fieldLabelClass} min-w-0 truncate`}>Presence</span>
-      <ScopeLabel scope="Frame" />
+  selection = false,
+}) => {
+  const labels = selection
+    ? {
+        hideHere: 'Not shown selected here',
+        hideOnward: 'Not shown selected onward',
+        showHere: 'Show selected here',
+        showOnward: 'Show selected onward',
+      }
+    : {
+        hideHere: 'Not shown here',
+        hideOnward: 'Not shown onward',
+        showHere: 'Show here',
+        showOnward: 'Show onward',
+      };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className={`${fieldLabelClass} min-w-0 truncate`}>Presence</span>
+        <ScopeLabel scope="Frame" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className={visibilityActionButtonClass}
+          aria-label={labels.hideHere}
+          title={labels.hideHere}
+          onClick={() => onSetVisibilityForFrame?.(false)}
+        >
+          {labels.hideHere}
+        </button>
+        <button
+          type="button"
+          className={visibilityActionButtonClass}
+          aria-label={labels.hideOnward}
+          title={labels.hideOnward}
+          onClick={() => onSetVisibilityFromFrame?.(false)}
+        >
+          {labels.hideOnward}
+        </button>
+        <button
+          type="button"
+          className={visibilityActionButtonClass}
+          aria-label={labels.showHere}
+          title={labels.showHere}
+          onClick={() => onSetVisibilityForFrame?.(true)}
+        >
+          {labels.showHere}
+        </button>
+        <button
+          type="button"
+          className={visibilityActionButtonClass}
+          aria-label={labels.showOnward}
+          title={labels.showOnward}
+          onClick={() => onSetVisibilityFromFrame?.(true)}
+        >
+          {labels.showOnward}
+        </button>
+      </div>
     </div>
-    <div className="grid grid-cols-2 gap-2">
-      <button
-        type="button"
-        className={visibilityActionButtonClass}
-        aria-label="Not shown on this frame"
-        title="Not shown on this frame"
-        onClick={() => onSetVisibilityForFrame?.(false)}
-      >
-        Not shown here
-      </button>
-      <button
-        type="button"
-        className={visibilityActionButtonClass}
-        aria-label="Not shown from this frame onward"
-        title="Not shown from this frame onward"
-        onClick={() => onSetVisibilityFromFrame?.(false)}
-      >
-        Not shown onward
-      </button>
-      <button
-        type="button"
-        className={visibilityActionButtonClass}
-        aria-label="Show on this frame"
-        title="Show on this frame"
-        onClick={() => onSetVisibilityForFrame?.(true)}
-      >
-        Show here
-      </button>
-      <button
-        type="button"
-        className={visibilityActionButtonClass}
-        aria-label="Show from this frame onward"
-        title="Show from this frame onward"
-        onClick={() => onSetVisibilityFromFrame?.(true)}
-      >
-        Show onward
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 const RangeControl = ({
   label,
@@ -575,7 +592,10 @@ const LinkedList = ({ items, emptyLabel, renderItem, onSelect }) => {
 
 const MultiSelectionPanel = ({
   selectedCount,
+  notShownCount = 0,
   onApplyToSelection,
+  onSetVisibilityForFrame,
+  onSetVisibilityFromFrame,
   onDeleteSelection,
   onClearSelection,
 }) => (
@@ -590,7 +610,14 @@ const MultiSelectionPanel = ({
     }
   >
     <Section title="Selected nodes">
-      <p className={bodyTextClass}>{selectedCount} items selected</p>
+      <p className={bodyTextClass}>
+        {selectedCount} items selected · {notShownCount} not shown here
+      </p>
+      <PresenceActions
+        selection
+        onSetVisibilityForFrame={onSetVisibilityForFrame}
+        onSetVisibilityFromFrame={onSetVisibilityFromFrame}
+      />
       <div className="space-y-2">
         <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
           Set visited
@@ -603,7 +630,7 @@ const MultiSelectionPanel = ({
         </ActionButton>
         <DeleteButton
           ariaLabel="Delete selected nodes from project"
-          title="Remove selected nodes from the entire project."
+          title="Remove selected nodes and their connected edges from the entire project."
           onClick={onDeleteSelection}
         >
           Delete from project
@@ -629,6 +656,17 @@ const NodeInspector = ({
   const nodeColor = selectedNode.color ?? '';
   const nodeStatus = String(selectedNode.status ?? 'default');
   const nodeVisible = selectedNode.visible !== false;
+  const connectedEdgeCount = connectedEdges.length;
+  const deleteTitle = connectedEdgeCount
+    ? `Remove this node and its ${connectedEdgeCount} connected ${
+        connectedEdgeCount === 1 ? 'edge' : 'edges'
+      } from the entire project.`
+    : 'Remove this node from the entire project.';
+  const deleteAriaLabel = connectedEdgeCount
+    ? `Delete node and ${connectedEdgeCount} connected ${
+        connectedEdgeCount === 1 ? 'edge' : 'edges'
+      } from project`
+    : 'Delete node from project';
 
   return (
     <PanelShell
@@ -703,7 +741,7 @@ const NodeInspector = ({
         />
       </div>
 
-      <Section title="Connected edges">
+      <Section title={`Connected edges (${connectedEdgeCount})`}>
         <LinkedList
           items={connectedEdges}
           emptyLabel="No connected edges"
@@ -722,8 +760,8 @@ const NodeInspector = ({
       </Section>
 
       <DeleteButton
-        ariaLabel="Delete node from project"
-        title="Remove this node from the entire project."
+        ariaLabel={deleteAriaLabel}
+        title={deleteTitle}
         onClick={onDeleteSelection}
       >
         Delete from project
@@ -944,6 +982,9 @@ const PropertyPanel = ({
   onSetNodeVisibilityFromFrame,
   onSetEdgeVisibilityForFrame,
   onSetEdgeVisibilityFromFrame,
+  multiSelectionNotShownCount,
+  onSetSelectionVisibilityForFrame,
+  onSetSelectionVisibilityFromFrame,
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
@@ -956,7 +997,10 @@ const PropertyPanel = ({
     return (
       <MultiSelectionPanel
         selectedCount={multiSelection.length}
+        notShownCount={multiSelectionNotShownCount}
         onApplyToSelection={onApplyToSelection}
+        onSetVisibilityForFrame={onSetSelectionVisibilityForFrame}
+        onSetVisibilityFromFrame={onSetSelectionVisibilityFromFrame}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
       />

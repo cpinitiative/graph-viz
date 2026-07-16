@@ -16,6 +16,8 @@ export const createTimelinePlaybackController = ({
   onFrameChange,
   onPlayingChange,
   onCannotPlay,
+  canPlay,
+  onPlayBlocked,
   schedule = defaultSchedule,
   clearSchedule = defaultClearSchedule,
 }) => {
@@ -27,6 +29,7 @@ export const createTimelinePlaybackController = ({
     const value = getSteps?.();
     return Array.isArray(value) ? value : [];
   };
+  const isPlayAllowed = () => canPlay?.() !== false;
 
   const clearPendingTimer = () => {
     if (timerId === null) return;
@@ -54,6 +57,10 @@ export const createTimelinePlaybackController = ({
 
   const scheduleNextFrame = runGeneration => {
     if (runGeneration !== generation || !running) return;
+    if (!isPlayAllowed()) {
+      stop();
+      return;
+    }
     const steps = readSteps();
     if (steps.length <= 1) {
       finish(runGeneration);
@@ -65,6 +72,10 @@ export const createTimelinePlaybackController = ({
     timerId = schedule(() => {
       timerId = null;
       if (runGeneration !== generation || !running) return;
+      if (!isPlayAllowed()) {
+        stop();
+        return;
+      }
 
       const latestSteps = readSteps();
       if (latestSteps.length <= 1) {
@@ -85,6 +96,10 @@ export const createTimelinePlaybackController = ({
 
   const play = () => {
     stop();
+    if (!isPlayAllowed()) {
+      onPlayBlocked?.();
+      return false;
+    }
     const steps = readSteps();
     if (steps.length <= 1) {
       onCannotPlay?.();

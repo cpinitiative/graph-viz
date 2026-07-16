@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { isEdgeEffectivelyVisible } from '../lib/effectiveVisibility';
 import { splitEdgePatch, splitNodePatch } from '../lib/graphPropertyRouting';
 
 const PROPERTY_LABELS = {
@@ -16,7 +15,7 @@ const getFirstPatchKey = patch => Object.keys(patch ?? {})[0];
 
 const getPresenceLabel = visible => (visible ? 'shown' : 'not shown');
 
-export const useGraphStudioSelection = ({ computedGraph }) => {
+export const useGraphStudioSelection = ({ baseGraph, computedGraph }) => {
   const [selectedObject, setSelectedObject] = useState(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState([]);
   const nodeMap = useMemo(
@@ -84,12 +83,10 @@ export const useGraphStudioSelection = ({ computedGraph }) => {
   const nodeConnectedEdges = useMemo(() => {
     if (!selectedNode) return [];
     const nodeId = String(selectedNode.id);
-    return computedGraph.edges.filter(
-      edge =>
-        (String(edge.from) === nodeId || String(edge.to) === nodeId) &&
-        isEdgeEffectivelyVisible(edge, nodeMap)
+    return (baseGraph?.edges ?? []).filter(
+      edge => String(edge.from) === nodeId || String(edge.to) === nodeId
     );
-  }, [computedGraph.edges, nodeMap, selectedNode]);
+  }, [baseGraph?.edges, selectedNode]);
 
   const edgeConnectedNodes = useMemo(() => {
     if (!selectedEdge) return [];
@@ -132,6 +129,8 @@ export const useGraphStudioSelectionPatchers = ({
   applyTemporalPropertyToAllFrames,
   setTemporalVisibility,
   setTemporalVisibilityFromFrame,
+  setTemporalVisibilityForObjects,
+  setTemporalVisibilityForObjectsFromFrame,
   currentFrame,
   setStatus,
 }) => {
@@ -339,6 +338,41 @@ export const useGraphStudioSelectionPatchers = ({
     [frameNumber, selectedNode, setStatus, setTemporalVisibilityFromFrame]
   );
 
+  const setSelectedNodesVisibilityForFrame = useCallback(
+    visible => {
+      if (!selectedNodeIds.length) return;
+      setTemporalVisibilityForObjects?.('node', selectedNodeIds, visible);
+      setStatus?.(
+        `${selectedNodeIds.length} nodes ${getPresenceLabel(
+          visible
+        )} on Frame ${frameNumber}`
+      );
+    },
+    [frameNumber, selectedNodeIds, setStatus, setTemporalVisibilityForObjects]
+  );
+
+  const setSelectedNodesVisibilityFromFrame = useCallback(
+    visible => {
+      if (!selectedNodeIds.length) return;
+      setTemporalVisibilityForObjectsFromFrame?.(
+        'node',
+        selectedNodeIds,
+        visible
+      );
+      setStatus?.(
+        `${selectedNodeIds.length} nodes ${getPresenceLabel(
+          visible
+        )} from Frame ${frameNumber} onward`
+      );
+    },
+    [
+      frameNumber,
+      selectedNodeIds,
+      setStatus,
+      setTemporalVisibilityForObjectsFromFrame,
+    ]
+  );
+
   const setSelectedEdgeVisibilityForFrame = useCallback(
     visible => {
       if (!selectedEdge) return;
@@ -373,6 +407,8 @@ export const useGraphStudioSelectionPatchers = ({
     applySelectedEdgeToAllFrames,
     setSelectedNodeVisibilityForFrame,
     setSelectedNodeVisibilityFromFrame,
+    setSelectedNodesVisibilityForFrame,
+    setSelectedNodesVisibilityFromFrame,
     setSelectedEdgeVisibilityForFrame,
     setSelectedEdgeVisibilityFromFrame,
   };

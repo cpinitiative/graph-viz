@@ -221,8 +221,11 @@ const GraphEdge = ({
   onPointerDown,
   onClick,
   strokeWidth,
+  isExporting = false,
+  themeOverride,
 }) => {
-  const { theme } = useTheme();
+  const { theme: contextTheme } = useTheme();
+  const theme = themeOverride ?? contextTheme;
   const isHighlighted = selected || multiSelected;
   const labelTone = getEdgeLabelTone(theme);
   const labelText = String(edge.label ?? '');
@@ -250,17 +253,22 @@ const GraphEdge = ({
   );
 
   return (
-    <g data-edge-id={edge.id} style={{ cursor: 'pointer' }}>
-      <path
-        data-edge-hit-target-id={edge.id}
-        d={pathD}
-        fill="none"
-        stroke="rgba(0,0,0,0)"
-        strokeWidth={Math.max(16, strokeWidth + 12)}
-        strokeLinecap="round"
-        onPointerDown={onPointerDown}
-        onClick={onClick}
-      />
+    <g
+      data-edge-id={edge.id}
+      style={isExporting ? undefined : { cursor: 'pointer' }}
+    >
+      {!isExporting && (
+        <path
+          data-edge-hit-target-id={edge.id}
+          d={pathD}
+          fill="none"
+          stroke="rgba(0,0,0,0)"
+          strokeWidth={Math.max(16, strokeWidth + 12)}
+          strokeLinecap="round"
+          onPointerDown={onPointerDown}
+          onClick={onClick}
+        />
+      )}
       <motion.path
         data-edge-path-id={edge.id}
         d={bodyPathD}

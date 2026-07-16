@@ -1,4 +1,5 @@
 export const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
+export const EXPORT_CAPTURE_SVG_ELEMENT_ID = 'graph-studio-export-capture-svg';
 export const DEFAULT_PNG_SCALE = 2;
 export const MAX_PNG_DIMENSION = 4096;
 export const SLIDE_EXPORT_WIDTH = 1040;
@@ -9,6 +10,11 @@ export const IMAGE_FRAMING = {
   slide: 'slide',
 };
 export const SLIDE_ASPECT_RATIO = SLIDE_EXPORT_WIDTH / SLIDE_EXPORT_HEIGHT;
+export const CAPTURE_MODE = Object.freeze({
+  static: 'static',
+  slide: 'slide',
+  video: 'video',
+});
 
 const FIT_CONTENT_MIN_PADDING = 36;
 const FIT_CONTENT_MAX_PADDING = 56;
@@ -22,24 +28,68 @@ const getDatedFrameFilename = extension => {
 export const downloadBlob = ({ blob, filename }) => {
   const downloadUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = downloadUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+  try {
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+  }
 };
 
-export const waitForFrameRender = async () => {
-  await new Promise(resolve => requestAnimationFrame(resolve));
-  await new Promise(resolve => requestAnimationFrame(resolve));
-  await new Promise(resolve => setTimeout(resolve, 80));
+const waitForAnimationFrame = () =>
+  new Promise(resolve => requestAnimationFrame(resolve));
+
+const isExpectedExportSurface = ({ svgEl, frameIndex, captureToken }) => {
+  const frameIsReady =
+    frameIndex === undefined ||
+    svgEl?.getAttribute('data-export-frame-index') === String(frameIndex);
+  const tokenIsReady =
+    captureToken === undefined ||
+    svgEl?.getAttribute('data-export-capture-token') === String(captureToken);
+  return Boolean(svgEl && frameIsReady && tokenIsReady);
 };
+
+export const waitForExportReady = async ({
+  svgElementId,
+  frameIndex,
+  captureToken,
+} = {}) => {
+  if (document.fonts?.ready) await document.fonts.ready;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await waitForAnimationFrame();
+    const svgEl = svgElementId ? document.getElementById(svgElementId) : null;
+    if (!svgElementId) return null;
+    if (isExpectedExportSurface({ svgEl, frameIndex, captureToken })) {
+      await waitForAnimationFrame();
+      const settledSvgEl = document.getElementById(svgElementId);
+      if (
+        isExpectedExportSurface({
+          svgEl: settledSvgEl,
+          frameIndex,
+          captureToken,
+        })
+      ) {
+        return settledSvgEl;
+      }
+    }
+  }
+
+  throw new Error(
+    Number.isInteger(frameIndex)
+      ? `Export frame ${frameIndex + 1} did not become ready`
+      : 'Export canvas did not become ready'
+  );
+};
+
+export const waitForFrameRender = waitForExportReady;
 
 export const getGraphSvgElement = (svgElementId = DEFAULT_SVG_ELEMENT_ID) => {
-  const svgEl =
-    document.getElementById(svgElementId) || document.querySelector('svg');
-  if (!svgEl) throw new Error('SVG not found');
+  const svgEl = document.getElementById(svgElementId);
+  if (!svgEl) throw new Error(`SVG "${svgElementId}" not found`);
   return svgEl;
 };
 
@@ -48,24 +98,6 @@ const getViewportSize = svgEl => {
   return {
     width: Math.max(2, rect.width),
     height: Math.max(2, rect.height),
-  };
-};
-
-const transformBounds = (element, matrix) => {
-  const box = element.getBBox();
-  const points = [
-    new DOMPoint(box.x, box.y),
-    new DOMPoint(box.x + box.width, box.y),
-    new DOMPoint(box.x, box.y + box.height),
-    new DOMPoint(box.x + box.width, box.y + box.height),
-  ].map(point => point.matrixTransform(matrix));
-  const xs = points.map(point => point.x);
-  const ys = points.map(point => point.y);
-  return {
-    minX: Math.min(...xs),
-    minY: Math.min(...ys),
-    maxX: Math.max(...xs),
-    maxY: Math.max(...ys),
   };
 };
 
@@ -79,13 +111,6 @@ const getUntransformedBounds = element => {
   };
 };
 
-const combineBounds = boundsList => ({
-  minX: Math.min(...boundsList.map(bounds => bounds.minX)),
-  minY: Math.min(...boundsList.map(bounds => bounds.minY)),
-  maxX: Math.max(...boundsList.map(bounds => bounds.maxX)),
-  maxY: Math.max(...boundsList.map(bounds => bounds.maxY)),
-});
-
 const getFitContentPadding = svgEl => {
   const viewport = getViewportSize(svgEl);
   return Math.round(
@@ -97,23 +122,6 @@ const getFitContentPadding = svgEl => {
       )
     )
   );
-};
-
-const expandBoundsToAspectRatio = (bounds, aspectRatio, padding) => {
-  let width = bounds.maxX - bounds.minX + padding * 2;
-  let height = bounds.maxY - bounds.minY + padding * 2;
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const centerY = (bounds.minY + bounds.maxY) / 2;
-
-  if (width / height > aspectRatio) height = width / aspectRatio;
-  else width = height * aspectRatio;
-
-  return {
-    x: centerX - width / 2,
-    y: centerY - height / 2,
-    width,
-    height,
-  };
 };
 
 const expandViewportToAspectRatio = ({ width, height }, aspectRatio) => {
@@ -136,50 +144,141 @@ const expandViewportToAspectRatio = ({ width, height }, aspectRatio) => {
   };
 };
 
-export const getFitContentViewBox = ({
-  svgEl,
-  aspectRatio,
-  normalizeGraphTransform = false,
-}) => {
-  const graphContent = svgEl.querySelector('[data-export-content="true"]');
-  const overlayElements = [
-    svgEl.querySelector('[data-testid="custom-export-legend"]'),
-    svgEl.querySelector('[data-testid="frame-caption-overlay"]'),
-  ].filter(Boolean);
-  const exportElements = [
-    ...(graphContent ? [{ element: graphContent, isGraphContent: true }] : []),
-    ...overlayElements.map(element => ({ element, isGraphContent: false })),
-  ];
-
-  const boundsList = exportElements.flatMap(({ element, isGraphContent }) => {
-    try {
-      if (normalizeGraphTransform && isGraphContent) {
-        const bounds = getUntransformedBounds(element);
-        const values = Object.values(bounds);
-        return values.every(Number.isFinite) ? [bounds] : [];
-      }
-      const matrix = element.getCTM();
-      if (!matrix) return [];
-      const bounds = transformBounds(element, matrix);
-      const values = Object.values(bounds);
-      return values.every(Number.isFinite) ? [bounds] : [];
-    } catch {
-      return [];
-    }
-  });
-
-  if (!boundsList.length) return null;
-  return expandBoundsToAspectRatio(
-    combineBounds(boundsList),
-    aspectRatio,
-    getFitContentPadding(svgEl)
+export const getFitContentTransform = ({ bounds, viewport, padding }) => {
+  const sourceWidth = Number(bounds?.maxX) - Number(bounds?.minX);
+  const sourceHeight = Number(bounds?.maxY) - Number(bounds?.minY);
+  const viewportX = Number(viewport?.x);
+  const viewportY = Number(viewport?.y);
+  const viewportWidth = Number(viewport?.width);
+  const viewportHeight = Number(viewport?.height);
+  const availableWidth = Math.max(1, viewportWidth - padding * 2);
+  const availableHeight = Math.max(1, viewportHeight - padding * 2);
+  if (
+    ![
+      sourceWidth,
+      sourceHeight,
+      viewportX,
+      viewportY,
+      viewportWidth,
+      viewportHeight,
+      availableWidth,
+      availableHeight,
+    ].every(Number.isFinite) ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0
+  ) {
+    return null;
+  }
+  const scale = Math.min(
+    availableWidth / sourceWidth,
+    availableHeight / sourceHeight
   );
+  return {
+    x:
+      viewportX +
+      (viewportWidth - sourceWidth * scale) / 2 -
+      Number(bounds.minX) * scale,
+    y:
+      viewportY +
+      (viewportHeight - sourceHeight * scale) / 2 -
+      Number(bounds.minY) * scale,
+    scale,
+  };
 };
+
+const getGraphContentTransform = ({ svgEl, viewport }) => {
+  const graphContent = svgEl.querySelector('[data-export-content="true"]');
+  if (!graphContent) return null;
+  try {
+    return getFitContentTransform({
+      bounds: getUntransformedBounds(graphContent),
+      viewport,
+      padding: getFitContentPadding(svgEl),
+    });
+  } catch {
+    return null;
+  }
+};
+
+const formatTransformNumber = value => Number(value.toFixed(4));
 
 const formatViewBox = viewBox =>
   [viewBox.x, viewBox.y, viewBox.width, viewBox.height]
     .map(value => Number(value.toFixed(3)))
     .join(' ');
+
+const EDITOR_ONLY_SELECTORS = [
+  '[data-edge-hit-target-id]',
+  '[data-node-selection-ring-id]',
+  '[data-node-draw-source-ring-id]',
+  '[data-edge-selection-underlay-id]',
+  '[data-testid="graph-grid"]',
+  '[id$="graphstudio-grid-minor"]',
+  '[id$="graphstudio-grid-major"]',
+];
+
+const EDITOR_ONLY_ATTRIBUTES = [
+  'data-testid',
+  'data-frame-navigation-surface',
+  'data-mode',
+  'data-view-x',
+  'data-view-y',
+  'data-view-zoom',
+  'data-export-mode',
+  'data-export-capture-token',
+  'data-snap-enabled',
+  'class',
+  'tabindex',
+  'pointer-events',
+];
+
+const sanitizeExportSvg = exportSvg => {
+  EDITOR_ONLY_SELECTORS.forEach(selector => {
+    exportSvg.querySelectorAll(selector).forEach(element => element.remove());
+  });
+
+  [exportSvg, ...exportSvg.querySelectorAll('*')].forEach(element => {
+    EDITOR_ONLY_ATTRIBUTES.forEach(attribute =>
+      element.removeAttribute(attribute)
+    );
+    if (!element.hasAttribute('style')) return;
+    [
+      'cursor',
+      'pointer-events',
+      'touch-action',
+      'user-select',
+      '-webkit-user-select',
+    ].forEach(property => element.style.removeProperty(property));
+    if (!element.getAttribute('style')?.trim())
+      element.removeAttribute('style');
+  });
+
+  return exportSvg;
+};
+
+export const normalizeCaptureDimensions = ({
+  width,
+  height,
+  mode = CAPTURE_MODE.static,
+}) => {
+  const numericWidth = Number(width);
+  const numericHeight = Number(height);
+  const normalizedWidth = Math.max(
+    2,
+    Number.isFinite(numericWidth) ? Math.round(numericWidth) : 2
+  );
+  const normalizedHeight = Math.max(
+    2,
+    Number.isFinite(numericHeight) ? Math.round(numericHeight) : 2
+  );
+  if (mode !== CAPTURE_MODE.video) {
+    return { width: normalizedWidth, height: normalizedHeight };
+  }
+  return {
+    width: Math.max(2, Math.floor(normalizedWidth / 2) * 2),
+    height: Math.max(2, Math.floor(normalizedHeight / 2) * 2),
+  };
+};
 
 export const serializeSvgElement = ({
   svgEl,
@@ -189,31 +288,34 @@ export const serializeSvgElement = ({
   viewportHeight = height,
   framingMode = IMAGE_FRAMING.viewport,
 }) => {
-  const exportSvg = svgEl.cloneNode(true);
+  const exportSvg = sanitizeExportSvg(svgEl.cloneNode(true));
   const outputAspectRatio = width / height;
   const isFitFraming =
     framingMode === IMAGE_FRAMING.fit || framingMode === IMAGE_FRAMING.slide;
+  const finalViewBox = expandViewportToAspectRatio(
+    {
+      width: viewportWidth,
+      height: viewportHeight,
+    },
+    outputAspectRatio
+  );
   if (isFitFraming) {
-    exportSvg
-      .querySelector('[data-graph-view-transform="true"]')
-      ?.setAttribute('transform', 'translate(0 0) scale(1)');
-  }
-  const fitViewBox = isFitFraming
-    ? getFitContentViewBox({
-        svgEl,
-        aspectRatio: outputAspectRatio,
-        normalizeGraphTransform: true,
-      })
-    : null;
-  const finalViewBox =
-    fitViewBox ??
-    expandViewportToAspectRatio(
-      {
-        width: viewportWidth,
-        height: viewportHeight,
-      },
-      outputAspectRatio
+    const graphView = exportSvg.querySelector(
+      '[data-graph-view-transform="true"]'
     );
+    const fitTransform = getGraphContentTransform({
+      svgEl,
+      viewport: finalViewBox,
+    });
+    if (fitTransform) {
+      graphView?.setAttribute(
+        'transform',
+        `translate(${formatTransformNumber(fitTransform.x)} ${formatTransformNumber(fitTransform.y)}) scale(${formatTransformNumber(fitTransform.scale)})`
+      );
+    } else {
+      graphView?.setAttribute('transform', 'translate(0 0) scale(1)');
+    }
+  }
 
   exportSvg.setAttribute('width', width);
   exportSvg.setAttribute('height', height);
@@ -323,7 +425,11 @@ export const loadSvgImageFromElement = async ({
 
 export const createCaptureCanvas = (
   svgEl,
-  { pngScale, framingMode = IMAGE_FRAMING.viewport } = {}
+  {
+    pngScale,
+    framingMode = IMAGE_FRAMING.viewport,
+    captureMode = CAPTURE_MODE.static,
+  } = {}
 ) => {
   const viewport = getViewportSize(svgEl);
   const canvas = document.createElement('canvas');
@@ -334,10 +440,8 @@ export const createCaptureCanvas = (
           height: SLIDE_EXPORT_HEIGHT,
         }
       : viewport;
-  if (pngScale === undefined) {
-    canvas.width = Math.max(2, Math.floor(baseSize.width / 2) * 2);
-    canvas.height = Math.max(2, Math.floor(baseSize.height / 2) * 2);
-  } else {
+  let targetSize = baseSize;
+  if (pngScale !== undefined) {
     const requestedScale = [1, 2, 3].includes(Number(pngScale))
       ? Number(pngScale)
       : DEFAULT_PNG_SCALE;
@@ -345,9 +449,17 @@ export const createCaptureCanvas = (
       requestedScale,
       MAX_PNG_DIMENSION / Math.max(baseSize.width, baseSize.height)
     );
-    canvas.width = Math.max(2, Math.round(baseSize.width * cappedScale));
-    canvas.height = Math.max(2, Math.round(baseSize.height * cappedScale));
+    targetSize = {
+      width: baseSize.width * cappedScale,
+      height: baseSize.height * cappedScale,
+    };
   }
+  const normalizedSize = normalizeCaptureDimensions({
+    ...targetSize,
+    mode: captureMode,
+  });
+  canvas.width = normalizedSize.width;
+  canvas.height = normalizedSize.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas rendering context unavailable');
   return { canvas, ctx, viewport };
@@ -356,8 +468,10 @@ export const createCaptureCanvas = (
 export const exportCurrentFrameSvg = async ({
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
   framingMode = IMAGE_FRAMING.viewport,
+  frameIndex,
+  captureToken,
 } = {}) => {
-  await waitForFrameRender();
+  await waitForExportReady({ svgElementId, frameIndex, captureToken });
   const svgData = serializeCurrentFrameSvg({
     svgElementId,
     framingMode,
@@ -373,8 +487,10 @@ export const exportCurrentFramePng = async ({
   svgElementId = DEFAULT_SVG_ELEMENT_ID,
   pngScale = DEFAULT_PNG_SCALE,
   framingMode = IMAGE_FRAMING.viewport,
+  frameIndex,
+  captureToken,
 } = {}) => {
-  await waitForFrameRender();
+  await waitForExportReady({ svgElementId, frameIndex, captureToken });
   const svgEl = getGraphSvgElement(svgElementId);
   const { canvas, ctx, viewport } = createCaptureCanvas(svgEl, {
     pngScale,

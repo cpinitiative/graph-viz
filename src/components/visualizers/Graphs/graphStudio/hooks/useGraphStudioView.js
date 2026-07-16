@@ -29,6 +29,11 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     }
   }, []);
 
+  const getZoomViewportSize = useCallback(
+    () => ({ ...viewportSizeRef.current }),
+    []
+  );
+
   const bumpViewReset = useCallback(() => {
     setViewResetCounter(count => count + 1);
   }, []);
@@ -93,6 +98,7 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     setLockCanvas,
     setViewFromNodes,
     setZoomViewportSize,
+    getZoomViewportSize,
     bumpViewReset,
     centerViewOnContent,
     zoomIn,

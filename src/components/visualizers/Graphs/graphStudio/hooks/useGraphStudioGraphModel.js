@@ -170,6 +170,56 @@ export const useGraphStudioGraphModel = ({
     [baseGraph, currentFrame, replaceTimeline, steps]
   );
 
+  const setTemporalVisibilityForObjects = useCallback(
+    (objectType, objectIds, visible) => {
+      const ids = Array.from(
+        new Set(
+          (Array.isArray(objectIds) ? objectIds : [objectIds]).map(String)
+        )
+      );
+      if (!ids.length) return;
+      updateStep(currentFrame, step =>
+        ids.reduce(
+          (nextStep, objectId) =>
+            applyVisibilityToStep({
+              baseGraph,
+              step: nextStep,
+              objectType,
+              objectId,
+              visible,
+            }),
+          step
+        )
+      );
+    },
+    [baseGraph, currentFrame, updateStep]
+  );
+
+  const setTemporalVisibilityForObjectsFromFrame = useCallback(
+    (objectType, objectIds, visible) => {
+      const ids = Array.from(
+        new Set(
+          (Array.isArray(objectIds) ? objectIds : [objectIds]).map(String)
+        )
+      );
+      if (!ids.length) return;
+      const nextSteps = ids.reduce(
+        (timeline, objectId) =>
+          applyVisibilityFromFrame({
+            baseGraph,
+            steps: timeline,
+            objectType,
+            objectId,
+            frameIndex: currentFrame,
+            visible,
+          }),
+        steps
+      );
+      replaceTimeline(baseGraph, nextSteps, currentFrame);
+    },
+    [baseGraph, currentFrame, replaceTimeline, steps]
+  );
+
   const addNodeAt = useCallback(
     point => {
       const id = nextNodeIdRef.current;
@@ -342,6 +392,8 @@ export const useGraphStudioGraphModel = ({
     applyTemporalPropertyToAllFrames,
     setTemporalVisibility,
     setTemporalVisibilityFromFrame,
+    setTemporalVisibilityForObjects,
+    setTemporalVisibilityForObjectsFromFrame,
     addNodeAt,
     addNode,
     addEdge,

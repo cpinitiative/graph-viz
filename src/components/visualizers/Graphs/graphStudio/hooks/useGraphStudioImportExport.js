@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SCRIPT } from '../data/defaultScript';
 import {
   exportEdgeListText,
@@ -22,17 +22,33 @@ import {
 } from '../lib/projectJson';
 import {
   DEFAULT_PNG_SCALE,
+  EXPORT_CAPTURE_SVG_ELEMENT_ID,
   exportCurrentFramePng,
   exportCurrentFrameSvg,
+  getGraphSvgElement,
   IMAGE_FRAMING,
-  waitForFrameRender,
+  waitForExportReady,
 } from '../lib/timelineFrameCapture';
+
+const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
+
+const validateExportFrameIndex = (frameIndex, frameCount) => {
+  const numericFrame = Number(frameIndex);
+  if (
+    !Number.isInteger(numericFrame) ||
+    numericFrame < 0 ||
+    numericFrame >= frameCount
+  ) {
+    throw new Error(`Invalid export frame ${String(frameIndex)}`);
+  }
+  return numericFrame;
+};
 
 export const useGraphStudioImportExport = ({
   baseGraph,
   steps,
   currentFrame,
-  setCurrentFrame,
+  getFrameGraph,
   replaceTimeline,
   setStatus,
   edgeRouting,
@@ -48,25 +64,44 @@ export const useGraphStudioImportExport = ({
   lockCanvas,
   setLockCanvas,
   viewState,
+  getZoomViewportSize,
   setViewState,
   setViewFromNodes,
   bumpViewReset,
   globalSettings,
+  theme,
   setGlobalSettings,
-  mode,
   setMode,
-  selectedObject,
-  setSelectedObject,
-  selectedNodeIds,
-  setSelectedNodeIds,
-  drawFrom,
-  restoreDrawState,
   clearSelection,
   clearDrawState,
-  setIsExporting,
   resetUndoHistory,
   stopTimeline,
+  setPlaybackLocked,
 }) => {
+  const getExportCanvasSnapshot = useCallback(
+    () => ({
+      viewState: cloneJson(viewState),
+      viewportSize: cloneJson(getZoomViewportSize?.()),
+      edgeRouting,
+      edgeCurvature: globalSettings?.edgeCurvature,
+      nodeRadius: globalSettings?.nodeSize,
+      edgeWidth: globalSettings?.edgeWidth,
+      nodeLabelFontSize: globalSettings?.nodeLabelFontSize,
+      edgeLabelFontSize: globalSettings?.edgeLabelFontSize,
+      theme,
+      baseCaptionOverlay: normalizeCaptionOverlay(captionOverlay),
+      customLegend: normalizeCustomLegend(customLegend),
+    }),
+    [
+      captionOverlay,
+      customLegend,
+      edgeRouting,
+      getZoomViewportSize,
+      globalSettings,
+      theme,
+      viewState,
+    ]
+  );
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
   const [parserError, setParserError] = useState('');
@@ -81,6 +116,25 @@ export const useGraphStudioImportExport = ({
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
   const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.fit);
+  const captureTokenRef = useRef(0);
+  const exportInFlightRef = useRef(false);
+  const exportReviewActiveRef = useRef(false);
+  const [isExportCaptureActive, setIsExportCaptureActive] = useState(false);
+  const [isVisualExporting, setIsVisualExporting] = useState(false);
+  const initialExportFrame =
+    Number.isInteger(currentFrame) &&
+    currentFrame >= 0 &&
+    currentFrame < steps.length
+      ? currentFrame
+      : 0;
+  const [exportFrameIndex, setExportFrameIndex] = useState(initialExportFrame);
+  const [exportCapture, setExportCapture] = useState(() => ({
+    frameIndex: initialExportFrame,
+    captureToken: 0,
+    graph: cloneJson(getFrameGraph?.(initialExportFrame)),
+    step: cloneJson(steps[initialExportFrame] ?? {}),
+    canvas: cloneJson(getExportCanvasSnapshot()),
+  }));
   const [exportFrameRangeState, setExportFrameRangeState] = useState(() => ({
     ...DEFAULT_EXPORT_FRAME_RANGE,
     endFrame: Math.max(1, steps.length),
@@ -114,15 +168,137 @@ export const useGraphStudioImportExport = ({
     [currentFrame, exportFrameRange, steps.length]
   );
 
-  const enableExportCanvas = useCallback(async () => {
-    setIsExporting?.(true);
-    await waitForFrameRender();
-  }, [setIsExporting]);
+  const queueExportFrame = useCallback(
+    (frameIndex, snapshot) => {
+      const safeFrame = validateExportFrameIndex(frameIndex, steps.length);
+      captureTokenRef.current += 1;
+      const nextCapture = {
+        frameIndex: safeFrame,
+        captureToken: captureTokenRef.current,
+        graph: cloneJson(snapshot?.graph ?? getFrameGraph?.(safeFrame)),
+        step: cloneJson(snapshot?.step ?? steps[safeFrame] ?? {}),
+        canvas: cloneJson(snapshot?.canvas ?? getExportCanvasSnapshot()),
+      };
+      setExportCapture(nextCapture);
+      return nextCapture;
+    },
+    [getExportCanvasSnapshot, getFrameGraph, steps]
+  );
 
-  const disableExportCanvas = useCallback(async () => {
-    setIsExporting?.(false);
-    await waitForFrameRender();
-  }, [setIsExporting]);
+  const prepareExportFrame = useCallback(
+    async (frameIndex, snapshot) => {
+      const capture = queueExportFrame(frameIndex, snapshot);
+      await waitForExportReady({
+        svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+        frameIndex: capture.frameIndex,
+        captureToken: capture.captureToken,
+      });
+      return {
+        ...capture,
+        svgEl: getGraphSvgElement(EXPORT_CAPTURE_SVG_ELEMENT_ID),
+      };
+    },
+    [queueExportFrame]
+  );
+
+  const getReviewedImageCapture = useCallback(
+    request => {
+      const frameIndex = validateExportFrameIndex(
+        request?.frameIndex,
+        steps.length
+      );
+      const captureToken = Number(request?.captureToken);
+      const framingMode = request?.framingMode;
+      const validFramingMode =
+        Object.values(IMAGE_FRAMING).includes(framingMode);
+      const captureIsCurrent =
+        exportReviewActiveRef.current &&
+        Number.isInteger(captureToken) &&
+        captureToken > 0 &&
+        captureToken === captureTokenRef.current &&
+        exportCapture?.captureToken === captureToken &&
+        exportCapture?.frameIndex === frameIndex &&
+        framingMode === imageFraming &&
+        validFramingMode &&
+        exportCapture?.graph &&
+        exportCapture?.canvas;
+
+      if (!captureIsCurrent) {
+        throw new Error(
+          'Reviewed preview is stale. Wait for it to refresh or reopen Export Review.'
+        );
+      }
+
+      return exportCapture;
+    },
+    [exportCapture, imageFraming, steps.length]
+  );
+
+  const beginExportReview = useCallback(() => {
+    if (exportInFlightRef.current) {
+      setStatus('An export is already in progress');
+      return false;
+    }
+    stopTimeline?.();
+    exportReviewActiveRef.current = true;
+    setIsExportCaptureActive(true);
+    setExportFrameIndex(currentFrame);
+    queueExportFrame(currentFrame);
+    return true;
+  }, [currentFrame, queueExportFrame, setStatus, stopTimeline]);
+
+  const setExportReviewFrame = useCallback(
+    frameIndex => {
+      if (exportInFlightRef.current) return;
+      const safeFrame = validateExportFrameIndex(frameIndex, steps.length);
+      setExportFrameIndex(safeFrame);
+      queueExportFrame(safeFrame);
+    },
+    [queueExportFrame, steps.length]
+  );
+
+  const endExportReview = useCallback(() => {
+    exportReviewActiveRef.current = false;
+    if (!exportInFlightRef.current) setIsExportCaptureActive(false);
+  }, []);
+
+  const beginVisualExport = useCallback(() => {
+    if (exportInFlightRef.current) {
+      setStatus('An export is already in progress');
+      return false;
+    }
+    exportInFlightRef.current = true;
+    setPlaybackLocked?.(true);
+    setIsExportCaptureActive(true);
+    setIsVisualExporting(true);
+    stopTimeline?.();
+    return true;
+  }, [setPlaybackLocked, setStatus, stopTimeline]);
+
+  const finishVisualExport = useCallback(() => {
+    stopTimeline?.();
+    setPlaybackLocked?.(false);
+    exportInFlightRef.current = false;
+    setIsVisualExporting(false);
+    if (!exportReviewActiveRef.current) setIsExportCaptureActive(false);
+  }, [setPlaybackLocked, stopTimeline]);
+
+  useEffect(() => {
+    if (!steps.length || isVisualExporting) return;
+    const lastFrameIndex = steps.length - 1;
+    if (exportCapture.frameIndex > lastFrameIndex) {
+      queueExportFrame(lastFrameIndex);
+    }
+  }, [
+    exportCapture.frameIndex,
+    isVisualExporting,
+    queueExportFrame,
+    steps.length,
+  ]);
+
+  const safeExportFrameIndex = steps.length
+    ? Math.min(exportFrameIndex, steps.length - 1)
+    : 0;
 
   const applyParserText = useCallback(() => {
     setParserError('');
@@ -215,42 +391,68 @@ export const useGraphStudioImportExport = ({
     viewState,
   ]);
 
-  const exportSvg = useCallback(async () => {
-    setStatus('Exporting SVG...');
-    try {
-      await enableExportCanvas();
-      await exportCurrentFrameSvg({ framingMode: imageFraming });
-      setStatus('SVG exported');
-    } catch (error) {
-      console.error(error);
-      setStatus(`SVG export error: ${error.message}`);
-    } finally {
-      await disableExportCanvas();
-    }
-  }, [disableExportCanvas, enableExportCanvas, imageFraming, setStatus]);
+  const exportSvg = useCallback(
+    async reviewedPreview => {
+      if (!beginVisualExport()) return;
+      setStatus('Exporting SVG...');
+      try {
+        const capture = getReviewedImageCapture(reviewedPreview);
+        await waitForExportReady({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
+        await exportCurrentFrameSvg({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          framingMode: reviewedPreview.framingMode,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
+        setStatus('SVG exported');
+      } catch (error) {
+        console.error(error);
+        setStatus(`SVG export error: ${error.message}`);
+      } finally {
+        finishVisualExport();
+      }
+    },
+    [beginVisualExport, finishVisualExport, getReviewedImageCapture, setStatus]
+  );
 
-  const exportPng = useCallback(async () => {
-    setStatus('Exporting PNG...');
-    try {
-      await enableExportCanvas();
-      await exportCurrentFramePng({
-        pngScale,
-        framingMode: imageFraming,
-      });
-      setStatus('PNG exported');
-    } catch (error) {
-      console.error(error);
-      setStatus(`PNG export error: ${error.message}`);
-    } finally {
-      await disableExportCanvas();
-    }
-  }, [
-    disableExportCanvas,
-    enableExportCanvas,
-    imageFraming,
-    pngScale,
-    setStatus,
-  ]);
+  const exportPng = useCallback(
+    async reviewedPreview => {
+      if (!beginVisualExport()) return;
+      setStatus('Exporting PNG...');
+      try {
+        const capture = getReviewedImageCapture(reviewedPreview);
+        await waitForExportReady({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
+        await exportCurrentFramePng({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          pngScale,
+          framingMode: reviewedPreview.framingMode,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
+        setStatus('PNG exported');
+      } catch (error) {
+        console.error(error);
+        setStatus(`PNG export error: ${error.message}`);
+      } finally {
+        finishVisualExport();
+      }
+    },
+    [
+      beginVisualExport,
+      finishVisualExport,
+      getReviewedImageCapture,
+      pngScale,
+      setStatus,
+    ]
+  );
 
   const applyProjectPayload = useCallback(
     project => {
@@ -348,112 +550,109 @@ export const useGraphStudioImportExport = ({
     }
   }, [importProjectJsonText, projectJsonPasteText, setStatus]);
 
-  const exportVideo = useCallback(async () => {
-    stopTimeline?.();
-    const frameIndexes = getExportFrameIndexes();
-    if (!frameIndexes.length) {
-      setStatus('Export failed: no timeline frames to export');
-      return;
-    }
+  const createExportSession = useCallback(
+    frameIndexes => {
+      const snapshotSteps = cloneJson(steps);
+      const canvas = cloneJson(getExportCanvasSnapshot());
+      const frameSnapshots = new Map(
+        frameIndexes.map(frameIndex => [
+          frameIndex,
+          {
+            graph: cloneJson(getFrameGraph?.(frameIndex)),
+            step: cloneJson(snapshotSteps[frameIndex] ?? {}),
+            canvas,
+          },
+        ])
+      );
+      return { steps: snapshotSteps, frameSnapshots };
+    },
+    [getExportCanvasSnapshot, getFrameGraph, steps]
+  );
 
-    const originalFrame = currentFrame;
-    setStatus('Exporting video...');
+  const exportVideo = useCallback(async () => {
+    if (!beginVisualExport()) return;
+    const originalCapture = exportCapture;
     try {
-      await enableExportCanvas();
+      const frameIndexes = getExportFrameIndexes();
+      if (!frameIndexes.length) {
+        throw new Error('No timeline frames to export');
+      }
+      const session = createExportSession(frameIndexes);
+      setStatus('Exporting video...');
       await exportTimelineVideo({
-        steps,
-        setCurrentFrame,
+        steps: session.steps,
         frameIndexes,
+        renderFrame: async frameIndex =>
+          (
+            await prepareExportFrame(
+              frameIndex,
+              session.frameSnapshots.get(frameIndex)
+            )
+          ).svgEl,
       });
       setStatus('Video exported successfully');
     } catch (error) {
       console.error(error);
       setStatus(`Export failed: ${error.message}`);
     } finally {
-      setCurrentFrame(originalFrame);
-      await waitForFrameRender();
-      await disableExportCanvas();
+      try {
+        await prepareExportFrame(originalCapture.frameIndex, originalCapture);
+      } catch (error) {
+        console.error('Failed to restore export capture surface', error);
+      }
+      finishVisualExport();
     }
   }, [
-    currentFrame,
-    disableExportCanvas,
-    enableExportCanvas,
+    beginVisualExport,
+    createExportSession,
+    exportCapture,
+    finishVisualExport,
     getExportFrameIndexes,
-    setCurrentFrame,
+    prepareExportFrame,
     setStatus,
-    stopTimeline,
-    steps,
   ]);
 
   const exportSlideshow = useCallback(async () => {
-    stopTimeline?.();
-    if (!steps.length) {
-      setStatus('Slideshow export error: no timeline frames to export');
-      return;
-    }
-
-    const originalFrame = currentFrame;
-    const originalViewState = viewState ? { ...viewState } : null;
-    const originalMode = mode;
-    const originalSelectedObject = selectedObject
-      ? { ...selectedObject }
-      : null;
-    const originalSelectedNodeIds = [...selectedNodeIds];
-    const originalDrawFrom = drawFrom;
-    const frameIndexes = getExportFrameIndexes();
-    if (!frameIndexes.length) {
-      setStatus('Slideshow export error: no timeline frames to export');
-      return;
-    }
-
-    const restoreViewState = () => {
-      if (!originalViewState) return;
-      setViewState(originalViewState);
-      window.setTimeout(() => setViewState(originalViewState), 0);
-      window.requestAnimationFrame?.(() => setViewState(originalViewState));
-    };
-
-    setStatus('Exporting slideshow...');
+    if (!beginVisualExport()) return;
+    const originalCapture = exportCapture;
     try {
-      await enableExportCanvas();
+      const frameIndexes = getExportFrameIndexes();
+      if (!frameIndexes.length) {
+        throw new Error('No timeline frames to export');
+      }
+      const session = createExportSession(frameIndexes);
+      setStatus('Exporting slideshow...');
       await exportTimelineSlideshow({
-        steps,
-        currentFrame,
-        setCurrentFrame,
+        steps: session.steps,
         frameIndexes,
+        renderFrame: async frameIndex =>
+          (
+            await prepareExportFrame(
+              frameIndex,
+              session.frameSnapshots.get(frameIndex)
+            )
+          ).svgEl,
       });
       setStatus('Slideshow exported');
     } catch (error) {
       console.error(error);
       setStatus(`Slideshow export error: ${error.message}`);
     } finally {
-      setCurrentFrame(originalFrame);
-      restoreViewState();
-      setMode(originalMode);
-      setSelectedObject(originalSelectedObject);
-      setSelectedNodeIds(originalSelectedNodeIds);
-      restoreDrawState?.(originalDrawFrom);
-      await disableExportCanvas();
+      try {
+        await prepareExportFrame(originalCapture.frameIndex, originalCapture);
+      } catch (error) {
+        console.error('Failed to restore export capture surface', error);
+      }
+      finishVisualExport();
     }
   }, [
-    currentFrame,
-    disableExportCanvas,
-    drawFrom,
-    enableExportCanvas,
+    beginVisualExport,
+    createExportSession,
+    exportCapture,
+    finishVisualExport,
     getExportFrameIndexes,
-    mode,
-    restoreDrawState,
-    selectedNodeIds,
-    selectedObject,
-    setCurrentFrame,
-    setMode,
-    setSelectedNodeIds,
-    setSelectedObject,
+    prepareExportFrame,
     setStatus,
-    setViewState,
-    stopTimeline,
-    steps,
-    viewState,
   ]);
 
   const setScriptModalOpen = useCallback(open => {
@@ -549,6 +748,12 @@ export const useGraphStudioImportExport = ({
     exportProject,
     exportFrameRange,
     updateExportFrameRange,
+    exportCapture: isExportCaptureActive ? exportCapture : null,
+    exportFrameIndex: safeExportFrameIndex,
+    setExportFrameIndex: setExportReviewFrame,
+    isVisualExporting,
+    beginExportReview,
+    endExportReview,
     importProjectFile,
     openExportVideoModal,
     closeExportVideoModal,
