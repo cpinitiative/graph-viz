@@ -64,6 +64,7 @@ export const useGraphStudioImportExport = ({
   lockCanvas,
   setLockCanvas,
   viewState,
+  getZoomViewportSize,
   setViewState,
   setViewFromNodes,
   bumpViewReset,
@@ -75,10 +76,12 @@ export const useGraphStudioImportExport = ({
   clearDrawState,
   resetUndoHistory,
   stopTimeline,
+  setPlaybackLocked,
 }) => {
   const getExportCanvasSnapshot = useCallback(
     () => ({
       viewState: cloneJson(viewState),
+      viewportSize: cloneJson(getZoomViewportSize?.()),
       edgeRouting,
       edgeCurvature: globalSettings?.edgeCurvature,
       nodeRadius: globalSettings?.nodeSize,
@@ -93,6 +96,7 @@ export const useGraphStudioImportExport = ({
       captionOverlay,
       customLegend,
       edgeRouting,
+      getZoomViewportSize,
       globalSettings,
       theme,
       viewState,
@@ -197,6 +201,39 @@ export const useGraphStudioImportExport = ({
     [queueExportFrame]
   );
 
+  const getReviewedImageCapture = useCallback(
+    request => {
+      const frameIndex = validateExportFrameIndex(
+        request?.frameIndex,
+        steps.length
+      );
+      const captureToken = Number(request?.captureToken);
+      const framingMode = request?.framingMode;
+      const validFramingMode =
+        Object.values(IMAGE_FRAMING).includes(framingMode);
+      const captureIsCurrent =
+        exportReviewActiveRef.current &&
+        Number.isInteger(captureToken) &&
+        captureToken > 0 &&
+        captureToken === captureTokenRef.current &&
+        exportCapture?.captureToken === captureToken &&
+        exportCapture?.frameIndex === frameIndex &&
+        framingMode === imageFraming &&
+        validFramingMode &&
+        exportCapture?.graph &&
+        exportCapture?.canvas;
+
+      if (!captureIsCurrent) {
+        throw new Error(
+          'Reviewed preview is stale. Wait for it to refresh or reopen Export Review.'
+        );
+      }
+
+      return exportCapture;
+    },
+    [exportCapture, imageFraming, steps.length]
+  );
+
   const beginExportReview = useCallback(() => {
     if (exportInFlightRef.current) {
       setStatus('An export is already in progress');
@@ -231,17 +268,20 @@ export const useGraphStudioImportExport = ({
       return false;
     }
     exportInFlightRef.current = true;
+    setPlaybackLocked?.(true);
     setIsExportCaptureActive(true);
     setIsVisualExporting(true);
     stopTimeline?.();
     return true;
-  }, [setStatus, stopTimeline]);
+  }, [setPlaybackLocked, setStatus, stopTimeline]);
 
   const finishVisualExport = useCallback(() => {
+    stopTimeline?.();
+    setPlaybackLocked?.(false);
     exportInFlightRef.current = false;
     setIsVisualExporting(false);
     if (!exportReviewActiveRef.current) setIsExportCaptureActive(false);
-  }, []);
+  }, [setPlaybackLocked, stopTimeline]);
 
   useEffect(() => {
     if (!steps.length || isVisualExporting) return;
@@ -352,14 +392,19 @@ export const useGraphStudioImportExport = ({
   ]);
 
   const exportSvg = useCallback(
-    async frameIndex => {
+    async reviewedPreview => {
       if (!beginVisualExport()) return;
       setStatus('Exporting SVG...');
       try {
-        const capture = await prepareExportFrame(frameIndex);
+        const capture = getReviewedImageCapture(reviewedPreview);
+        await waitForExportReady({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
         await exportCurrentFrameSvg({
           svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
-          framingMode: imageFraming,
+          framingMode: reviewedPreview.framingMode,
           frameIndex: capture.frameIndex,
           captureToken: capture.captureToken,
         });
@@ -371,25 +416,24 @@ export const useGraphStudioImportExport = ({
         finishVisualExport();
       }
     },
-    [
-      beginVisualExport,
-      finishVisualExport,
-      imageFraming,
-      prepareExportFrame,
-      setStatus,
-    ]
+    [beginVisualExport, finishVisualExport, getReviewedImageCapture, setStatus]
   );
 
   const exportPng = useCallback(
-    async frameIndex => {
+    async reviewedPreview => {
       if (!beginVisualExport()) return;
       setStatus('Exporting PNG...');
       try {
-        const capture = await prepareExportFrame(frameIndex);
+        const capture = getReviewedImageCapture(reviewedPreview);
+        await waitForExportReady({
+          svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
+          frameIndex: capture.frameIndex,
+          captureToken: capture.captureToken,
+        });
         await exportCurrentFramePng({
           svgElementId: EXPORT_CAPTURE_SVG_ELEMENT_ID,
           pngScale,
-          framingMode: imageFraming,
+          framingMode: reviewedPreview.framingMode,
           frameIndex: capture.frameIndex,
           captureToken: capture.captureToken,
         });
@@ -404,9 +448,8 @@ export const useGraphStudioImportExport = ({
     [
       beginVisualExport,
       finishVisualExport,
-      imageFraming,
+      getReviewedImageCapture,
       pngScale,
-      prepareExportFrame,
       setStatus,
     ]
   );

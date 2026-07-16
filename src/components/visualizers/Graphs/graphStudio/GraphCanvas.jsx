@@ -896,11 +896,14 @@ const GraphCanvas = ({
     if (!el) return undefined;
     const updateCanvasSize = () => {
       const bounds = el.getBoundingClientRect();
+      onViewportSizeChange?.({
+        width: Math.max(0, bounds.width),
+        height: Math.max(0, bounds.height),
+      });
       const next = {
         width: Math.max(0, Math.round(bounds.width)),
         height: Math.max(0, Math.round(bounds.height)),
       };
-      onViewportSizeChange?.(next);
       setCanvasSize(prev => {
         return prev.width === next.width && prev.height === next.height
           ? prev
@@ -997,7 +1000,7 @@ const GraphCanvas = ({
   }, [setViewState, viewState.zoom]);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg) return;
+    if (!svg || isExporting) return undefined;
     const handleWheel = event => {
       event.preventDefault();
       if (lockCanvas) return;
@@ -1028,7 +1031,7 @@ const GraphCanvas = ({
     };
     svg.addEventListener('wheel', handleWheel, { passive: false });
     return () => svg.removeEventListener('wheel', handleWheel);
-  }, [lockCanvas, viewState, setViewState]);
+  }, [isExporting, lockCanvas, viewState, setViewState]);
   const onPointerDownBackground = event => {
     svgRef.current?.focus();
     const bounds = svgRef.current?.getBoundingClientRect();
@@ -1195,30 +1198,34 @@ const GraphCanvas = ({
         ref={svgRef}
         className="h-full w-full"
         aria-label="Graph canvas"
-        data-frame-navigation-surface="true"
-        data-mode={mode}
-        data-view-x={viewState.x}
-        data-view-y={viewState.y}
-        data-view-zoom={viewState.zoom}
+        data-frame-navigation-surface={isExporting ? undefined : 'true'}
+        data-mode={isExporting ? undefined : mode}
+        data-view-x={isExporting ? undefined : viewState.x}
+        data-view-y={isExporting ? undefined : viewState.y}
+        data-view-zoom={isExporting ? undefined : viewState.zoom}
         data-export-mode={isExporting ? 'true' : 'false'}
         data-export-frame-index={
           Number.isInteger(exportFrameIndex) ? exportFrameIndex : undefined
         }
         data-export-capture-token={exportCaptureToken}
-        tabIndex="0"
-        onPointerDown={onPointerDownBackground}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
-        style={{
-          touchAction: 'none',
-          cursor:
-            mode === 'pan'
-              ? 'grab'
-              : mode === 'add' || mode === 'draw'
-                ? 'crosshair'
-                : 'default',
-        }}
+        tabIndex={isExporting ? undefined : 0}
+        onPointerDown={isExporting ? undefined : onPointerDownBackground}
+        onPointerMove={isExporting ? undefined : onPointerMove}
+        onPointerUp={isExporting ? undefined : onPointerUp}
+        onPointerLeave={isExporting ? undefined : onPointerUp}
+        style={
+          isExporting
+            ? undefined
+            : {
+                touchAction: 'none',
+                cursor:
+                  mode === 'pan'
+                    ? 'grab'
+                    : mode === 'add' || mode === 'draw'
+                      ? 'crosshair'
+                      : 'default',
+              }
+        }
       >
         <defs>
           <pattern

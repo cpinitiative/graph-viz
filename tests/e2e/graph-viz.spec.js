@@ -339,6 +339,36 @@ const getSvgViewBox = svgText => {
   return viewBox;
 };
 
+const getGraphViewTransform = svgText => {
+  const transform = svgText.match(
+    /data-graph-view-transform="true"[^>]*transform="([^"]+)"/
+  )?.[1];
+  expect(transform).toBeTruthy();
+  const match = transform.match(
+    /translate\(([-+\d.eE]+)[ ,]+([-+\d.eE]+)\)\s+scale\(([-+\d.eE]+)\)/
+  );
+  expect(match).not.toBeNull();
+  return {
+    x: Number(match[1]),
+    y: Number(match[2]),
+    zoom: Number(match[3]),
+  };
+};
+
+const getVisibleWorldBounds = ({ x, y, zoom, width, height }) => ({
+  minX: -x / zoom,
+  minY: -y / zoom,
+  maxX: (width - x) / zoom,
+  maxY: (height - y) / zoom,
+});
+
+const getMappedBounds = (worldBounds, viewState) => ({
+  minX: worldBounds.minX * viewState.zoom + viewState.x,
+  minY: worldBounds.minY * viewState.zoom + viewState.y,
+  maxX: worldBounds.maxX * viewState.zoom + viewState.x,
+  maxY: worldBounds.maxY * viewState.zoom + viewState.y,
+});
+
 const expectReasonableFittedViewBox = svgText => {
   const viewBox = getSvgViewBox(svgText);
   expect(viewBox[2]).toBeGreaterThan(0);
@@ -3364,7 +3394,7 @@ while (true) {}
       'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
     );
     await expect(exportMenu.getByTestId('image-export-controls')).toContainText(
-      'Fit graph is the default. Viewport exports the visible editor view; Slide 16:9 composes a presentation frame.'
+      'Fit graph is the default. Viewport contains the complete editor region captured when review opened; Slide 16:9 composes a presentation frame.'
     );
 
     await exportMenu.getByLabel('Image Framing').selectOption('viewport');
@@ -3406,6 +3436,98 @@ while (true) {}
       (await fetch(image.src)).text()
     );
     expectSlideFramedSvg(slidePreviewSvgText);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('viewport review preserves the captured editor world region after resize', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'multigraph');
+    await commitInputValue(page.getByLabel('Zoom percent'), 180);
+    await page.getByRole('button', { name: 'Pan' }).click();
+
+    const canvasBox = await getRequiredBox(graphCanvas(page));
+    await page.mouse.move(
+      canvasBox.x + canvasBox.width / 2,
+      canvasBox.y + canvasBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      canvasBox.x + canvasBox.width / 2 + 135,
+      canvasBox.y + canvasBox.height / 2 - 85,
+      { steps: 8 }
+    );
+    await page.mouse.up();
+
+    const reviewedEditorCamera = await graphCanvas(page).evaluate(svg => {
+      const bounds = svg.getBoundingClientRect();
+      return {
+        x: Number(svg.getAttribute('data-view-x')),
+        y: Number(svg.getAttribute('data-view-y')),
+        zoom: Number(svg.getAttribute('data-view-zoom')),
+        width: bounds.width,
+        height: bounds.height,
+      };
+    });
+    expect(reviewedEditorCamera.zoom).toBeCloseTo(1.8, 5);
+    const reviewedWorldBounds = getVisibleWorldBounds(reviewedEditorCamera);
+
+    const exportMenu = await openExportMenu(page);
+    await exportMenu.getByLabel('Image Framing').selectOption('viewport');
+    await expect
+      .poll(async () =>
+        getSvgRootAttribute(
+          await getPreviewSvgText(page),
+          'data-export-framing'
+        )
+      )
+      .toBe('viewport');
+    const previewImage = await expectExportPreview(page);
+    const previewSource = await previewImage.getAttribute('src');
+    const reviewedPreviewSvg = await getPreviewSvgText(page);
+    expect(getSvgRootAttribute(reviewedPreviewSvg, 'width')).toBe('1040');
+    expect(getSvgRootAttribute(reviewedPreviewSvg, 'height')).toBe('585');
+
+    const exportViewState = getGraphViewTransform(reviewedPreviewSvg);
+    const expectedZoom = Math.min(
+      1040 / (reviewedWorldBounds.maxX - reviewedWorldBounds.minX),
+      585 / (reviewedWorldBounds.maxY - reviewedWorldBounds.minY)
+    );
+    expect(exportViewState.zoom).toBeCloseTo(expectedZoom, 5);
+    const mappedBounds = getMappedBounds(reviewedWorldBounds, exportViewState);
+    expect(mappedBounds.minX).toBeGreaterThanOrEqual(-0.01);
+    expect(mappedBounds.minY).toBeGreaterThanOrEqual(-0.01);
+    expect(mappedBounds.maxX).toBeLessThanOrEqual(1040.01);
+    expect(mappedBounds.maxY).toBeLessThanOrEqual(585.01);
+    expect(mappedBounds.minX).toBeCloseTo(1040 - mappedBounds.maxX, 2);
+    expect(mappedBounds.minY).toBeCloseTo(585 - mappedBounds.maxY, 2);
+
+    await page.setViewportSize({ width: 1900, height: 650 });
+    await expect
+      .poll(async () => {
+        const resizedCanvasBox = await graphCanvas(page).boundingBox();
+        return resizedCanvasBox
+          ? Math.abs(resizedCanvasBox.width - reviewedEditorCamera.width)
+          : 0;
+      })
+      .toBeGreaterThan(50);
+    await expect(previewImage).toHaveAttribute('src', previewSource);
+    expect(await getPreviewSvgText(page)).toBe(reviewedPreviewSvg);
+
+    const svgDownload = await expectDownloadFrom({
+      page,
+      locator: exportMenu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    const svgPath = await svgDownload.path();
+    expect(svgPath).not.toBeNull();
+    expect(await fs.readFile(svgPath, 'utf8')).toBe(reviewedPreviewSvg);
 
     expect(errors).toEqual([]);
   });
@@ -3637,6 +3759,8 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'dfs');
+    await setRangeValue(page, 'Node size', 30);
+    await expect(graphNodeCircles(page).first()).toHaveAttribute('r', '30');
 
     const frameCounter = page.getByTestId('timeline-frame-counter');
     await expect(frameCounter).toHaveText('1 / 9');
@@ -3679,6 +3803,52 @@ while (true) {}
     expect(previewSvgText).toContain('data-edge-path-id=');
     expect(previewSvgText).toContain('data-edge-arrowhead-id=');
     expect(previewSvgText).toContain('data-node-label-id=');
+    expect(
+      (await getSvgPresentationState(page, previewSvgText)).firstNode.r
+    ).toBe(30);
+
+    const captureSurface = page.getByTestId('export-capture-surface');
+    const captureSvg = page.locator('#graph-studio-export-capture-svg');
+    await expect(captureSurface).toHaveAttribute('inert', '');
+    await expect(captureSvg).not.toHaveAttribute('tabindex', /.+/);
+    await expect(captureSvg).not.toHaveAttribute(
+      'data-frame-navigation-surface',
+      /.+/
+    );
+    expect(
+      await captureSvg.evaluate(svg => {
+        svg.focus();
+        return document.activeElement === svg;
+      })
+    ).toBe(false);
+    for (let index = 0; index < 8; index += 1) {
+      await page.keyboard.press('Tab');
+      expect(
+        await captureSurface.evaluate(surface =>
+          surface.contains(document.activeElement)
+        )
+      ).toBe(false);
+    }
+    await captureSvg.evaluate(svg => {
+      svg.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+      );
+    });
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+
+    await exportMenu.getByTestId('svg-export-button').focus();
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+Shift+z');
+    await page.keyboard.press('Control+y');
+    await expect(graphNodeCircles(page).first()).toHaveAttribute('r', '30');
+
+    await setRangeValue(page, 'Node size', 42);
+    await expect(graphNodeCircles(page).first()).toHaveAttribute('r', '42');
+    expect(await getPreviewSvgText(page)).toBe(previewSvgText);
+    expect(
+      (await getSvgPresentationState(page, await getPreviewSvgText(page)))
+        .firstNode.r
+    ).toBe(30);
     for (const editorOnlyMarker of [
       'data-edge-hit-target-id=',
       'data-node-selection-ring-id=',
@@ -3737,6 +3907,8 @@ while (true) {}
 
     await closeExportMenu(page);
     await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await page.keyboard.press('Control+z');
+    await expect(graphNodeCircles(page).first()).toHaveAttribute('r', '30');
     await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
       0
     );
@@ -3814,6 +3986,16 @@ while (true) {}
       }
     });
     test.skip(!supportsAvc, 'Chromium AVC VideoEncoder is unavailable');
+    await page.evaluate(() => {
+      const nativeFlush = VideoEncoder.prototype.flush;
+      Object.defineProperty(VideoEncoder.prototype, 'flush', {
+        configurable: true,
+        value: async function slowFlush() {
+          await new Promise(resolve => window.setTimeout(resolve, 650));
+          return nativeFlush.call(this);
+        },
+      });
+    });
 
     await choosePreset(page, 'bfs');
     const frameCounter = page.getByTestId('timeline-frame-counter');
@@ -3834,6 +4016,20 @@ while (true) {}
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect(page.getByText('Exporting video...')).toBeVisible();
+    const playButton = page.getByTestId('timeline-playback-button');
+    await expect(playButton).toBeDisabled();
+    await expect(playButton).toHaveAttribute(
+      'title',
+      'Playback is unavailable while exporting.'
+    );
+    await playButton.evaluate(button => {
+      button.disabled = false;
+      button.click();
+      button.disabled = true;
+    });
+    await page.waitForTimeout(250);
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe('graph-export.mp4');
     const videoPath = await download.path();
@@ -3841,10 +4037,86 @@ while (true) {}
     expect((await fs.stat(videoPath)).size).toBeGreaterThan(0);
     await expect(page.getByText('Video exported successfully')).toBeVisible();
     await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await expect(playButton).toBeEnabled();
+    await expect(playButton).toHaveAttribute('aria-label', 'Play timeline');
     await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
       0
     );
     expect(errors).toEqual([]);
+  });
+
+  test('MP4 failure leaves playback stopped and unlocks its controls', async ({
+    page,
+  }) => {
+    const developerErrors = [];
+    page.on('console', message => {
+      if (message.type() === 'error') developerErrors.push(message.text());
+    });
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    const supportsAvc = await page.evaluate(async () => {
+      if (typeof VideoEncoder === 'undefined') return false;
+      try {
+        const result = await VideoEncoder.isConfigSupported({
+          codec: 'avc1.42E01F',
+          width: 1040,
+          height: 584,
+          avc: { format: 'avc' },
+          bitrate: 5_000_000,
+          framerate: 30,
+        });
+        return result.supported;
+      } catch {
+        return false;
+      }
+    });
+    test.skip(!supportsAvc, 'Chromium AVC VideoEncoder is unavailable');
+    await page.evaluate(() => {
+      Object.defineProperty(VideoEncoder.prototype, 'flush', {
+        configurable: true,
+        value: async function injectedFailure() {
+          await new Promise(resolve => window.setTimeout(resolve, 650));
+          throw new Error('Injected MP4 flush failure');
+        },
+      });
+    });
+
+    await choosePreset(page, 'bfs');
+    const frameCounter = page.getByTestId('timeline-frame-counter');
+    await page.getByRole('button', { name: 'Play timeline' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Pause timeline' })
+    ).toBeVisible();
+    const exportMenu = await openExportMenu(page);
+    const editorFrameAtExportStart = await frameCounter.textContent();
+    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+
+    const playButton = page.getByTestId('timeline-playback-button');
+    await expect(playButton).toBeDisabled();
+    await playButton.evaluate(button => {
+      button.disabled = false;
+      button.click();
+      button.disabled = true;
+    });
+    await page.waitForTimeout(250);
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await expect(
+      page.getByText('Export failed: Injected MP4 flush failure')
+    ).toBeVisible();
+    await expect(playButton).toBeEnabled();
+    await expect(playButton).toHaveAttribute('aria-label', 'Play timeline');
+    await expect(frameCounter).toHaveText(editorFrameAtExportStart);
+    await expect(page.locator('#graph-studio-export-capture-svg')).toHaveCount(
+      0
+    );
+    expect(
+      developerErrors.some(message =>
+        message.includes('Injected MP4 flush failure')
+      )
+    ).toBe(true);
   });
 
   test('imports valid pasted project JSON', async ({ page }) => {

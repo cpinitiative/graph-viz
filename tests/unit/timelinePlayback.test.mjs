@@ -44,6 +44,8 @@ const createHarness = ({ initialFrame = 0, initialSteps } = {}) => {
   const frameChanges = [];
   const playingChanges = [];
   const timers = createFakeTimers();
+  let playAllowed = true;
+  let blockedPlayCount = 0;
   const controller = createTimelinePlaybackController({
     getSteps: () => steps,
     getCurrentFrame: () => currentFrame,
@@ -52,6 +54,10 @@ const createHarness = ({ initialFrame = 0, initialSteps } = {}) => {
       frameChanges.push(frame);
     },
     onPlayingChange: playing => playingChanges.push(playing),
+    canPlay: () => playAllowed,
+    onPlayBlocked: () => {
+      blockedPlayCount += 1;
+    },
     schedule: (callback, delay) => timers.schedule(callback, delay),
     clearSchedule: id => timers.clear(id),
   });
@@ -65,6 +71,10 @@ const createHarness = ({ initialFrame = 0, initialSteps } = {}) => {
     setSteps: nextSteps => {
       steps = nextSteps;
     },
+    setPlayAllowed: allowed => {
+      playAllowed = allowed;
+    },
+    getBlockedPlayCount: () => blockedPlayCount,
   };
 };
 
@@ -154,4 +164,31 @@ test('disposing playback clears the timer and invalidates its callback', () => {
   assert.deepEqual(harness.frameChanges, []);
   assert.equal(harness.controller.isRunning(), false);
   assert.equal(harness.controller.hasPendingTimer(), false);
+});
+
+test('playback controller refuses to start while visual export is locked', () => {
+  const harness = createHarness();
+  harness.setPlayAllowed(false);
+
+  assert.equal(harness.controller.play(), false);
+  assert.equal(harness.controller.isRunning(), false);
+  assert.equal(harness.controller.hasPendingTimer(), false);
+  assert.equal(harness.getBlockedPlayCount(), 1);
+  assert.deepEqual(harness.playingChanges, []);
+  assert.deepEqual(harness.frameChanges, []);
+});
+
+test('a delayed playback callback becomes inert when export locks playback', () => {
+  const harness = createHarness();
+
+  harness.controller.play();
+  const timerId = harness.timers.pending[0][0];
+  harness.setPlayAllowed(false);
+  harness.timers.invoke(timerId);
+
+  assert.equal(harness.controller.isRunning(), false);
+  assert.equal(harness.controller.hasPendingTimer(), false);
+  assert.equal(harness.getCurrentFrame(), 0);
+  assert.deepEqual(harness.frameChanges, []);
+  assert.deepEqual(harness.playingChanges, [true, false]);
 });

@@ -23,6 +23,13 @@ export const snapshotTimelineState = ({ baseGraph, steps, settings }) => ({
 
 export const isTextEditingUndoTarget = target => {
   if (target?.isContentEditable) return true;
+  const editableAncestor = target?.closest?.('[contenteditable]');
+  if (
+    editableAncestor &&
+    editableAncestor.getAttribute('contenteditable') !== 'false'
+  ) {
+    return true;
+  }
 
   const tagName = String(target?.tagName ?? '').toLowerCase();
   if (tagName === 'textarea') return true;

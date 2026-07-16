@@ -31,6 +31,61 @@ export const toWorld = ({ x, y }, viewState) => ({
   y: (y - viewState.y) / viewState.zoom,
 });
 
+export const getVisibleWorldBounds = ({ viewState, viewport }) => {
+  const x = Number(viewState?.x);
+  const y = Number(viewState?.y);
+  const zoom = Number(viewState?.zoom);
+  const width = Number(viewport?.width);
+  const height = Number(viewport?.height);
+  if (
+    ![x, y, zoom, width, height].every(Number.isFinite) ||
+    zoom <= 0 ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    minX: -x / zoom,
+    minY: -y / zoom,
+    maxX: (width - x) / zoom,
+    maxY: (height - y) / zoom,
+  };
+};
+
+export const getContainedViewState = ({
+  viewState,
+  sourceViewport,
+  targetViewport,
+}) => {
+  const worldBounds = getVisibleWorldBounds({
+    viewState,
+    viewport: sourceViewport,
+  });
+  const targetWidth = Number(targetViewport?.width);
+  const targetHeight = Number(targetViewport?.height);
+  if (
+    !worldBounds ||
+    ![targetWidth, targetHeight].every(Number.isFinite) ||
+    targetWidth <= 0 ||
+    targetHeight <= 0
+  ) {
+    return null;
+  }
+
+  const worldWidth = worldBounds.maxX - worldBounds.minX;
+  const worldHeight = worldBounds.maxY - worldBounds.minY;
+  if (worldWidth <= 0 || worldHeight <= 0) return null;
+
+  const zoom = Math.min(targetWidth / worldWidth, targetHeight / worldHeight);
+  return {
+    zoom,
+    x: (targetWidth - worldWidth * zoom) / 2 - worldBounds.minX * zoom,
+    y: (targetHeight - worldHeight * zoom) / 2 - worldBounds.minY * zoom,
+  };
+};
+
 export const clampViewStateToPlayspace = (
   candidate,
   viewportWidth,

@@ -129,6 +129,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setLockCanvas,
     setViewFromNodes,
     setZoomViewportSize,
+    getZoomViewportSize,
     bumpViewReset,
     centerViewOnContent,
     zoomIn,
@@ -255,12 +256,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     restoreSettings: restoreUndoSettings,
     setStatus,
   });
-  const { isPlaying, stopTimeline, togglePlayback } = useGraphStudioPlayback({
-    steps,
-    currentFrame,
-    setCurrentFrame,
-    setStatus,
-  });
+  const { isPlaying, stopTimeline, setPlaybackLocked, togglePlayback } =
+    useGraphStudioPlayback({
+      steps,
+      currentFrame,
+      setCurrentFrame,
+      setStatus,
+    });
   useEffect(() => {
     playbackStopRef.current = stopTimeline;
     return () => {
@@ -442,6 +444,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     lockCanvas,
     setLockCanvas,
     viewState,
+    getZoomViewportSize,
     setViewState,
     setViewFromNodes,
     bumpViewReset,
@@ -453,6 +456,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     clearDrawState,
     resetUndoHistory,
     stopTimeline,
+    setPlaybackLocked,
   });
   useEffect(() => {
     replaceTimeline(seedTimeline.baseGraph, seedTimeline.steps);
@@ -906,6 +910,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       },
       onPlay: togglePlayback,
       isPlaying,
+      playbackDisabled: isVisualExporting,
     },
     modals: {
       parser: {

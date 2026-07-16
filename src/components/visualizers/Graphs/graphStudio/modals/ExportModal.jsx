@@ -548,8 +548,9 @@ const ExportModal = ({
                 <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
               </NativeSelect>
               <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                Fit graph is the default. Viewport exports the visible editor
-                view; Slide 16:9 composes a presentation frame.
+                Fit graph is the default. Viewport contains the complete editor
+                region captured when review opened; Slide 16:9 composes a
+                presentation frame.
               </span>
             </label>
           </div>
@@ -560,7 +561,13 @@ const ExportModal = ({
               data-testid="png-export-button"
               disabled={!imageExportReady}
               onClick={() => {
-                if (imageExportReady) onExportPng?.(previewFrameIndex);
+                if (imageExportReady) {
+                  onExportPng?.({
+                    frameIndex: previewFrameIndex,
+                    captureToken: previewCaptureToken,
+                    framingMode: imageFraming,
+                  });
+                }
               }}
             >
               Export PNG
@@ -571,7 +578,13 @@ const ExportModal = ({
               data-testid="svg-export-button"
               disabled={!imageExportReady}
               onClick={() => {
-                if (imageExportReady) onExportSvg?.(previewFrameIndex);
+                if (imageExportReady) {
+                  onExportSvg?.({
+                    frameIndex: previewFrameIndex,
+                    captureToken: previewCaptureToken,
+                    framingMode: imageFraming,
+                  });
+                }
               }}
             >
               Export SVG

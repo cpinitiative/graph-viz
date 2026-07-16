@@ -18,6 +18,7 @@ export const useGraphStudioPlayback = ({
   const currentFrameRef = useRef(currentFrame);
   const setCurrentFrameRef = useRef(setCurrentFrame);
   const setStatusRef = useRef(setStatus);
+  const playbackLockedRef = useRef(false);
   useLayoutEffect(() => {
     stepsRef.current = steps;
     currentFrameRef.current = currentFrame;
@@ -37,6 +38,9 @@ export const useGraphStudioPlayback = ({
       onPlayingChange: setIsPlaying,
       onCannotPlay: () =>
         setStatusRef.current('Add more keyframes to play timeline'),
+      canPlay: () => !playbackLockedRef.current,
+      onPlayBlocked: () =>
+        setStatusRef.current('Playback is unavailable while exporting.'),
     });
     playbackRef.current = playback;
     return () => {
@@ -47,6 +51,10 @@ export const useGraphStudioPlayback = ({
 
   const stopTimeline = useCallback(() => playbackRef.current?.stop(), []);
   const playTimeline = useCallback(() => playbackRef.current?.play(), []);
+  const setPlaybackLocked = useCallback(locked => {
+    playbackLockedRef.current = Boolean(locked);
+    if (playbackLockedRef.current) playbackRef.current?.stop();
+  }, []);
 
   const togglePlayback = useCallback(() => playbackRef.current?.toggle(), []);
 
@@ -54,6 +62,7 @@ export const useGraphStudioPlayback = ({
     isPlaying,
     playTimeline,
     stopTimeline,
+    setPlaybackLocked,
     togglePlayback,
   };
 };
