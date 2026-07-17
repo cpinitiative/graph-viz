@@ -32,7 +32,7 @@ const actionButtonBaseClass =
 const actionButtonDefaultClass =
   'border-[#D7DEE8] bg-[#FFFFFF] text-[#334155] hover:bg-[#EEF2F6] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155]';
 const toolButtonClass =
-  'relative flex items-center justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827]';
+  'relative flex items-center justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#F8F9FA] disabled:cursor-not-allowed disabled:border-[#D7DEE8] disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#111827] dark:disabled:border-[#334155] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const toolButtonActiveClass =
   'border-[#1D4ED8] bg-[#0F2747] font-bold text-[#FFFFFF] shadow-none ring-1 ring-inset ring-[#93C5FD] hover:bg-[#12345F] dark:border-[#60A5FA] dark:bg-[#1E3A8A] dark:text-[#FFFFFF] dark:ring-[#3B82F6] dark:hover:bg-[#1D4ED8]';
 const iconButtonClass =
@@ -422,6 +422,12 @@ const LeftSidebar = ({
                   : actionButtonDefaultClass
               )}
               aria-pressed={mode === tool.id}
+              disabled={lockCanvas && tool.id === 'pan'}
+              title={
+                lockCanvas && tool.id === 'pan'
+                  ? 'Unlock view to pan'
+                  : undefined
+              }
               data-active={mode === tool.id ? 'true' : 'false'}
               data-testid={`tool-button-${tool.id}`}
               onClick={() =>
@@ -474,6 +480,12 @@ const LeftSidebar = ({
           disabled={!onForceStrengthChange}
           onChange={onForceStrengthChange}
         />
+        <p
+          className="px-1 text-[10px] font-medium leading-snug text-[#64748B] dark:text-[#94A3B8]"
+          data-testid="force-strength-guidance"
+        >
+          Applied on the next Force pass.
+        </p>
       </SidebarSection>
 
       <SidebarSection>

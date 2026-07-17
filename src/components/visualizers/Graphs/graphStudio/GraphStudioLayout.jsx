@@ -37,6 +37,21 @@ const MODE_LABELS = {
   draw: 'Draw Edge',
 };
 
+const getModeGuidance = ({ mode, currentFrame = 0, drawFrom }) => {
+  const scope = `Applies from Frame ${Math.max(0, Number(currentFrame) || 0) + 1} onward`;
+  if (mode === 'pan') return { action: 'Drag canvas', scope: '' };
+  if (mode === 'add') return { action: 'Click canvas', scope };
+  if (mode !== 'draw') return null;
+  if (drawFrom !== null && drawFrom !== undefined) {
+    return {
+      action: 'Choose target',
+      scope,
+      accessibleAction: `Source node ${drawFrom} selected; choose target`,
+    };
+  }
+  return { action: 'Choose source, then target', scope };
+};
+
 const getStatusClassName = status => {
   const tone = STATUS_ERROR_PATTERN.test(status)
     ? 'error'
@@ -55,7 +70,7 @@ const getStatusClassName = status => {
 const canvasHudStackClass =
   'pointer-events-none absolute right-3 top-3 z-30 flex w-80 max-w-[90%] flex-col items-end gap-2';
 const canvasModeIndicatorClass =
-  'pointer-events-none w-[150px] max-w-[180px] border border-[#334155] bg-[#111827] px-2.5 py-1.5 text-center text-[#F8FAFC] shadow-[0_6px_18px_#0F172A1F] dark:border-[#475569] dark:bg-[#0F172A] dark:text-[#F8FAFC]';
+  'pointer-events-none w-[220px] max-w-full border border-[#CBD5E1] border-l-2 border-l-[#A66A00] bg-[#FFFFFF] px-3 py-2 text-left text-[#0F172A] shadow-[0_2px_4px_#0F172A0D] dark:border-[#475569] dark:border-l-[#F59E0B] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryShellClass =
   'pointer-events-auto w-80 max-w-full border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryToggleClass =
@@ -68,16 +83,59 @@ const getRecoverySignature = entries =>
     .map(entry => `${entry.type}:${entry.id}:${entry.note ?? ''}`)
     .join('|');
 
-const CanvasModeIndicator = ({ mode }) => {
+const CanvasModeIndicator = ({ mode, currentFrame, drawFrom, lockCanvas }) => {
   const modeLabel = MODE_LABELS[mode] ?? MODE_LABELS.select;
+  const guidance = getModeGuidance({ mode, currentFrame, drawFrom });
+  const accessibleLabel = [
+    `Current canvas mode: ${modeLabel}`,
+    lockCanvas ? 'View locked' : '',
+    guidance?.accessibleAction ?? guidance?.action,
+    guidance?.scope,
+  ]
+    .filter(Boolean)
+    .join('. ');
 
   return (
     <div
       className={canvasModeIndicatorClass}
       data-testid="canvas-mode-indicator"
-      aria-label={`Current canvas mode: ${modeLabel}`}
+      data-mode={mode}
+      aria-label={accessibleLabel}
+      aria-live="polite"
     >
-      <div className="text-[11px] font-bold leading-tight">{modeLabel}</div>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#64748B] dark:text-[#94A3B8]">
+          Mode
+        </span>
+        <span className="text-[11px] font-bold leading-tight text-[#0F2747] dark:text-[#F8FAFC]">
+          {modeLabel}
+        </span>
+      </div>
+      {(lockCanvas || guidance) && (
+        <div className="mt-1 space-y-0.5 border-t border-[#E2E8F0] pt-1 text-[10px] font-medium leading-snug dark:border-[#334155]">
+          {lockCanvas && (
+            <div
+              className="font-bold uppercase tracking-[0.1em] text-[#A66A00] dark:text-[#F59E0B]"
+              data-testid="canvas-view-lock-indicator"
+            >
+              View locked
+            </div>
+          )}
+          {guidance && (
+            <div
+              className="space-y-0.5 text-[#475569] dark:text-[#CBD5E1]"
+              data-testid="canvas-mode-guidance"
+            >
+              <div>{guidance.action}</div>
+              {guidance.scope && (
+                <div className="text-[#64748B] dark:text-[#94A3B8]">
+                  {guidance.scope}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -242,11 +300,16 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   );
 };
 
-const CanvasStage = ({ canvas, status, presenceRecovery }) => (
+const CanvasStage = ({ canvas, currentFrame, status, presenceRecovery }) => (
   <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
     <GraphCanvas {...canvas} />
     <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
-      <CanvasModeIndicator mode={canvas.mode} />
+      <CanvasModeIndicator
+        mode={canvas.mode}
+        currentFrame={currentFrame}
+        drawFrom={canvas.drawFrom}
+        lockCanvas={canvas.lockCanvas}
+      />
       <PresenceRecoveryAffordance recovery={presenceRecovery} />
     </div>
     {status && (
@@ -456,6 +519,7 @@ const GraphStudioLayout = ({
         <div className="relative min-h-0 flex-1">
           <CanvasStage
             canvas={canvas}
+            currentFrame={sidebar.currentFrame}
             presenceRecovery={presenceRecovery}
             status={status}
           />
@@ -482,6 +546,7 @@ const GraphStudioLayout = ({
             <Panel minSize="40%" defaultSize="60%">
               <CanvasStage
                 canvas={canvas}
+                currentFrame={sidebar.currentFrame}
                 presenceRecovery={presenceRecovery}
                 status={status}
               />

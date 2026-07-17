@@ -5,7 +5,8 @@ import {
   VIEWBOX_WIDTH,
 } from './constants.js';
 
-const MIN_ZOOM_FLOOR = 0.1;
+const MIN_ZOOM_FLOOR = 0.05;
+const FIT_ZOOM_FLOOR = 0.001;
 const MAX_ZOOM = 2.6;
 const EPSILON = 0.001;
 const STRAIGHT_PARALLEL_SPACING = 24;
@@ -14,16 +15,71 @@ const MAX_STRAIGHT_FAN_SHIFT = 60;
 const MAX_CURVED_FAN_SHIFT = 48;
 
 export const computeMinZoom = (viewportW, viewportH) => {
-  if (!viewportW || !viewportH) return MIN_ZOOM_FLOOR;
+  const width = Number(viewportW);
+  const height = Number(viewportH);
+  if (!(width > 0) || !(height > 0)) return MIN_ZOOM_FLOOR;
   return Math.max(
     MIN_ZOOM_FLOOR,
-    Math.min(viewportW / VIEWBOX_WIDTH, viewportH / VIEWBOX_HEIGHT)
+    Math.min(width / VIEWBOX_WIDTH, height / VIEWBOX_HEIGHT)
   );
 };
 
-export const clampZoom = (zoom, viewportW = 0, viewportH = 0) => {
-  const minZoom = computeMinZoom(viewportW, viewportH);
+export const clampZoom = zoom => {
+  const minZoom = MIN_ZOOM_FLOOR;
   return Math.max(minZoom, Math.min(MAX_ZOOM, zoom));
+};
+
+export const clampFitZoom = zoom =>
+  Math.max(FIT_ZOOM_FLOOR, Math.min(MAX_ZOOM, zoom));
+
+export const createFitViewState = ({
+  bounds,
+  viewportWidth,
+  viewportHeight,
+  padding = 24,
+  minZoom = FIT_ZOOM_FLOOR,
+  maxZoom = 1,
+}) => {
+  const x = Number(bounds?.x);
+  const y = Number(bounds?.y);
+  const width = Number(bounds?.width);
+  const height = Number(bounds?.height);
+  const viewportW = Number(viewportWidth);
+  const viewportH = Number(viewportHeight);
+  const safePadding = Math.max(0, Number(padding) || 0);
+  const requestedZoomFloor = Number(minZoom);
+  const zoomFloor = Math.max(
+    FIT_ZOOM_FLOOR,
+    Number.isFinite(requestedZoomFloor) ? requestedZoomFloor : FIT_ZOOM_FLOOR
+  );
+  const zoomCeiling = Math.max(zoomFloor, Number(maxZoom) || 1);
+  if (
+    ![x, y, width, height, viewportW, viewportH].every(Number.isFinite) ||
+    width < 0 ||
+    height < 0 ||
+    viewportW <= 0 ||
+    viewportH <= 0
+  ) {
+    return null;
+  }
+
+  const availableWidth = Math.max(1, viewportW - safePadding * 2);
+  const availableHeight = Math.max(1, viewportH - safePadding * 2);
+  const zoom = Math.max(
+    zoomFloor,
+    Math.min(
+      availableWidth / Math.max(1, width),
+      availableHeight / Math.max(1, height),
+      zoomCeiling
+    )
+  );
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  return {
+    zoom,
+    x: viewportW / 2 - centerX * zoom,
+    y: viewportH / 2 - centerY * zoom,
+  };
 };
 
 export const toWorld = ({ x, y }, viewState) => ({
@@ -92,14 +148,13 @@ export const clampViewStateToPlayspace = (
   viewportHeight
 ) => {
   if (!viewportWidth || !viewportHeight) return candidate;
-  // Enforce dynamic minimum zoom so grid always fills the viewport
-  const minZoom = computeMinZoom(viewportWidth, viewportHeight);
+  const minZoom = computeMinZoom();
   const zoom = Math.max(minZoom, Math.min(MAX_ZOOM, candidate.zoom));
   const worldWidthPx = VIEWBOX_WIDTH * zoom;
   const worldHeightPx = VIEWBOX_HEIGHT * zoom;
   let nextX = candidate.x;
   let nextY = candidate.y;
-  // If zoom level changed (clamped to min), re-center so grid fills view
+  // If zoom was clamped, re-center the bounded editing playspace.
   if (zoom !== candidate.zoom) {
     nextX = (viewportWidth - worldWidthPx) / 2;
     nextY = (viewportHeight - worldHeightPx) / 2;

@@ -75,7 +75,14 @@ const GraphNode = ({
       style={
         isExporting
           ? undefined
-          : { cursor: mode === 'draw' ? 'crosshair' : 'grab' }
+          : {
+              cursor:
+                mode === 'draw'
+                  ? 'crosshair'
+                  : mode === 'add'
+                    ? 'not-allowed'
+                    : 'grab',
+            }
       }
       onClick={isExporting ? undefined : onClick}
       onPointerDown={isExporting ? undefined : onPointerDown}

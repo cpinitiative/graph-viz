@@ -313,13 +313,17 @@ export const useGraphStudioImportExport = ({
           edgeOverrides: {},
         },
       ]);
-      setViewFromNodes?.(graph.nodes);
-      bumpViewReset?.();
+      if (!lockCanvas) {
+        setViewFromNodes?.(graph.nodes);
+        bumpViewReset?.();
+      }
       setMode('select');
       clearSelection?.();
       clearDrawState?.();
       setIsParserOpen(false);
-      setStatus(`Graph parsed: ${meta}`);
+      setStatus(
+        `Graph parsed: ${meta}${lockCanvas ? ' · view preserved' : ''}`
+      );
     } catch (error) {
       const message = `Parse failed: ${error.message}`;
       setParserError(message);
@@ -329,6 +333,7 @@ export const useGraphStudioImportExport = ({
     clearDrawState,
     clearSelection,
     bumpViewReset,
+    lockCanvas,
     parserText,
     replaceTimeline,
     setViewFromNodes,

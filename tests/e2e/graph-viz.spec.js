@@ -41,6 +41,36 @@ const getCanvasViewSnapshot = async page => ({
   zoom: await graphCanvas(page).getAttribute('data-view-zoom'),
 });
 
+const getRenderedContentViewportBounds = async page =>
+  graphCanvas(page).evaluate(svg => {
+    const content = svg.querySelector('[data-export-content="true"]');
+    const viewport = svg.getBoundingClientRect();
+    const renderedRects = Array.from(
+      content?.querySelectorAll('circle, path, polygon, text') ?? []
+    )
+      .filter(element => !element.hasAttribute('data-edge-hit-target-id'))
+      .map(element => element.getBoundingClientRect())
+      .filter(
+        bounds =>
+          [bounds.left, bounds.top, bounds.right, bounds.bottom].every(
+            Number.isFinite
+          ) &&
+          (bounds.width > 0 || bounds.height > 0)
+      );
+    if (!renderedRects.length) return null;
+    return {
+      left:
+        Math.min(...renderedRects.map(bounds => bounds.left)) - viewport.left,
+      top: Math.min(...renderedRects.map(bounds => bounds.top)) - viewport.top,
+      right:
+        Math.max(...renderedRects.map(bounds => bounds.right)) - viewport.left,
+      bottom:
+        Math.max(...renderedRects.map(bounds => bounds.bottom)) - viewport.top,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+    };
+  });
+
 const getNodePositionSnapshot = async page =>
   graphCanvas(page).evaluate((svg, selector) => {
     return Array.from(svg.querySelectorAll(selector)).map(circle => ({
@@ -721,7 +751,12 @@ test.describe('Graph Studio desktop smoke', () => {
           element => window.getComputedStyle(element).textAlign
         )
       )
-      .toBe('center');
+      .toBe('left');
+    await expect(modeIndicator).toHaveCSS('border-radius', '0px');
+    await expect(modeIndicator).toHaveCSS(
+      'border-left-color',
+      'rgb(166, 106, 0)'
+    );
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -998,7 +1033,7 @@ test.describe('Graph Studio desktop smoke', () => {
       await expect(graphCanvas(page)).toBeVisible();
       if (layout === 'Force') {
         await expect(page.getByTestId('graph-studio-status')).toHaveText(
-          'Applied Force layout'
+          'Applied Force layout at 1.0 strength'
         );
       }
     }
@@ -1013,8 +1048,23 @@ test.describe('Graph Studio desktop smoke', () => {
     await commitInputValue(zoomValueInput, 180);
     const zoomBeforeForceRefit =
       await graphCanvas(page).getAttribute('data-view-zoom');
+    const geometryBeforeForceStrengthChange = JSON.stringify(
+      await getNodePositionSnapshot(page)
+    );
     await setRangeValue(page, 'Force strength', 0.2);
+    await expect(page.getByTestId('force-strength-guidance')).toHaveText(
+      'Applied on the next Force pass.'
+    );
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Force strength 0.2 set for the next Force layout'
+    );
+    expect(JSON.stringify(await getNodePositionSnapshot(page))).toBe(
+      geometryBeforeForceStrengthChange
+    );
     await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Applied Force layout at 0.2 strength'
+    );
     await expect
       .poll(() => graphCanvas(page).getAttribute('data-view-zoom'))
       .not.toBe(zoomBeforeForceRefit);
@@ -2694,6 +2744,333 @@ while (true) {}
       'canvas'
     );
     await expect(selectionRing).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps additive deselection inspector and delete targets aligned', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const graphNodes = graphNodeCircles(page);
+    const firstNode = graphNodes.nth(0);
+    const secondNode = graphNodes.nth(1);
+    const selectionRings = graphCanvas(page).locator(
+      '[data-node-selection-ring-id]'
+    );
+
+    await firstNode.click();
+    await firstNode.click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'canvas'
+    );
+    await expect(selectionRings).toHaveCount(0);
+
+    await firstNode.click();
+    await secondNode.click({ modifiers: ['Shift'] });
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'selection'
+    );
+    await secondNode.click({ modifiers: ['Shift'] });
+
+    await expect(propertyPanel(page)).toHaveAttribute(
+      'data-inspector-type',
+      'node'
+    );
+    await expect(
+      propertyPanel(page).getByLabel('Label', { exact: true })
+    ).toHaveValue('0');
+    await expect(selectionRings).toHaveCount(1);
+    await expect(
+      graphCanvas(page).locator('[data-node-selection-ring-id="0"]')
+    ).toHaveAttribute('data-node-selection-ring-kind', 'primary');
+    await expect(
+      graphCanvas(page).locator('[data-node-selection-ring-id="1"]')
+    ).toHaveCount(0);
+
+    await propertyPanel(page)
+      .getByRole('button', {
+        name: /^Delete node(?: and \d+ connected edges?)? from project$/,
+      })
+      .click();
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="0"]')
+    ).toHaveCount(0);
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="1"]')
+    ).toBeVisible();
+    await expect(page.getByText('Node 0 deleted from project')).toBeVisible();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps fit, pan, lock, grid, and temporal mode guidance trustworthy', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+    });
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await page.getByTestId('timeline-frame-card').nth(1).click();
+
+    const modeIndicator = page.getByTestId('canvas-mode-indicator');
+    const modeGuidance = page.getByTestId('canvas-mode-guidance');
+    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
+    await expect(modeGuidance).toHaveCount(0);
+    const selectModeWidth = (await getRequiredBox(modeIndicator)).width;
+
+    await page.getByTestId('tool-button-add').click();
+    await expect(modeIndicator).toHaveAttribute('data-mode', 'add');
+    await expect(modeGuidance).toHaveText(
+      'Click canvasApplies from Frame 2 onward'
+    );
+    await expect(
+      leftSidebar(page).getByText('Applies from Frame 2 onward')
+    ).toHaveCount(0);
+    await expect(
+      page.getByText('Applies from Frame 2 onward', { exact: true })
+    ).toHaveCount(1);
+    expect(
+      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
+    ).toBeLessThanOrEqual(1);
+    await expect
+      .poll(() =>
+        graphNodeCircles(page)
+          .first()
+          .evaluate(
+            circle => window.getComputedStyle(circle.parentElement).cursor
+          )
+      )
+      .toBe('not-allowed');
+
+    await page.getByTestId('tool-button-draw').click();
+    await expect(modeGuidance).toHaveText(
+      'Choose source, then targetApplies from Frame 2 onward'
+    );
+    await graphNodeCircles(page).first().click();
+    await expect(modeGuidance).toHaveText(
+      'Choose targetApplies from Frame 2 onward'
+    );
+    await expect(modeIndicator).toHaveAttribute(
+      'aria-label',
+      /Source node 0 selected; choose target/
+    );
+    expect(
+      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
+    ).toBeLessThanOrEqual(1);
+    await expect
+      .poll(() =>
+        graphNodeCircles(page)
+          .first()
+          .evaluate(
+            circle => window.getComputedStyle(circle.parentElement).cursor
+          )
+      )
+      .toBe('crosshair');
+    await page.getByTestId('tool-button-select').click();
+
+    const minorGridLine = graphCanvas(page).locator(
+      '[data-grid-level="minor"]'
+    );
+    const majorGridLine = graphCanvas(page).locator(
+      '[data-grid-level="major"]'
+    );
+    await expect(minorGridLine).toHaveAttribute('stroke', '#E2E8F0');
+    await expect(minorGridLine).toHaveAttribute('stroke-opacity', '0.7');
+    await expect(minorGridLine).toHaveAttribute('stroke-width', '0.75');
+    await expect(majorGridLine).toHaveAttribute('stroke', '#CBD5E1');
+    await expect(majorGridLine).toHaveAttribute('stroke-opacity', '0.85');
+    await expect(majorGridLine).toHaveAttribute('stroke-width', '1');
+
+    const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
+    await themeToggle.click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await expect(minorGridLine).toHaveAttribute('stroke', '#263244');
+    await expect(majorGridLine).toHaveAttribute('stroke', '#475569');
+    await themeToggle.click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+
+    await choosePreset(page, 'multigraph');
+    await graphNodeCircles(page).nth(1).click();
+    await propertyPanel(page)
+      .getByLabel('Label', { exact: true })
+      .fill(
+        'Executive governance, operating cadence, decision rights, accountability, escalation architecture, cross-functional ownership, risk controls, and quarterly performance review'
+      );
+    await graphCanvas(page)
+      .locator('[data-edge-hit-target-id="e3"]')
+      .dispatchEvent('click');
+    await propertyPanel(page)
+      .getByLabel('Weight / Label', { exact: true })
+      .fill(
+        'Self-loop control path for exceptions, policy waivers, material risk escalation, executive review, remediation ownership, audit evidence, and final closure approval'
+      );
+    await page.keyboard.press('Escape');
+    await commitInputValue(page.getByLabel('Zoom percent'), 250);
+    await page.getByRole('button', { name: 'Fit View' }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'View fit to graph'
+    );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+    expect(
+      Number(await graphCanvas(page).getAttribute('data-view-zoom'))
+    ).toBeLessThan(1);
+
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Applied Force layout at 1.0 strength'
+    );
+    await expect
+      .poll(() =>
+        graphCanvas(page).evaluate(svg =>
+          Array.from(svg.querySelectorAll('[data-node-label-id]')).every(
+            label => {
+              const circle = label.parentElement?.querySelector(
+                'circle:not([data-node-selection-ring-id]):not([data-node-draw-source-ring-id])'
+              );
+              return (
+                circle &&
+                Math.abs(
+                  Number(circle.getAttribute('cx')) -
+                    Number(label.getAttribute('x'))
+                ) < 0.5 &&
+                Math.abs(
+                  Number(circle.getAttribute('cy')) -
+                    Number(label.getAttribute('y'))
+                ) < 20
+              );
+            }
+          )
+        )
+      )
+      .toBe(true);
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+
+    const firstNode = graphNodeCircles(page).first();
+    const nodePositionsBeforePan = JSON.stringify(
+      await getNodePositionSnapshot(page)
+    );
+    const viewBeforePan = JSON.stringify(await getCanvasViewSnapshot(page));
+    await page.getByTestId('tool-button-pan').click();
+    await expect(modeGuidance).toHaveText('Drag canvas');
+    const firstNodeBox = await getRequiredBox(firstNode);
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2,
+      firstNodeBox.y + firstNodeBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2 - 60,
+      firstNodeBox.y + firstNodeBox.height / 2 - 40,
+      { steps: 6 }
+    );
+    await page.mouse.up();
+    await expect
+      .poll(async () => JSON.stringify(await getCanvasViewSnapshot(page)))
+      .not.toBe(viewBeforePan);
+    expect(JSON.stringify(await getNodePositionSnapshot(page))).toBe(
+      nodePositionsBeforePan
+    );
+
+    const lockView = page.getByRole('checkbox', { name: 'Lock View' });
+    const panButton = page.getByTestId('tool-button-pan');
+    await lockView.check();
+    await expect(graphCanvas(page)).toHaveAttribute('data-view-locked', 'true');
+    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
+    await expect(modeIndicator).toContainText('View locked');
+    await expect(panButton).toBeDisabled();
+    await expect(panButton).toHaveAttribute('title', 'Unlock view to pan');
+    await page.evaluate(
+      () =>
+        new Promise(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    );
+
+    const dispatchWheel = () =>
+      graphCanvas(page).evaluate(svg => {
+        const bounds = svg.getBoundingClientRect();
+        return svg.dispatchEvent(
+          new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            clientX: bounds.left + bounds.width / 2,
+            clientY: bounds.top + bounds.height / 2,
+            deltaY: -120,
+          })
+        );
+      });
+    const lockedView = JSON.stringify(await getCanvasViewSnapshot(page));
+    expect(await dispatchWheel()).toBe(true);
+    await expect
+      .poll(async () => JSON.stringify(await getCanvasViewSnapshot(page)))
+      .toBe(lockedView);
+
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Applied Force layout at 1.0 strength'
+    );
+    await expect
+      .poll(async () => JSON.stringify(await getCanvasViewSnapshot(page)))
+      .toBe(lockedView);
+
+    await choosePreset(page, 'dfs');
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Loaded DFS · view preserved'
+    );
+    await expect
+      .poll(async () => JSON.stringify(await getCanvasViewSnapshot(page)))
+      .toBe(lockedView);
+
+    await lockView.uncheck();
+    await expect(graphCanvas(page)).toHaveAttribute(
+      'data-view-locked',
+      'false'
+    );
+    await expect(panButton).toBeEnabled();
+    await page.evaluate(
+      () =>
+        new Promise(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    );
+    const unlockedView = JSON.stringify(await getCanvasViewSnapshot(page));
+    expect(await dispatchWheel()).toBe(false);
+    await expect
+      .poll(async () => JSON.stringify(await getCanvasViewSnapshot(page)))
+      .not.toBe(unlockedView);
 
     expect(errors).toEqual([]);
   });
@@ -4897,7 +5274,7 @@ api.edge('e0', '#f59e0b');
     await choosePreset(page, 'kruskal-mst');
     await page.getByText('Frame 6').click();
     await expect(
-      graphCanvas(page).locator('path[stroke]').first()
+      graphCanvas(page).locator('[data-edge-path-id]').first()
     ).toBeVisible();
 
     await choosePreset(page, 'dijkstra-shortest-paths');

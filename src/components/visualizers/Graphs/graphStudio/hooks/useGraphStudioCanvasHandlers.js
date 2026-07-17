@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clampNodePosition, snapToGrid } from '../graphStudioUtils';
 import { isNodeVisible } from '../lib/effectiveVisibility';
+import { resolveNodeSelection } from '../lib/selectionState';
 
 export const useGraphStudioCanvasHandlers = ({
   setMode,
@@ -9,18 +10,15 @@ export const useGraphStudioCanvasHandlers = ({
   computedGraph,
   addEdge,
   updateBaseNodesBulk,
+  selectedObject,
   selectedNodeIds,
   selectedNodeIdSet,
   setSelectedObject,
   setSelectedNodeIds,
   clearSelection,
-  currentFrame = 0,
 }) => {
   const [drawFrom, setDrawFrom] = useState(null);
   const dragStateRef = useRef(null);
-  const frameNumber = currentFrame + 1;
-  const addNodeHelpText = `Click canvas to add a node from Frame ${frameNumber} onward.`;
-  const drawEdgeHelpText = `Connect nodes to add an edge from Frame ${frameNumber} onward.`;
 
   useEffect(() => {
     if (drawFrom === null || drawFrom === undefined) return undefined;
@@ -42,20 +40,16 @@ export const useGraphStudioCanvasHandlers = ({
 
   const onSelectNode = useCallback(
     (nodeId, additive = false) => {
-      const idText = String(nodeId);
-      setSelectedObject({ type: 'node', id: nodeId });
-      if (additive) {
-        setSelectedNodeIds(prev => {
-          const set = new Set(prev.map(String));
-          if (set.has(idText)) set.delete(idText);
-          else set.add(idText);
-          return Array.from(set);
-        });
-        return;
-      }
-      setSelectedNodeIds([idText]);
+      const nextSelection = resolveNodeSelection({
+        selectedObject,
+        selectedNodeIds,
+        nodeId,
+        additive,
+      });
+      setSelectedObject(nextSelection.selectedObject);
+      setSelectedNodeIds(nextSelection.selectedNodeIds);
     },
-    [setSelectedNodeIds, setSelectedObject]
+    [selectedNodeIds, selectedObject, setSelectedNodeIds, setSelectedObject]
   );
 
   const onSelectEdge = useCallback(
@@ -88,37 +82,22 @@ export const useGraphStudioCanvasHandlers = ({
       if (drawFrom === null || drawFrom === undefined) {
         clearSelection();
         setDrawFrom(nodeId);
-        setStatus(`Source node ${nodeId} selected. ${drawEdgeHelpText}`);
+        setStatus(`Source node ${nodeId} selected`);
         return;
       }
       addEdge(drawFrom, nodeId);
       setDrawFrom(null);
     },
-    [addEdge, clearSelection, drawEdgeHelpText, drawFrom, setStatus]
+    [addEdge, clearSelection, drawFrom, setStatus]
   );
 
   const handleSetMode = useCallback(
     nextMode => {
       if (nextMode !== 'draw') setDrawFrom(null);
-      else {
-        clearSelection();
-        if (drawFrom === null || drawFrom === undefined) {
-          setStatus(drawEdgeHelpText);
-        }
-      }
-      if (nextMode === 'add') {
-        setStatus(addNodeHelpText);
-      }
+      else clearSelection();
       setMode(nextMode);
     },
-    [
-      addNodeHelpText,
-      clearSelection,
-      drawEdgeHelpText,
-      drawFrom,
-      setMode,
-      setStatus,
-    ]
+    [clearSelection, setMode]
   );
 
   const startDrawEdge = useCallback(() => {
@@ -134,21 +113,13 @@ export const useGraphStudioCanvasHandlers = ({
       clearSelection();
       setDrawFrom(sourceId);
       setMode('draw');
-      setStatus(`Source node ${sourceId} selected. ${drawEdgeHelpText}`);
+      setStatus(`Source node ${sourceId} selected`);
       return;
     }
     clearSelection();
     setDrawFrom(null);
     setMode('draw');
-    setStatus(drawEdgeHelpText);
-  }, [
-    addEdge,
-    clearSelection,
-    drawEdgeHelpText,
-    selectedNodeIds,
-    setMode,
-    setStatus,
-  ]);
+  }, [addEdge, clearSelection, selectedNodeIds, setMode, setStatus]);
 
   const onNodePointerDown = useCallback(
     ({ nodeId, worldX, worldY }) => {
