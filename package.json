@@ -15,7 +15,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "check": "npm run format:check && npm run lint && npm run build",
-    "test:unit": "node --test tests/unit/effectiveVisibility.test.mjs tests/unit/exportCapture.test.mjs tests/unit/exportVideoPlan.test.mjs tests/unit/frameDuration.test.mjs tests/unit/graphCanvasUtils.test.mjs tests/unit/graphLayouts.test.mjs tests/unit/projectJsonRoundtrip.test.mjs tests/unit/selectionState.test.mjs tests/unit/temporalGraphState.test.mjs tests/unit/temporalOverrideSchema.test.mjs tests/unit/timelinePlayback.test.mjs tests/unit/undoUtils.test.mjs",
+    "test:unit": "node --test tests/unit/edgeListRoundtrip.test.mjs tests/unit/effectiveVisibility.test.mjs tests/unit/exportCapture.test.mjs tests/unit/exportVideoPlan.test.mjs tests/unit/frameDuration.test.mjs tests/unit/graphCanvasUtils.test.mjs tests/unit/graphLayouts.test.mjs tests/unit/projectJsonRoundtrip.test.mjs tests/unit/selectionState.test.mjs tests/unit/temporalGraphState.test.mjs tests/unit/temporalOverrideSchema.test.mjs tests/unit/timelinePlayback.test.mjs tests/unit/undoUtils.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --project=smoke-chromium",
     "test:e2e:headed": "playwright test --headed",

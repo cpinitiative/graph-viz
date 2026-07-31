@@ -613,6 +613,90 @@ const FrameCaption = ({
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  useEffect(() => {
+    if (!isDragging || isExporting) return undefined;
+
+    const releaseCapture = dragState => {
+      const captureTarget = dragState?.captureTarget;
+      if (!captureTarget) return;
+      try {
+        if (
+          !captureTarget.hasPointerCapture?.(dragState.pointerId) ||
+          !captureTarget.releasePointerCapture
+        ) {
+          return;
+        }
+        captureTarget.releasePointerCapture(dragState.pointerId);
+      } catch {
+        // The overlay may have been detached while the pointer was outside it.
+      }
+    };
+    const finishDragging = event => {
+      const dragState = dragStateRef.current;
+      if (
+        !dragState ||
+        (event?.pointerId !== undefined &&
+          dragState.pointerId !== event.pointerId)
+      ) {
+        return;
+      }
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      releaseCapture(dragState);
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    const updatePosition = event => {
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const svgBounds = svgRef.current?.getBoundingClientRect();
+      if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
+      const scaleX = dragState.canvasWidth / svgBounds.width;
+      const scaleY = dragState.canvasHeight / svgBounds.height;
+      const nextX =
+        dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
+      const nextY =
+        dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
+      const normalizedX =
+        dragState.rightX > dragState.leftX
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextX - dragState.leftX) / (dragState.rightX - dragState.leftX)
+              )
+            )
+          : 0;
+      const normalizedY =
+        dragState.bottomY > dragState.topY
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextY - dragState.topY) / (dragState.bottomY - dragState.topY)
+              )
+            )
+          : 0;
+      setCaptionOverlay?.(prev => ({
+        ...normalizeCaptionOverlay(prev),
+        position: { x: normalizedX, y: normalizedY },
+      }));
+    };
+
+    window.addEventListener('pointermove', updatePosition, true);
+    window.addEventListener('pointerup', finishDragging, true);
+    window.addEventListener('pointercancel', finishDragging, true);
+    window.addEventListener('blur', finishDragging);
+    return () => {
+      window.removeEventListener('pointermove', updatePosition, true);
+      window.removeEventListener('pointerup', finishDragging, true);
+      window.removeEventListener('pointercancel', finishDragging, true);
+      window.removeEventListener('blur', finishDragging);
+    };
+  }, [isDragging, isExporting, setCaptionOverlay, svgRef]);
+
   if (
     !caption.enabled ||
     !text ||
@@ -681,45 +765,6 @@ const FrameCaption = ({
     position: caption.position,
   });
 
-  const updatePosition = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const svgBounds = svgRef.current?.getBoundingClientRect();
-    if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
-    const scaleX = canvasSize.width / svgBounds.width;
-    const scaleY = canvasSize.height / svgBounds.height;
-    const nextX =
-      dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
-    const nextY =
-      dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
-    const normalizedX =
-      rightX > leftX
-        ? Math.max(0, Math.min(1, (nextX - leftX) / (rightX - leftX)))
-        : 0;
-    const normalizedY =
-      bottomY > topY
-        ? Math.max(0, Math.min(1, (nextY - topY) / (bottomY - topY)))
-        : 0;
-    setCaptionOverlay?.(prev => ({
-      ...normalizeCaptionOverlay(prev),
-      position: {
-        x: normalizedX,
-        y: normalizedY,
-      },
-    }));
-  };
-  const finishDragging = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragStateRef.current = null;
-    setIsDragging(false);
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  };
-
   return (
     <g
       aria-label="Frame caption"
@@ -741,6 +786,7 @@ const FrameCaption = ({
         isExporting
           ? undefined
           : event => {
+              if (event.button !== 0) return;
               event.preventDefault();
               event.stopPropagation();
               dragStateRef.current = {
@@ -749,14 +795,22 @@ const FrameCaption = ({
                 startClientY: event.clientY,
                 originX: x,
                 originY: y,
+                leftX,
+                topY,
+                rightX,
+                bottomY,
+                canvasWidth: canvasSize.width,
+                canvasHeight: canvasSize.height,
+                captureTarget: event.currentTarget,
               };
               setIsDragging(true);
-              event.currentTarget.setPointerCapture?.(event.pointerId);
+              try {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              } catch {
+                // Window listeners retain drag ownership when capture is unavailable.
+              }
             }
       }
-      onPointerMove={isExporting ? undefined : updatePosition}
-      onPointerUp={isExporting ? undefined : finishDragging}
-      onPointerCancel={isExporting ? undefined : finishDragging}
       style={
         isExporting
           ? undefined

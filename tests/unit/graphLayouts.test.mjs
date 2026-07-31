@@ -25,6 +25,26 @@ const sampleGraph = {
   ],
 };
 
+const disconnectedStressGraph = {
+  nodes: [
+    { id: 0, x: 180, y: 240 },
+    { id: 1, x: 360, y: 180 },
+    { id: 2, x: 360, y: 320 },
+    { id: 3, x: 660, y: 220 },
+    { id: 4, x: 840, y: 220 },
+    { id: 5, x: 660, y: 500 },
+    { id: 6, x: 840, y: 440 },
+    { id: 7, x: 1020, y: 500 },
+  ],
+  edges: [
+    { id: 'e0', from: 0, to: 1 },
+    { id: 'e1', from: 0, to: 2 },
+    { id: 'e2', from: 3, to: 4 },
+    { id: 'e3', from: 5, to: 6 },
+    { id: 'e4', from: 6, to: 7 },
+  ],
+};
+
 const getPairDistances = graph => {
   const distances = [];
   graph.nodes.forEach((node, index) => {
@@ -35,20 +55,41 @@ const getPairDistances = graph => {
   return distances;
 };
 
-const getMedianPairDistance = graph => {
-  const distances = getPairDistances(graph).sort((left, right) => left - right);
+const getMedianDistance = distances => {
+  distances.sort((left, right) => left - right);
   const middle = Math.floor(distances.length / 2);
   return distances.length % 2 === 0
     ? (distances[middle - 1] + distances[middle]) / 2
     : distances[middle];
 };
 
-const getMaxNodeMovement = (before, after) =>
-  Math.max(
-    ...before.nodes.map((node, index) =>
-      Math.hypot(node.x - after.nodes[index].x, node.y - after.nodes[index].y)
-    )
+const getMedianEdgeDistance = graph => {
+  const nodeMap = new Map(graph.nodes.map(node => [String(node.id), node]));
+  return getMedianDistance(
+    graph.edges.map(edge => {
+      const from = nodeMap.get(String(edge.from));
+      const to = nodeMap.get(String(edge.to));
+      return Math.hypot(from.x - to.x, from.y - to.y);
+    })
   );
+};
+
+const getExtent = graph => {
+  const xs = graph.nodes.map(node => node.x);
+  const ys = graph.nodes.map(node => node.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+};
 
 const assertFiniteAndInBounds = graph => {
   graph.nodes.forEach(node => {
@@ -104,31 +145,51 @@ test('force layout preserves the legacy strength argument overload', () => {
   assert.notDeepEqual(first, forceDirectedLayout(sampleGraph, 70, 0.2));
 });
 
-test('force strength increases median spacing without invalid coordinates', () => {
+test('force layout preserves an already-positioned single node', () => {
+  const graph = { nodes: [{ id: 'only', x: 321, y: 654 }], edges: [] };
+  assert.deepEqual(forceDirectedLayout(graph), graph);
+});
+
+test('force strength changes connected spacing without exploding the layout', () => {
   const low = forceDirectedLayout(sampleGraph, getForceLayoutOptions(0.2));
   const medium = forceDirectedLayout(sampleGraph, getForceLayoutOptions(1));
   const high = forceDirectedLayout(sampleGraph, getForceLayoutOptions(2));
 
-  const lowSpacing = getMedianPairDistance(low);
-  const mediumSpacing = getMedianPairDistance(medium);
-  const highSpacing = getMedianPairDistance(high);
+  const lowSpacing = getMedianEdgeDistance(low);
+  const mediumSpacing = getMedianEdgeDistance(medium);
+  const highSpacing = getMedianEdgeDistance(high);
 
   assert.ok(lowSpacing < mediumSpacing);
   assert.ok(mediumSpacing < highSpacing);
   assert.ok(highSpacing > lowSpacing * 1.5);
-  [low, medium, high].forEach(assertFiniteAndInBounds);
+  [low, medium, high].forEach(graph => {
+    assertFiniteAndInBounds(graph);
+    const extent = getExtent(graph);
+    assert.ok(extent.width < 900);
+    assert.ok(extent.height < 750);
+  });
 });
 
-test('repeating a settled force pass remains stable', () => {
+test('disconnected force layouts stay readable and repeat exactly', () => {
+  const layouts = [];
   for (const strength of [0.2, 1, 2]) {
     const options = getForceLayoutOptions(strength);
-    const first = forceDirectedLayout(sampleGraph, options);
+    const first = forceDirectedLayout(disconnectedStressGraph, options);
     const second = forceDirectedLayout(first, options);
 
-    assert.ok(
-      getMaxNodeMovement(first, second) < 2,
-      `strength ${strength} should not materially drift on a repeated pass`
-    );
+    assert.deepEqual(second, first);
     assertFiniteAndInBounds(second);
+    const extent = getExtent(second);
+    assert.ok(extent.minX > 100);
+    assert.ok(extent.maxX < 2100);
+    assert.ok(extent.minY > 100);
+    assert.ok(extent.maxY < 1300);
+    assert.ok(extent.width < 900);
+    assert.ok(extent.height < 750);
+    layouts.push(second);
   }
+
+  const edgeSpacings = layouts.map(getMedianEdgeDistance);
+  assert.ok(edgeSpacings[0] < edgeSpacings[1]);
+  assert.ok(edgeSpacings[1] < edgeSpacings[2]);
 });

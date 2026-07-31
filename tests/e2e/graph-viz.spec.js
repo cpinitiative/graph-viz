@@ -1896,6 +1896,39 @@ while (true) {}
     await expect(caption).toContainText('Explain the active');
     await expect(caption).toContainText('frontier');
 
+    const outwardCaptionBox = await caption.boundingBox();
+    const captionCanvasBox = await graphCanvas(page).boundingBox();
+    expect(outwardCaptionBox).not.toBeNull();
+    expect(captionCanvasBox).not.toBeNull();
+    expect(Number(await caption.getAttribute('data-caption-position-x'))).toBe(
+      0
+    );
+    expect(Number(await caption.getAttribute('data-caption-position-y'))).toBe(
+      1
+    );
+    await page.mouse.move(
+      outwardCaptionBox.x + outwardCaptionBox.width / 2,
+      outwardCaptionBox.y + outwardCaptionBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      captionCanvasBox.x + 2,
+      captionCanvasBox.y + captionCanvasBox.height - 2,
+      { steps: 8 }
+    );
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        caption.evaluate(element => window.getComputedStyle(element).cursor)
+      )
+      .toBe('grab');
+    expect(Number(await caption.getAttribute('data-caption-position-x'))).toBe(
+      0
+    );
+    expect(Number(await caption.getAttribute('data-caption-position-y'))).toBe(
+      1
+    );
+
     const draggedPosition = await dragCaption(page);
     expect(draggedPosition.x).toBeGreaterThan(0);
     expect(draggedPosition.y).toBeLessThan(1);
@@ -3697,6 +3730,43 @@ while (true) {}
         }, nodeCircleSelector)
       )
       .toBe(true);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('round-trips exported multi-edges and loops through strict input', async ({
+    context,
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'multigraph');
+
+    const exportMenu = await openExportMenu(page);
+    await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Edge list copied to clipboard'
+    );
+    const exported = await page.evaluate(() => navigator.clipboard.readText());
+    expect(exported).toBe(
+      ['3 6', '0 1', '0 1', '0 1', '1 1', '1 2', '2 0'].join('\n')
+    );
+    await closeExportMenu(page);
+
+    const parserModal = await openEdgeListParser(page);
+    await parserModal.locator('textarea').fill(exported);
+    await parserModal.getByRole('button', { name: 'Generate graph' }).click();
+    await expect(parserModal).toBeHidden();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Graph parsed: 3 nodes / 6 edges'
+    );
+    await expect(graphNodeCircles(page)).toHaveCount(3);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      6
+    );
 
     expect(errors).toEqual([]);
   });
