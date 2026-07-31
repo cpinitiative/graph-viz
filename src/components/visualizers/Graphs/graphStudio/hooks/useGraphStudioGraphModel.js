@@ -7,6 +7,7 @@ import {
   snapToGrid,
   treeLayout,
 } from '../graphStudioUtils';
+import { getForceLayoutOptions } from '../lib/graphLayouts.js';
 import {
   applyFrameOverride,
   applyPropertyToAllFrames,
@@ -357,26 +358,17 @@ export const useGraphStudioGraphModel = ({
   const applyLayout = useCallback(
     type => {
       let nextGraph = baseGraph;
+      let status = `Applied ${LAYOUT_STATUS_LABELS[type] ?? type} layout`;
       if (type === 'circle') nextGraph = circularLayout(baseGraph);
       if (type === 'tree')
         nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
       if (type === 'force') {
-        const normalizedStrength = Math.max(
-          0.2,
-          Math.min(
-            2,
-            Number.isFinite(Number(forceStrength)) ? Number(forceStrength) : 1
-          )
-        );
-        const iterations = Math.round(70 + 35 * normalizedStrength);
-        nextGraph = forceDirectedLayout(
-          baseGraph,
-          iterations,
-          normalizedStrength
-        );
+        const forceOptions = getForceLayoutOptions(forceStrength);
+        nextGraph = forceDirectedLayout(baseGraph, forceOptions);
+        status = `Applied Force layout at ${forceOptions.strength.toFixed(1)} strength`;
       }
       setBaseGraph(nextGraph);
-      setStatus(`Applied ${LAYOUT_STATUS_LABELS[type] ?? type} layout`);
+      setStatus(status);
       return nextGraph;
     },
     [baseGraph, forceStrength, setBaseGraph, setStatus]

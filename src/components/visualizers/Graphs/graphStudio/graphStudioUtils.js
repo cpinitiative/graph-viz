@@ -3,17 +3,19 @@ import {
   NODE_RADIUS,
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
-} from './constants';
-import { normalizeFrameDuration } from './lib/frameDuration';
-import { clamp, clampNodePosition } from './lib/graphGeometry';
+} from './constants.js';
+import { normalizeFrameDuration } from './lib/frameDuration.js';
+import { clamp, clampNodePosition } from './lib/graphGeometry.js';
 
-export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry';
+const EDGE_LIST_WEIGHT_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
+
+export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry.js';
 export {
   circularLayout,
   forceDirectedLayout,
   treeLayout,
-} from './lib/graphLayouts';
-export { runScriptTrace } from './lib/scriptTrace';
+} from './lib/graphLayouts.js';
+export { runScriptTrace } from './lib/scriptTrace.js';
 
 export const normalizeNodeId = (rawId, fallback) => {
   if (Number.isFinite(Number(rawId))) return Number(rawId);
@@ -181,7 +183,7 @@ export const parseEdgeListText = text => {
     return value;
   };
   const parseWeight = (token, lineNumber) => {
-    if (!/^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token)) {
+    if (!EDGE_LIST_WEIGHT_PATTERN.test(token)) {
       throw new Error(`Line ${lineNumber} weight must be numeric.`);
     }
     const value = Number(token);
@@ -260,11 +262,22 @@ export const parseEdgeListText = text => {
 export const exportEdgeListText = graph => {
   const nodes = graph?.nodes ?? [];
   const edges = graph?.edges ?? [];
-  const header = `${nodes.length} ${edges.length}`;
-  const body = edges
-    .map(edge => `${edge.from} ${edge.to}${edge.label ? ` ${edge.label}` : ''}`)
-    .join('\n');
-  return `${header}\n${body}`;
+  const nodeIndexById = new Map(
+    nodes.map((node, index) => [String(node.id), index])
+  );
+  const rows = edges.flatMap(edge => {
+    const from = nodeIndexById.get(String(edge.from));
+    const to = nodeIndexById.get(String(edge.to));
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return [];
+
+    const label = String(edge.label ?? '').trim();
+    const weight =
+      EDGE_LIST_WEIGHT_PATTERN.test(label) && Number.isFinite(Number(label))
+        ? ` ${label}`
+        : '';
+    return [`${from} ${to}${weight}`];
+  });
+  return [`${nodes.length} ${rows.length}`, ...rows].join('\n');
 };
 export const getSelectionBounds = nodes => {
   if (!nodes.length) return null;

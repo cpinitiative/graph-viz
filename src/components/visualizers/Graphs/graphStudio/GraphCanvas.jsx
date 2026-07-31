@@ -4,9 +4,11 @@ import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
 import { NODE_RADIUS, VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from './constants';
 import {
+  clampFitZoom,
   clampViewStateToPlayspace,
   clampZoom,
   computeMinZoom,
+  createFitViewState,
   EPSILON,
   getRectSelection,
   toWorld,
@@ -35,13 +37,58 @@ const CANVAS_BACKGROUND_COLORS = {
 };
 const GRID_PALETTES = {
   light: {
-    minor: '#D7DEE8',
-    major: '#AEB8C4',
+    minor: '#E2E8F0',
+    major: '#CBD5E1',
+    minorOpacity: 0.7,
+    majorOpacity: 0.85,
   },
   dark: {
-    minor: '#334155',
-    major: '#64748B',
+    minor: '#263244',
+    major: '#475569',
+    minorOpacity: 0.7,
+    majorOpacity: 0.85,
   },
+};
+
+const isUsableSvgBounds = bounds =>
+  Boolean(
+    bounds &&
+    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
+    bounds.width >= 0 &&
+    bounds.height >= 0 &&
+    (bounds.width > 0 || bounds.height > 0)
+  );
+
+const mergeSvgBounds = (...boundsList) => {
+  const validBounds = boundsList.filter(isUsableSvgBounds);
+  if (!validBounds.length) return null;
+  const minX = Math.min(...validBounds.map(bounds => bounds.x));
+  const minY = Math.min(...validBounds.map(bounds => bounds.y));
+  const maxX = Math.max(...validBounds.map(bounds => bounds.x + bounds.width));
+  const maxY = Math.max(...validBounds.map(bounds => bounds.y + bounds.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+};
+
+const measureRenderedContentBounds = content => {
+  if (!content) return null;
+  try {
+    const bounds = content.getBBox?.();
+    if (isUsableSvgBounds(bounds)) return bounds;
+  } catch {
+    // Fall through to per-element measurement for defensive browser support.
+  }
+
+  return mergeSvgBounds(
+    ...Array.from(
+      content.querySelectorAll('circle, path, polygon, rect, text')
+    ).map(element => {
+      try {
+        return element.getBBox?.() ?? null;
+      } catch {
+        return null;
+      }
+    })
+  );
 };
 const LEGEND_PALETTES = {
   light: {
@@ -566,6 +613,90 @@ const FrameCaption = ({
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  useEffect(() => {
+    if (!isDragging || isExporting) return undefined;
+
+    const releaseCapture = dragState => {
+      const captureTarget = dragState?.captureTarget;
+      if (!captureTarget) return;
+      try {
+        if (
+          !captureTarget.hasPointerCapture?.(dragState.pointerId) ||
+          !captureTarget.releasePointerCapture
+        ) {
+          return;
+        }
+        captureTarget.releasePointerCapture(dragState.pointerId);
+      } catch {
+        // The overlay may have been detached while the pointer was outside it.
+      }
+    };
+    const finishDragging = event => {
+      const dragState = dragStateRef.current;
+      if (
+        !dragState ||
+        (event?.pointerId !== undefined &&
+          dragState.pointerId !== event.pointerId)
+      ) {
+        return;
+      }
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      releaseCapture(dragState);
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    const updatePosition = event => {
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const svgBounds = svgRef.current?.getBoundingClientRect();
+      if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
+      const scaleX = dragState.canvasWidth / svgBounds.width;
+      const scaleY = dragState.canvasHeight / svgBounds.height;
+      const nextX =
+        dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
+      const nextY =
+        dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
+      const normalizedX =
+        dragState.rightX > dragState.leftX
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextX - dragState.leftX) / (dragState.rightX - dragState.leftX)
+              )
+            )
+          : 0;
+      const normalizedY =
+        dragState.bottomY > dragState.topY
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextY - dragState.topY) / (dragState.bottomY - dragState.topY)
+              )
+            )
+          : 0;
+      setCaptionOverlay?.(prev => ({
+        ...normalizeCaptionOverlay(prev),
+        position: { x: normalizedX, y: normalizedY },
+      }));
+    };
+
+    window.addEventListener('pointermove', updatePosition, true);
+    window.addEventListener('pointerup', finishDragging, true);
+    window.addEventListener('pointercancel', finishDragging, true);
+    window.addEventListener('blur', finishDragging);
+    return () => {
+      window.removeEventListener('pointermove', updatePosition, true);
+      window.removeEventListener('pointerup', finishDragging, true);
+      window.removeEventListener('pointercancel', finishDragging, true);
+      window.removeEventListener('blur', finishDragging);
+    };
+  }, [isDragging, isExporting, setCaptionOverlay, svgRef]);
+
   if (
     !caption.enabled ||
     !text ||
@@ -634,45 +765,6 @@ const FrameCaption = ({
     position: caption.position,
   });
 
-  const updatePosition = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const svgBounds = svgRef.current?.getBoundingClientRect();
-    if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
-    const scaleX = canvasSize.width / svgBounds.width;
-    const scaleY = canvasSize.height / svgBounds.height;
-    const nextX =
-      dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
-    const nextY =
-      dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
-    const normalizedX =
-      rightX > leftX
-        ? Math.max(0, Math.min(1, (nextX - leftX) / (rightX - leftX)))
-        : 0;
-    const normalizedY =
-      bottomY > topY
-        ? Math.max(0, Math.min(1, (nextY - topY) / (bottomY - topY)))
-        : 0;
-    setCaptionOverlay?.(prev => ({
-      ...normalizeCaptionOverlay(prev),
-      position: {
-        x: normalizedX,
-        y: normalizedY,
-      },
-    }));
-  };
-  const finishDragging = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragStateRef.current = null;
-    setIsDragging(false);
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  };
-
   return (
     <g
       aria-label="Frame caption"
@@ -694,6 +786,7 @@ const FrameCaption = ({
         isExporting
           ? undefined
           : event => {
+              if (event.button !== 0) return;
               event.preventDefault();
               event.stopPropagation();
               dragStateRef.current = {
@@ -702,14 +795,22 @@ const FrameCaption = ({
                 startClientY: event.clientY,
                 originX: x,
                 originY: y,
+                leftX,
+                topY,
+                rightX,
+                bottomY,
+                canvasWidth: canvasSize.width,
+                canvasHeight: canvasSize.height,
+                captureTarget: event.currentTarget,
               };
               setIsDragging(true);
-              event.currentTarget.setPointerCapture?.(event.pointerId);
+              try {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              } catch {
+                // Window listeners retain drag ownership when capture is unavailable.
+              }
             }
       }
-      onPointerMove={isExporting ? undefined : updatePosition}
-      onPointerUp={isExporting ? undefined : finishDragging}
-      onPointerCancel={isExporting ? undefined : finishDragging}
       style={
         isExporting
           ? undefined
@@ -888,8 +989,7 @@ const GraphCanvas = ({
     [edgeRenderData, effectiveSelectedObject, edgeWidth]
   );
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
-  const gridMinorPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid-minor`;
-  const gridMajorPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid-major`;
+  const gridPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid`;
   const gridPalette = GRID_PALETTES[theme] ?? GRID_PALETTES.light;
   useEffect(() => {
     const el = svgRef.current;
@@ -931,10 +1031,9 @@ const GraphCanvas = ({
       if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
       const viewportWidth = bounds.width;
       const viewportHeight = bounds.height;
-      const minZoom = computeMinZoom(viewportWidth, viewportHeight);
       const visibleNodes = graph.nodes.filter(node => node.visible !== false);
       if (!visibleNodes.length) {
-        const zoom = minZoom;
+        const zoom = Math.min(1, computeMinZoom(viewportWidth, viewportHeight));
         setViewState({
           zoom,
           x: (viewportWidth - VIEWBOX_WIDTH * zoom) / 2,
@@ -943,28 +1042,29 @@ const GraphCanvas = ({
         hasInitializedViewRef.current = true;
         return true;
       }
-      const xs = visibleNodes.map(node => node.x);
-      const ys = visibleNodes.map(node => node.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-      const padding = Math.max(36, nodeRadius * 2.2);
-      const fitWidth = Math.max(1, maxX - minX + padding * 2);
-      const fitHeight = Math.max(1, maxY - minY + padding * 2);
-      const fitZoom = Math.min(
-        viewportWidth / fitWidth,
-        viewportHeight / fitHeight,
-        1
-      );
-      const zoom = Math.max(minZoom, fitZoom);
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-      setViewState({
-        zoom,
-        x: viewportWidth / 2 - centerX * zoom,
-        y: viewportHeight / 2 - centerY * zoom,
+      const content = el.querySelector('[data-export-content="true"]');
+      const renderedBounds = measureRenderedContentBounds(content);
+      const fallbackBounds = {
+        x: Math.min(...visibleNodes.map(node => node.x)) - nodeRadius,
+        y: Math.min(...visibleNodes.map(node => node.y)) - nodeRadius,
+        width:
+          Math.max(...visibleNodes.map(node => node.x)) -
+          Math.min(...visibleNodes.map(node => node.x)) +
+          nodeRadius * 2,
+        height:
+          Math.max(...visibleNodes.map(node => node.y)) -
+          Math.min(...visibleNodes.map(node => node.y)) +
+          nodeRadius * 2,
+      };
+      const nextView = createFitViewState({
+        bounds: mergeSvgBounds(renderedBounds, fallbackBounds),
+        viewportWidth,
+        viewportHeight,
+        maxZoom: 1,
+        padding: Math.max(24, nodeRadius),
       });
+      if (!nextView) return false;
+      setViewState(nextView);
       hasInitializedViewRef.current = true;
       return true;
     };
@@ -989,7 +1089,7 @@ const GraphCanvas = ({
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
     setViewState(prev => {
-      const zoom = clampZoom(prev.zoom, bounds.width, bounds.height);
+      const zoom = clampFitZoom(prev.zoom);
       const clamped = zoom === prev.zoom ? prev : { ...prev, zoom };
       const unchanged =
         Math.abs(clamped.x - prev.x) < EPSILON &&
@@ -1000,10 +1100,9 @@ const GraphCanvas = ({
   }, [setViewState, viewState.zoom]);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg || isExporting) return undefined;
+    if (!svg || isExporting || lockCanvas) return undefined;
     const handleWheel = event => {
       event.preventDefault();
-      if (lockCanvas) return;
       const bounds = svg.getBoundingClientRect();
       if (!bounds) return;
       const cursorX = event.clientX - bounds.left;
@@ -1203,6 +1302,7 @@ const GraphCanvas = ({
         data-view-x={isExporting ? undefined : viewState.x}
         data-view-y={isExporting ? undefined : viewState.y}
         data-view-zoom={isExporting ? undefined : viewState.zoom}
+        data-view-locked={isExporting ? undefined : String(lockCanvas)}
         data-export-mode={isExporting ? 'true' : 'false'}
         data-export-frame-index={
           Number.isInteger(exportFrameIndex) ? exportFrameIndex : undefined
@@ -1219,7 +1319,7 @@ const GraphCanvas = ({
             : {
                 touchAction: 'none',
                 cursor:
-                  mode === 'pan'
+                  mode === 'pan' && !lockCanvas
                     ? 'grab'
                     : mode === 'add' || mode === 'draw'
                       ? 'crosshair'
@@ -1229,49 +1329,26 @@ const GraphCanvas = ({
       >
         <defs>
           <pattern
-            id={gridMinorPatternId}
-            width="28"
-            height="28"
-            patternUnits="userSpaceOnUse"
-          >
-            <line
-              x1="0"
-              y1="0"
-              x2="28"
-              y2="0"
-              stroke={gridPalette.minor}
-              strokeWidth="1"
-            />
-            <line
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="28"
-              stroke={gridPalette.minor}
-              strokeWidth="1"
-            />
-          </pattern>
-          <pattern
-            id={gridMajorPatternId}
+            id={gridPatternId}
             width="140"
             height="140"
             patternUnits="userSpaceOnUse"
           >
-            <line
-              x1="0"
-              y1="0"
-              x2="140"
-              y2="0"
-              stroke={gridPalette.major}
-              strokeWidth="1.2"
+            <path
+              data-grid-level="minor"
+              d="M 28 0 V 140 M 56 0 V 140 M 84 0 V 140 M 112 0 V 140 M 0 28 H 140 M 0 56 H 140 M 0 84 H 140 M 0 112 H 140"
+              fill="none"
+              stroke={gridPalette.minor}
+              strokeOpacity={gridPalette.minorOpacity}
+              strokeWidth="0.75"
             />
-            <line
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="140"
+            <path
+              data-grid-level="major"
+              d="M 0 0 H 140 M 0 0 V 140"
+              fill="none"
               stroke={gridPalette.major}
-              strokeWidth="1.2"
+              strokeOpacity={gridPalette.majorOpacity}
+              strokeWidth="1"
             />
           </pattern>
           <filter
@@ -1312,14 +1389,7 @@ const GraphCanvas = ({
                 y="-10000"
                 width="20000"
                 height="20000"
-                fill={`url(#${gridMinorPatternId})`}
-              />
-              <rect
-                x="-10000"
-                y="-10000"
-                width="20000"
-                height="20000"
-                fill={`url(#${gridMajorPatternId})`}
+                fill={`url(#${gridPatternId})`}
               />
             </g>
           )}

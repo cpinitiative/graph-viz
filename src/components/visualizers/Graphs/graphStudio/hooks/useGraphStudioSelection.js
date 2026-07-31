@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { splitEdgePatch, splitNodePatch } from '../lib/graphPropertyRouting';
+import { reconcileSelectionWithGraph } from '../lib/selectionState';
 
 const PROPERTY_LABELS = {
   color: 'color',
@@ -14,6 +15,14 @@ const getPropertyLabel = key => PROPERTY_LABELS[key] ?? key;
 const getFirstPatchKey = patch => Object.keys(patch ?? {})[0];
 
 const getPresenceLabel = visible => (visible ? 'shown' : 'not shown');
+
+const selectionObjectsMatch = (first, second) =>
+  first === second ||
+  (first?.type === second?.type && String(first?.id) === String(second?.id));
+
+const selectedNodeIdsMatch = (first, second) =>
+  first.length === second.length &&
+  first.every((id, index) => String(id) === String(second[index]));
 
 export const useGraphStudioSelection = ({ baseGraph, computedGraph }) => {
   const [selectedObject, setSelectedObject] = useState(null);
@@ -47,38 +56,33 @@ export const useGraphStudioSelection = ({ baseGraph, computedGraph }) => {
   }, [selectedObject, computedGraph.edges]);
 
   useEffect(() => {
-    if (!selectedObject) return;
-    if (selectedObject.type === 'node') {
-      const node = computedGraph.nodes.find(
-        node => String(node.id) === String(selectedObject.id)
-      );
-      if (!node) {
-        const timeout = setTimeout(() => setSelectedObject(null), 0);
-        return () => clearTimeout(timeout);
-      }
-      return;
-    }
-    if (selectedObject.type === 'edge') {
-      const edge = computedGraph.edges.find(
-        edge => String(edge.id) === String(selectedObject.id)
-      );
-      if (!edge) {
-        const timeout = setTimeout(() => setSelectedObject(null), 0);
-        return () => clearTimeout(timeout);
-      }
-    }
-    return;
-  }, [selectedObject, computedGraph.nodes, computedGraph.edges]);
-
-  useEffect(() => {
-    if (!selectedNodeIds.length) return undefined;
-    const existingNodeIds = selectedNodeIds.filter(id =>
-      nodeMap.has(String(id))
+    const nextSelection = reconcileSelectionWithGraph({
+      selectedObject,
+      selectedNodeIds,
+      nodeIds: computedGraph.nodes.map(node => node.id),
+      edgeIds: computedGraph.edges.map(edge => edge.id),
+    });
+    const objectChanged = !selectionObjectsMatch(
+      selectedObject,
+      nextSelection.selectedObject
     );
-    if (existingNodeIds.length === selectedNodeIds.length) return undefined;
-    const timeout = setTimeout(() => setSelectedNodeIds(existingNodeIds), 0);
+    const nodeIdsChanged = !selectedNodeIdsMatch(
+      selectedNodeIds,
+      nextSelection.selectedNodeIds
+    );
+    if (!objectChanged && !nodeIdsChanged) return undefined;
+
+    const timeout = setTimeout(() => {
+      if (objectChanged) setSelectedObject(nextSelection.selectedObject);
+      if (nodeIdsChanged) setSelectedNodeIds(nextSelection.selectedNodeIds);
+    }, 0);
     return () => clearTimeout(timeout);
-  }, [nodeMap, selectedNodeIds]);
+  }, [
+    selectedObject,
+    selectedNodeIds,
+    computedGraph.nodes,
+    computedGraph.edges,
+  ]);
 
   const nodeConnectedEdges = useMemo(() => {
     if (!selectedNode) return [];

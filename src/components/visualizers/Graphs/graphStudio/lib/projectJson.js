@@ -177,7 +177,7 @@ const sanitizeViewState = value => {
   const x = Number(value.x);
   const y = Number(value.y);
   if (![zoom, x, y].every(Number.isFinite)) return DEFAULT_SETTINGS.viewState;
-  return { zoom: clamp(zoom, 0.05, 2.6), x, y };
+  return { zoom: clamp(zoom, 0.001, 2.6), x, y };
 };
 
 const sanitizeSettings = settings => {

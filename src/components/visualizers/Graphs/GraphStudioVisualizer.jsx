@@ -35,6 +35,7 @@ import {
   getDefaultEdgeLabelFontSize,
   getDefaultNodeLabelFontSize,
 } from './graphStudio/lib/fontSizing';
+import { normalizeForceStrength } from './graphStudio/lib/graphLayouts';
 import {
   hasOpenModal,
   isEditableKeyboardTarget,
@@ -156,10 +157,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   const updateLockCanvas = useCallback(
     locked => {
       const nextLocked = Boolean(locked);
+      if (nextLocked && mode === 'pan') setMode('select');
       setLockCanvas(nextLocked);
       setStatus(nextLocked ? 'View locked' : 'View unlocked');
     },
-    [setLockCanvas, setStatus]
+    [mode, setLockCanvas, setStatus]
   );
   const handleCenterView = useCallback(() => {
     if (lockCanvas) {
@@ -214,6 +216,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       return next;
     });
   }, []);
+  const updateForceStrength = useCallback(
+    nextStrength => {
+      const normalizedStrength = normalizeForceStrength(nextStrength);
+      updateGlobalSettings({ forceStrength: normalizedStrength });
+      setStatus(
+        `Force strength ${normalizedStrength.toFixed(1)} set for the next Force layout`
+      );
+    },
+    [setStatus, updateGlobalSettings]
+  );
   const undoSettings = useMemo(
     () => ({
       edgeRouting,
@@ -242,10 +254,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setShowGrid(Boolean(settings.showGrid));
       setCaptionOverlay(settings.captionOverlay);
       setCustomLegend(settings.customLegend);
-      setLockCanvas(Boolean(settings.lockCanvas));
+      updateLockCanvas(Boolean(settings.lockCanvas));
       setGlobalSettings(settings.globalSettings);
     },
-    [setLockCanvas]
+    [updateLockCanvas]
   );
   const { resetUndoHistory } = useGraphStudioUndo({
     baseGraph,
@@ -368,12 +380,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     computedGraph,
     addEdge,
     updateBaseNodesBulk,
+    selectedObject,
     selectedNodeIds,
     selectedNodeIdSet,
     setSelectedObject,
     setSelectedNodeIds,
     clearSelection,
-    currentFrame,
   });
   const previousFrameRef = useRef(currentFrame);
   useEffect(() => {
@@ -442,7 +454,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     customLegend,
     setCustomLegend,
     lockCanvas,
-    setLockCanvas,
+    setLockCanvas: updateLockCanvas,
     viewState,
     getZoomViewportSize,
     setViewState,
@@ -696,8 +708,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextGraph = cloneJson(preset.graph);
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
-    setViewFromNodes(nextGraph.nodes);
-    bumpViewReset();
+    if (!lockCanvas) {
+      setViewFromNodes(nextGraph.nodes);
+      bumpViewReset();
+    }
     setMode('select');
     clearSelection();
     clearDrawState();
@@ -708,7 +722,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         enabled: Boolean(prev?.enabled),
       })
     );
-    setStatus(`Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}`);
+    setStatus(
+      `Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}${lockCanvas ? ' · view preserved' : ''}`
+    );
   };
   const handleAutoLayout = useCallback(
     type => {
@@ -743,8 +759,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       setLockCanvas: updateLockCanvas,
       onAutoLayout: handleAutoLayout,
       forceStrength: globalSettings.forceStrength,
-      onForceStrengthChange: forceStrength =>
-        updateGlobalSettings({ forceStrength }),
+      onForceStrengthChange: updateForceStrength,
       onOpenParser: () => setIsParserOpen(true),
       onExportText: exportText,
       onExportProject: exportProject,
