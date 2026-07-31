@@ -366,6 +366,7 @@ const ZoomInIcon = () => (
 
 const LeftSidebar = ({
   mode,
+  modeGuidance = null,
   setMode,
   snapEnabled,
   setSnapEnabled,
@@ -437,6 +438,18 @@ const LeftSidebar = ({
               <span className="truncate">{tool.label}</span>
             </button>
           ))}
+        </div>
+        <div className="min-h-4">
+          {modeGuidance && (
+            <p
+              className="text-[10px] font-medium leading-4 text-[#64748B] dark:text-[#94A3B8]"
+              data-testid="tool-mode-guidance"
+              aria-label={`${modeGuidance.modeLabel}. ${modeGuidance.accessibleAction ?? modeGuidance.action}`}
+              aria-live="polite"
+            >
+              {modeGuidance.action}
+            </p>
+          )}
         </div>
       </SidebarSection>
 

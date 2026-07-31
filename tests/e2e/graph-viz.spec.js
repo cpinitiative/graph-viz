@@ -740,23 +740,13 @@ test.describe('Graph Studio desktop smoke', () => {
       'background-color',
       'rgb(15, 39, 71)'
     );
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    await expect(modeIndicator).toBeVisible();
-    await expect(modeIndicator).toContainText('Select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(page.getByTestId('canvas-hud-stack')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
     await expect(page.getByTestId('current-mode-indicator')).toHaveCount(0);
-    await expect
-      .poll(() =>
-        modeIndicator.evaluate(
-          element => window.getComputedStyle(element).textAlign
-        )
-      )
-      .toBe('left');
-    await expect(modeIndicator).toHaveCSS('border-radius', '0px');
-    await expect(modeIndicator).toHaveCSS(
-      'border-left-color',
-      'rgb(166, 106, 0)'
-    );
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -780,7 +770,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Add Node');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('From Frame 1 onward');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
@@ -796,10 +787,16 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Draw Edge');
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
+      'aria-label',
+      /Source node \d+ selected; choose target/
+    );
+    await expect(editScope).toHaveText('From Frame 1 onward');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(modeIndicator).toContainText('Select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
     const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
@@ -1007,7 +1004,7 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
-    await expect(modeIndicator).toContainText('Pan');
+    await expect(modeGuidance).toHaveText('Drag canvas');
     const viewBeforePan = [
       await graphCanvas(page).getAttribute('data-view-x'),
       await graphCanvas(page).getAttribute('data-view-y'),
@@ -2619,8 +2616,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2721,8 +2718,8 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2751,8 +2748,8 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2760,8 +2757,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2856,26 +2853,23 @@ while (true) {}
     await choosePreset(page, 'bfs');
     await page.getByTestId('timeline-frame-card').nth(1).click();
 
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    const modeGuidance = page.getByTestId('canvas-mode-guidance');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
     await expect(modeGuidance).toHaveCount(0);
-    const selectModeWidth = (await getRequiredBox(modeIndicator)).width;
+    await expect(editScope).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
 
     await page.getByTestId('tool-button-add').click();
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'add');
-    await expect(modeGuidance).toHaveText(
-      'Click canvasApplies from Frame 2 onward'
-    );
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('From Frame 2 onward');
     await expect(
-      leftSidebar(page).getByText('Applies from Frame 2 onward')
+      leftSidebar(page).getByText('From Frame 2 onward')
     ).toHaveCount(0);
     await expect(
-      page.getByText('Applies from Frame 2 onward', { exact: true })
+      page.getByText('From Frame 2 onward', { exact: true })
     ).toHaveCount(1);
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2887,20 +2881,14 @@ while (true) {}
       .toBe('not-allowed');
 
     await page.getByTestId('tool-button-draw').click();
-    await expect(modeGuidance).toHaveText(
-      'Choose source, then targetApplies from Frame 2 onward'
-    );
+    await expect(modeGuidance).toHaveText('Choose source, then target');
+    await expect(editScope).toHaveText('From Frame 2 onward');
     await graphNodeCircles(page).first().click();
-    await expect(modeGuidance).toHaveText(
-      'Choose targetApplies from Frame 2 onward'
-    );
-    await expect(modeIndicator).toHaveAttribute(
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
       'aria-label',
       /Source node 0 selected; choose target/
     );
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2911,6 +2899,8 @@ while (true) {}
       )
       .toBe('crosshair');
     await page.getByTestId('tool-button-select').click();
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const minorGridLine = graphCanvas(page).locator(
       '[data-grid-level="minor"]'
@@ -3041,8 +3031,11 @@ while (true) {}
     const panButton = page.getByTestId('tool-button-pan');
     await lockView.check();
     await expect(graphCanvas(page)).toHaveAttribute('data-view-locked', 'true');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
-    await expect(modeIndicator).toContainText('View locked');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(page.getByTestId('view-lock-indicator')).toHaveText(
+      'View locked'
+    );
     await expect(panButton).toBeDisabled();
     await expect(panButton).toHaveAttribute('title', 'Unlock view to pan');
     await page.evaluate(
@@ -3394,17 +3387,11 @@ while (true) {}
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(modeIndicator).toContainText('Select');
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     const recoveryAffordance = page.getByTestId('presence-recovery-affordance');
     await expect(
       recoveryAffordance.getByText('1 object not shown this frame')
     ).toBeVisible();
-    const modeIndicatorBox = await getRequiredBox(modeIndicator);
-    const recoveryBox = await getRequiredBox(recoveryAffordance);
-    expect(modeIndicatorBox.y + modeIndicatorBox.height).toBeLessThanOrEqual(
-      recoveryBox.y
-    );
     await recoveryAffordance
       .getByRole('button', { name: /1 object not shown this frame/i })
       .click();
@@ -3779,6 +3766,20 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await page.getByTestId('mobile-tools-toggle').click();
 
+    await page.getByTestId('tool-button-draw').click();
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
+    );
+    await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
+    await expect(page.getByTestId('mobile-mode-guidance')).toHaveText(
+      'Draw Edge · Choose source, then target'
+    );
+    await expect(page.getByTestId('timeline-edit-scope')).toHaveText(
+      'From Frame 1 onward'
+    );
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
+    await page.getByTestId('mobile-tools-toggle').click();
+
     const importButton = page.getByTestId('open-import-menu');
     await importButton.scrollIntoViewIfNeeded();
     await importButton.click();
@@ -4074,13 +4075,11 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     exportMenu = await openExportMenu(page);
-    await expect(exportMenu.getByTestId('canvas-mode-indicator')).toHaveCount(
-      0
-    );
+    await expect(exportMenu.getByTestId('tool-mode-guidance')).toHaveCount(0);
     previewState = await getSvgPresentationState(
       page,
       await getPreviewSvgText(page)
@@ -4092,8 +4091,8 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
 
     await page.getByTestId('tool-button-select').click();

@@ -266,6 +266,7 @@ const CaptionFontSizeInput = ({ value, onCommit }) => {
 const TimelinePanel = ({
   steps,
   currentFrame,
+  editScope = '',
   onFrameChange,
   onStepDurationChange,
   onDescriptionChange,
@@ -303,7 +304,7 @@ const TimelinePanel = ({
       tabIndex="0"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
           </div>
@@ -341,6 +342,19 @@ const TimelinePanel = ({
               {currentFrame + 1} / {Math.max(1, steps.length)}
             </span>
           </div>
+          {editScope && (
+            <div
+              className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]"
+              data-testid="timeline-edit-scope"
+              aria-label={`Edit scope: ${editScope}`}
+            >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full bg-[#A66A00] dark:bg-[#F59E0B]"
+              />
+              {editScope}
+            </div>
+          )}
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 lg:w-[22%] lg:shrink-0 lg:flex-nowrap lg:justify-start lg:gap-1 lg:pl-2">
           <button
