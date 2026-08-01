@@ -251,7 +251,7 @@ export const useGraphStudioGraphModel = ({
       replaceTimeline(nextBaseGraph, nextSteps, currentFrame);
       setSelectedObject({ type: 'node', id });
       setSelectedNodeIds([String(id)]);
-      setStatus(`Node ${id} added from Frame ${currentFrame + 1} onward`);
+      setStatus(`Node ${id} added on Frame ${currentFrame + 1} and following`);
     },
     [
       baseGraph,
@@ -299,7 +299,7 @@ export const useGraphStudioGraphModel = ({
       setSelectedNodeIds([]);
       setSelectedObject({ type: 'edge', id });
       setStatus(
-        `Edge ${from} → ${to} added from Frame ${currentFrame + 1} onward`
+        `Edge ${from} → ${to} added on Frame ${currentFrame + 1} and following`
       );
       return id;
     },

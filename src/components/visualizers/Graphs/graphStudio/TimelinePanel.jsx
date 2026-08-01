@@ -36,9 +36,9 @@ const HELP_TOOLTIP_ESTIMATED_HEIGHT = 78;
 const HELP_TOOLTIP_GUTTER = 12;
 const HELP_TOOLTIP_OFFSET = 6;
 const TIMELINE_HELP_TEXT =
-  'Frame edits affect the current frame. Project settings affect all frames. New nodes and edges appear from this frame onward.';
+  'Each frame can change appearance and visibility. Labels, positions, and canvas settings stay shared across the project. New nodes and edges start on the frame where you add them.';
 const CAPTION_SCOPE_HELP_TEXT =
-  'Show caption is frame-specific. Caption appearance is project-wide.';
+  'Caption visibility belongs to this frame. Caption style and font size are shared across the project.';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -155,7 +155,7 @@ const HelpTooltip = ({
 
 const TimelineHelp = () => (
   <HelpTooltip
-    label="Timeline temporal model help"
+    label="How frame editing works"
     text={TIMELINE_HELP_TEXT}
     testId="timeline-temporal-help-tooltip"
   />
@@ -369,7 +369,7 @@ const TimelinePanel = ({
             type="button"
             className={toolbarButtonClass}
             onClick={onDuplicateStep}
-            title="Duplicate copies this frame exactly, including overrides"
+            title="Duplicate copies this frame's appearance and settings"
           >
             Duplicate
           </button>
@@ -501,7 +501,7 @@ const TimelinePanel = ({
                 onDescriptionChange(currentFrame, event.target.value)
               }
               className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
-              placeholder="Enter a description for this frame..."
+              placeholder="Describe what happens on this frame..."
             />
           </label>
           <div
@@ -536,14 +536,14 @@ const TimelinePanel = ({
               {hasCaptionVisibleOverride && (
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]">
-                    Current frame override
+                    Different on this frame
                   </span>
                   <button
                     type="button"
                     className={inlineActionButtonClass}
                     onClick={onResetCaptionVisibleOverride}
                   >
-                    Reset override
+                    Use project value
                   </button>
                 </span>
               )}

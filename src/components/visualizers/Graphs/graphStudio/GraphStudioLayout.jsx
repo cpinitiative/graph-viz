@@ -54,7 +54,7 @@ const getModeGuidance = ({ mode, drawFrom }) => {
 
 const getTimelineEditScope = ({ mode, currentFrame = 0 }) =>
   mode === 'add' || mode === 'draw'
-    ? `From Frame ${Math.max(0, Number(currentFrame) || 0) + 1} onward`
+    ? `New items start on Frame ${Math.max(0, Number(currentFrame) || 0) + 1}`
     : '';
 
 const getStatusClassName = status => {
@@ -112,7 +112,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
         }
       >
         <span>
-          {entries.length} {objectLabel} not shown this frame
+          {entries.length} {objectLabel} hidden on this frame
         </span>
         <span aria-hidden="true" className="text-[#64748B] dark:text-[#94A3B8]">
           {expanded ? 'Collapse' : 'Expand'}
@@ -145,7 +145,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
                       setExpandedSignature('');
                     }}
                   >
-                    Show here
+                    Show on this frame
                   </button>
                   <button
                     type="button"
@@ -155,7 +155,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
                       setExpandedSignature('');
                     }}
                   >
-                    Show onward
+                    Show from this frame
                   </button>
                 </div>
               </div>
