@@ -703,7 +703,9 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Project')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project', { exact: true })
+    ).toHaveCount(0);
     await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
       'straight'
     );
@@ -714,6 +716,10 @@ test.describe('Graph Studio desktop smoke', () => {
         .getByTestId('timeline-panel')
         .getByRole('button', { name: 'Play timeline' })
     ).toBeVisible();
+    await page.getByRole('button', { name: 'How frame editing works' }).focus();
+    await expect(page.getByTestId('timeline-temporal-help-tooltip')).toHaveText(
+      'Each frame can change appearance and visibility. Labels, positions, and canvas settings stay shared across the project. New nodes and edges start on the frame where you add them.'
+    );
     await expect(
       page.getByTestId('left-sidebar').getByRole('button', { name: 'Play' })
     ).toHaveCount(0);
@@ -740,23 +746,13 @@ test.describe('Graph Studio desktop smoke', () => {
       'background-color',
       'rgb(15, 39, 71)'
     );
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    await expect(modeIndicator).toBeVisible();
-    await expect(modeIndicator).toContainText('Select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(page.getByTestId('canvas-hud-stack')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
     await expect(page.getByTestId('current-mode-indicator')).toHaveCount(0);
-    await expect
-      .poll(() =>
-        modeIndicator.evaluate(
-          element => window.getComputedStyle(element).textAlign
-        )
-      )
-      .toBe('left');
-    await expect(modeIndicator).toHaveCSS('border-radius', '0px');
-    await expect(modeIndicator).toHaveCSS(
-      'border-left-color',
-      'rgb(166, 106, 0)'
-    );
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -780,7 +776,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Add Node');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('New items start on Frame 1');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
@@ -796,10 +793,16 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Draw Edge');
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
+      'aria-label',
+      /Source node \d+ selected; choose target/
+    );
+    await expect(editScope).toHaveText('New items start on Frame 1');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(modeIndicator).toContainText('Select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
     const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
@@ -1007,7 +1010,7 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
-    await expect(modeIndicator).toContainText('Pan');
+    await expect(modeGuidance).toHaveText('Drag canvas');
     const viewBeforePan = [
       await graphCanvas(page).getAttribute('data-view-x'),
       await graphCanvas(page).getAttribute('data-view-y'),
@@ -1087,6 +1090,40 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Node properties')
     ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project details', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Shared by every frame.', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
+    await expect(
+      propertyPanel(page)
+        .getByText('Different on this frame', { exact: true })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page)
+        .getByRole('button', {
+          name: 'Use project value',
+        })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page)
+        .getByRole('button', {
+          name: 'Use on every frame',
+        })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('All frames', { exact: true })
+    ).toHaveCount(0);
     await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
@@ -1095,6 +1132,15 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Edge properties')
     ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project details', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
     await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 24, y: 24 } });
     await expect(
@@ -1127,7 +1173,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(frameLabels).toHaveCount(initialFrameCount + 1);
 
     const frameDescription = page.getByPlaceholder(
-      'Enter a description for this frame...'
+      'Describe what happens on this frame...'
     );
     const descriptionRow = page.getByTestId('frame-description-row');
     const timelinePanel = page.getByTestId('timeline-panel');
@@ -2218,7 +2264,7 @@ while (true) {}
     ).toHaveText('Load preset...');
 
     const frameDescription = page.getByPlaceholder(
-      'Enter a description for this frame...'
+      'Describe what happens on this frame...'
     );
     const frameLabels = page.getByText(/^Frame \d+$/);
 
@@ -2619,8 +2665,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2644,7 +2690,15 @@ while (true) {}
     await expect(
       propertyPanel(page).getByText('Selection', { exact: true })
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Selected nodes')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('2 nodes selected', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id]')
     ).toHaveCount(0);
@@ -2721,8 +2775,8 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2751,8 +2805,8 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2760,8 +2814,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2856,26 +2910,23 @@ while (true) {}
     await choosePreset(page, 'bfs');
     await page.getByTestId('timeline-frame-card').nth(1).click();
 
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    const modeGuidance = page.getByTestId('canvas-mode-guidance');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
     await expect(modeGuidance).toHaveCount(0);
-    const selectModeWidth = (await getRequiredBox(modeIndicator)).width;
+    await expect(editScope).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
 
     await page.getByTestId('tool-button-add').click();
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'add');
-    await expect(modeGuidance).toHaveText(
-      'Click canvasApplies from Frame 2 onward'
-    );
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('New items start on Frame 2');
     await expect(
-      leftSidebar(page).getByText('Applies from Frame 2 onward')
+      leftSidebar(page).getByText('New items start on Frame 2')
     ).toHaveCount(0);
     await expect(
-      page.getByText('Applies from Frame 2 onward', { exact: true })
+      page.getByText('New items start on Frame 2', { exact: true })
     ).toHaveCount(1);
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2887,20 +2938,14 @@ while (true) {}
       .toBe('not-allowed');
 
     await page.getByTestId('tool-button-draw').click();
-    await expect(modeGuidance).toHaveText(
-      'Choose source, then targetApplies from Frame 2 onward'
-    );
+    await expect(modeGuidance).toHaveText('Choose source, then target');
+    await expect(editScope).toHaveText('New items start on Frame 2');
     await graphNodeCircles(page).first().click();
-    await expect(modeGuidance).toHaveText(
-      'Choose targetApplies from Frame 2 onward'
-    );
-    await expect(modeIndicator).toHaveAttribute(
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
       'aria-label',
       /Source node 0 selected; choose target/
     );
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2911,6 +2956,8 @@ while (true) {}
       )
       .toBe('crosshair');
     await page.getByTestId('tool-button-select').click();
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const minorGridLine = graphCanvas(page).locator(
       '[data-grid-level="minor"]'
@@ -3041,8 +3088,11 @@ while (true) {}
     const panButton = page.getByTestId('tool-button-pan');
     await lockView.check();
     await expect(graphCanvas(page)).toHaveAttribute('data-view-locked', 'true');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
-    await expect(modeIndicator).toContainText('View locked');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(page.getByTestId('view-lock-indicator')).toHaveText(
+      'View locked'
+    );
     await expect(panButton).toBeDisabled();
     await expect(panButton).toHaveAttribute('title', 'Unlock view to pan');
     await page.evaluate(
@@ -3202,7 +3252,7 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText(/^Frame \d+$/)).toHaveCount(2);
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Imported fixture frame two');
     await expect(page.getByLabel('Show caption')).not.toBeChecked();
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
@@ -3253,7 +3303,7 @@ while (true) {}
     await expect(page.getByText(/Project import error:/)).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Imported fixture frame two');
 
     expect(errors).toEqual([]);
@@ -3380,13 +3430,13 @@ while (true) {}
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByText(
-        'Edge eAB is not shown because Node B is not shown on this frame'
+        'Edge eAB is hidden because Node B is hidden on Frame 1'
       )
     ).toBeVisible();
     await expect(
       page
         .getByTestId('presence-recovery-affordance')
-        .getByText('1 object not shown this frame')
+        .getByText('1 object hidden on this frame')
     ).toBeVisible();
 
     await propertyPanel(page).getByTestId('inspector-clear-selection').click();
@@ -3394,22 +3444,18 @@ while (true) {}
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(modeIndicator).toContainText('Select');
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     const recoveryAffordance = page.getByTestId('presence-recovery-affordance');
     await expect(
-      recoveryAffordance.getByText('1 object not shown this frame')
+      recoveryAffordance.getByText('1 object hidden on this frame')
     ).toBeVisible();
-    const modeIndicatorBox = await getRequiredBox(modeIndicator);
-    const recoveryBox = await getRequiredBox(recoveryAffordance);
-    expect(modeIndicatorBox.y + modeIndicatorBox.height).toBeLessThanOrEqual(
-      recoveryBox.y
-    );
     await recoveryAffordance
-      .getByRole('button', { name: /1 object not shown this frame/i })
+      .getByRole('button', { name: /1 object hidden on this frame/i })
       .click();
     await expect(recoveryAffordance.getByText('Node B')).toBeVisible();
-    await recoveryAffordance.getByRole('button', { name: 'Show here' }).click();
+    await recoveryAffordance
+      .getByRole('button', { name: 'Show on this frame' })
+      .click();
     await expect(
       graphCanvas(page).locator('[data-node-label-id="B"]')
     ).toBeVisible();
@@ -3444,54 +3490,70 @@ while (true) {}
       'selection'
     );
     await expect(
-      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+      propertyPanel(page).getByText('3 of 3 shown on Frame 1')
     ).toBeVisible();
 
     await propertyPanel(page)
-      .getByRole('button', { name: 'Not shown selected here' })
+      .getByRole('button', { name: 'Hide selected nodes on this frame' })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+      propertyPanel(page).getByText('0 of 3 shown on Frame 1')
     ).toBeVisible();
     await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
       0
     );
     await expect(
-      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+      propertyPanel(page).getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByRole('button', { name: 'Show selected onward' })
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     await page.getByText('Frame 2', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+      propertyPanel(page).getByText('3 of 3 shown on Frame 2')
     ).toBeVisible();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Not shown selected onward' })
+      .getByLabel('Visibility change scope')
+      .selectOption('following');
+    await propertyPanel(page)
+      .getByRole('button', {
+        name: 'Hide selected nodes on this and following frames',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+      propertyPanel(page).getByText('0 of 3 shown on Frame 2')
     ).toBeVisible();
     await page.getByText('Frame 3', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await page.getByText('Frame 2', { exact: true }).click();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Show selected onward' })
+      .getByRole('button', {
+        name: 'Show selected nodes on this and following frames',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await page.getByText('Frame 3', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await page.getByText('Frame 1', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
+    await propertyPanel(page)
+      .getByLabel('Visibility change scope')
+      .selectOption('frame');
     await expect(
-      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+      propertyPanel(page).getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
     ).toBeVisible();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Show selected here' })
+      .getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
 
@@ -3519,7 +3581,7 @@ while (true) {}
     await page.getByText('Frame 1', { exact: true }).click();
 
     await expect(
-      propertyPanel(page).getByText('Node B is not shown on this frame')
+      propertyPanel(page).getByText('Node B is hidden on Frame 1')
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByText('Connected edges (2)', { exact: true })
@@ -3545,13 +3607,13 @@ while (true) {}
     await page.getByText('Frame 1', { exact: true }).click();
     await expect(
       propertyPanel(page).getByText(
-        'Edge eAB is not shown because Node B is not shown on this frame'
+        'Edge eAB is hidden because Node B is hidden on Frame 1'
       )
     ).toBeVisible();
     await expect(
       page
         .getByTestId('presence-recovery-affordance')
-        .getByText('1 object not shown this frame')
+        .getByText('1 object hidden on this frame')
     ).toBeVisible();
 
     expect(errors).toEqual([]);
@@ -3590,6 +3652,9 @@ while (true) {}
     await expect(
       exportMenu.getByRole('heading', { name: 'Export' })
     ).toBeVisible();
+    await expect(
+      exportMenu.getByText('Selected Frame Image', { exact: true })
+    ).toBeVisible();
     await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
     await expect(page.getByTestId('graph-studio-status')).toHaveText(
       /Edge list copied to clipboard|Clipboard unavailable/
@@ -3614,7 +3679,7 @@ while (true) {}
     await choosePreset(page, 'bfs');
 
     const originalDescription = await page
-      .getByPlaceholder('Enter a description for this frame...')
+      .getByPlaceholder('Describe what happens on this frame...')
       .inputValue();
     const originalNodeCount = await graphNodeCircles(page).count();
     const originalEdgeCount = await graphCanvas(page)
@@ -3672,7 +3737,7 @@ while (true) {}
         graphCanvas(page).locator('[data-edge-path-id]')
       ).toHaveCount(originalEdgeCount);
       await expect(
-        page.getByPlaceholder('Enter a description for this frame...')
+        page.getByPlaceholder('Describe what happens on this frame...')
       ).toHaveValue(originalDescription);
     }
 
@@ -3777,6 +3842,20 @@ while (true) {}
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await page.getByTestId('mobile-tools-toggle').click();
+
+    await page.getByTestId('tool-button-draw').click();
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
+    );
+    await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
+    await expect(page.getByTestId('mobile-mode-guidance')).toHaveText(
+      'Draw Edge · Choose source, then target'
+    );
+    await expect(page.getByTestId('timeline-edit-scope')).toHaveText(
+      'New items start on Frame 1'
+    );
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     await page.getByTestId('mobile-tools-toggle').click();
 
     const importButton = page.getByTestId('open-import-menu');
@@ -4074,13 +4153,11 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     exportMenu = await openExportMenu(page);
-    await expect(exportMenu.getByTestId('canvas-mode-indicator')).toHaveCount(
-      0
-    );
+    await expect(exportMenu.getByTestId('tool-mode-guidance')).toHaveCount(0);
     previewState = await getSvgPresentationState(
       page,
       await getPreviewSvgText(page)
@@ -4092,8 +4169,8 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
 
     await page.getByTestId('tool-button-select').click();
@@ -4166,7 +4243,7 @@ while (true) {}
       .not.toBe(firstFramePreviewUrl);
     await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await expect(frameItems).toHaveCount(1);
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-0')
@@ -4458,7 +4535,7 @@ while (true) {}
       page.getByRole('button', { name: 'Play timeline' })
     ).toBeVisible();
     const editorFrameAtExportStart = await frameCounter.textContent();
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
@@ -4537,7 +4614,7 @@ while (true) {}
     ).toBeVisible();
     const exportMenu = await openExportMenu(page);
     const editorFrameAtExportStart = await frameCounter.textContent();
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
     await page.getByRole('button', { name: 'Export', exact: true }).click();
 
@@ -4587,7 +4664,7 @@ while (true) {}
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Pasted JSON import test');
     await expect(
       graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
@@ -4653,7 +4730,7 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
     const originalDescription = await page
-      .getByPlaceholder('Enter a description for this frame...')
+      .getByPlaceholder('Describe what happens on this frame...')
       .inputValue();
 
     await openImportMenu(page);
@@ -4687,7 +4764,7 @@ while (true) {}
     );
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue(originalDescription);
 
     await modal.getByRole('button', { name: 'Cancel' }).click();
@@ -5383,7 +5460,7 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
-      page.getByRole('radio', { name: 'Current' })
+      page.getByRole('radio', { name: 'Selected' })
     ).not.toBeChecked();
     await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
@@ -5557,8 +5634,8 @@ api.edge('e0', '#f59e0b');
     await expect(frameCounter).toHaveText(initialFrameCounter);
     await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('radio', { name: 'Current' }).check();
-    await expect(page.getByRole('radio', { name: 'Current' })).toBeChecked();
+    await page.getByRole('radio', { name: 'Selected' }).check();
+    await expect(page.getByRole('radio', { name: 'Selected' })).toBeChecked();
     const currentFrameSlideshow = await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),

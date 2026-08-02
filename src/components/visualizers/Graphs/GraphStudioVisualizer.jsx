@@ -607,9 +607,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       );
       const endpointNote =
         notShownEndpoints.length === 1
-          ? `Also waiting on Node ${notShownEndpoints[0].id}`
+          ? `Also hidden by Node ${notShownEndpoints[0].id}`
           : notShownEndpoints.length > 1
-            ? 'Also waiting on endpoints'
+            ? 'Also hidden by its endpoints'
             : '';
 
       entries.push({
@@ -664,7 +664,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     (objectType, objectId) => {
       setTemporalVisibilityFromFrame?.(objectType, objectId, true);
       setStatus(
-        `${getObjectName(objectType, objectId)} shown from Frame ${currentFrame + 1} onward`
+        `${getObjectName(objectType, objectId)} shown on Frame ${currentFrame + 1} and following`
       );
     },
     [currentFrame, setStatus, setTemporalVisibilityFromFrame]
@@ -833,6 +833,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     property: {
       selectedNode,
       selectedEdge,
+      currentFrame,
       connectedEdges: nodeConnectedEdges,
       connectedNodes: edgeConnectedNodes,
       multiSelection: selectedNodeIds,

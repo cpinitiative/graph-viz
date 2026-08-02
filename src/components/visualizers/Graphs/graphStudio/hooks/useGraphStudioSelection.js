@@ -14,7 +14,7 @@ const getPropertyLabel = key => PROPERTY_LABELS[key] ?? key;
 
 const getFirstPatchKey = patch => Object.keys(patch ?? {})[0];
 
-const getPresenceLabel = visible => (visible ? 'shown' : 'not shown');
+const getPresenceLabel = visible => (visible ? 'shown' : 'hidden');
 
 const selectionObjectsMatch = (first, second) =>
   first === second ||
@@ -169,14 +169,14 @@ export const useGraphStudioSelectionPatchers = ({
           );
         } else {
           setStatus?.(
-            `Node ${getPropertyLabel(stepUpdates[0].key)} updated for Frame ${frameNumber}`
+            `Node ${getPropertyLabel(stepUpdates[0].key)} changed on Frame ${frameNumber}`
           );
         }
       }
       if (Object.keys(basePatch).length > 0) {
         updateBaseNode(selectedNode.id, basePatch);
         const key = getFirstPatchKey(basePatch);
-        setStatus?.(`Node ${getPropertyLabel(key)} updated for all frames`);
+        setStatus?.(`Node ${getPropertyLabel(key)} updated across the project`);
       }
     },
     [
@@ -218,14 +218,14 @@ export const useGraphStudioSelectionPatchers = ({
           );
         } else {
           setStatus?.(
-            `Edge ${getPropertyLabel(stepUpdates[0].key)} updated for Frame ${frameNumber}`
+            `Edge ${getPropertyLabel(stepUpdates[0].key)} changed on Frame ${frameNumber}`
           );
         }
       }
       if (Object.keys(basePatch).length > 0) {
         updateBaseEdge(selectedEdge.id, basePatch);
         const key = getFirstPatchKey(basePatch);
-        setStatus?.(`Edge ${getPropertyLabel(key)} updated for all frames`);
+        setStatus?.(`Edge ${getPropertyLabel(key)} updated across the project`);
       }
     },
     [
@@ -263,7 +263,7 @@ export const useGraphStudioSelectionPatchers = ({
         );
       } else {
         setStatus?.(
-          `${selectedNodeIds.length} nodes updated for Frame ${frameNumber}`
+          `${selectedNodeIds.length} nodes changed on Frame ${frameNumber}`
         );
       }
     },
@@ -281,7 +281,7 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedNode) return;
       resetFrameOverride('node', selectedNode.id, key);
       setStatus?.(
-        `Node ${getPropertyLabel(key)} reset for Frame ${frameNumber}`
+        `Node ${getPropertyLabel(key)} uses the project value on Frame ${frameNumber}`
       );
     },
     [frameNumber, resetFrameOverride, selectedNode, setStatus]
@@ -292,7 +292,7 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedEdge) return;
       resetFrameOverride('edge', selectedEdge.id, key);
       setStatus?.(
-        `Edge ${getPropertyLabel(key)} reset for Frame ${frameNumber}`
+        `Edge ${getPropertyLabel(key)} uses the project value on Frame ${frameNumber}`
       );
     },
     [frameNumber, resetFrameOverride, selectedEdge, setStatus]
@@ -303,7 +303,7 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedNode) return;
       applyTemporalPropertyToAllFrames('node', selectedNode.id, patch);
       const key = getFirstPatchKey(patch);
-      setStatus?.(`Applied node ${getPropertyLabel(key)} to all frames`);
+      setStatus?.(`Node ${getPropertyLabel(key)} set on every frame`);
     },
     [applyTemporalPropertyToAllFrames, selectedNode, setStatus]
   );
@@ -313,7 +313,7 @@ export const useGraphStudioSelectionPatchers = ({
       if (!selectedEdge) return;
       applyTemporalPropertyToAllFrames('edge', selectedEdge.id, patch);
       const key = getFirstPatchKey(patch);
-      setStatus?.(`Applied edge ${getPropertyLabel(key)} to all frames`);
+      setStatus?.(`Edge ${getPropertyLabel(key)} set on every frame`);
     },
     [applyTemporalPropertyToAllFrames, selectedEdge, setStatus]
   );
@@ -336,7 +336,7 @@ export const useGraphStudioSelectionPatchers = ({
       setStatus?.(
         `Node ${selectedNode.id} ${getPresenceLabel(
           visible
-        )} from Frame ${frameNumber} onward`
+        )} on Frame ${frameNumber} and following`
       );
     },
     [frameNumber, selectedNode, setStatus, setTemporalVisibilityFromFrame]
@@ -366,7 +366,7 @@ export const useGraphStudioSelectionPatchers = ({
       setStatus?.(
         `${selectedNodeIds.length} nodes ${getPresenceLabel(
           visible
-        )} from Frame ${frameNumber} onward`
+        )} on Frame ${frameNumber} and following`
       );
     },
     [
@@ -395,7 +395,7 @@ export const useGraphStudioSelectionPatchers = ({
       setStatus?.(
         `Edge ${selectedEdge.id} ${getPresenceLabel(
           visible
-        )} from Frame ${frameNumber} onward`
+        )} on Frame ${frameNumber} and following`
       );
     },
     [frameNumber, selectedEdge, setStatus, setTemporalVisibilityFromFrame]
