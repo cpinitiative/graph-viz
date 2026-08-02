@@ -760,6 +760,7 @@ export const useGraphStudioImportExport = ({
     beginExportReview,
     endExportReview,
     importProjectFile,
+    applyProjectPayload,
     openExportVideoModal,
     closeExportVideoModal,
     confirmExportVideo,

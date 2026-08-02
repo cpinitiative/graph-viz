@@ -47,6 +47,7 @@ const ModalFrame = ({
   children,
   onClose,
   closeOnBackdrop = false,
+  showCloseButton = true,
 }) => {
   if (!open) return null;
 
@@ -95,7 +96,7 @@ const ModalFrame = ({
               </p>
             )}
           </div>
-          <ModalCloseButton onClick={onClose} />
+          {showCloseButton && <ModalCloseButton onClick={onClose} />}
         </header>
 
         <div

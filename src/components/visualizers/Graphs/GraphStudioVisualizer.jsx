@@ -12,6 +12,7 @@ import {
 import { useGraphStudioCanvasHandlers } from './graphStudio/hooks/useGraphStudioCanvasHandlers';
 import { useGraphStudioGraphModel } from './graphStudio/hooks/useGraphStudioGraphModel';
 import { useGraphStudioImportExport } from './graphStudio/hooks/useGraphStudioImportExport';
+import { useGraphStudioLocalDraft } from './graphStudio/hooks/useGraphStudioLocalDraft';
 import { useGraphStudioPlayback } from './graphStudio/hooks/useGraphStudioPlayback';
 import {
   useGraphStudioSelection,
@@ -40,6 +41,7 @@ import {
   hasOpenModal,
   isEditableKeyboardTarget,
 } from './graphStudio/lib/keyboardTargets';
+import { exportProjectJson } from './graphStudio/lib/projectJson';
 import { getFrameOverrideState } from './graphStudio/lib/temporalGraphState';
 import { cloneJson } from './graphStudio/lib/undoUtils';
 import { useGraphAnimation } from './useGraphAnimation';
@@ -259,15 +261,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     },
     [updateLockCanvas]
   );
-  const { resetUndoHistory } = useGraphStudioUndo({
-    baseGraph,
-    steps,
-    settings: undoSettings,
-    currentFrame,
-    replaceTimeline,
-    restoreSettings: restoreUndoSettings,
-    setStatus,
-  });
+  const { canUndo, canRedo, undoLastAction, redoLastAction, resetUndoHistory } =
+    useGraphStudioUndo({
+      baseGraph,
+      steps,
+      settings: undoSettings,
+      currentFrame,
+      replaceTimeline,
+      restoreSettings: restoreUndoSettings,
+      setStatus,
+    });
   const { isPlaying, stopTimeline, setPlaybackLocked, togglePlayback } =
     useGraphStudioPlayback({
       steps,
@@ -433,6 +436,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     beginExportReview,
     endExportReview,
     importProjectFile,
+    applyProjectPayload,
     openExportVideoModal,
     closeExportVideoModal,
     confirmExportVideo,
@@ -469,6 +473,53 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     resetUndoHistory,
     stopTimeline,
     setPlaybackLocked,
+  });
+  const localDraftProject = useMemo(
+    () =>
+      exportProjectJson({
+        baseGraph,
+        steps,
+        currentFrame,
+        settings: {
+          edgeRouting,
+          snapEnabled,
+          showGrid,
+          captionOverlay: normalizeCaptionOverlay(captionOverlay),
+          customLegend: normalizeCustomLegend(customLegend),
+          lockCanvas,
+          viewState,
+          globalSettings,
+        },
+      }),
+    [
+      baseGraph,
+      captionOverlay,
+      currentFrame,
+      customLegend,
+      edgeRouting,
+      globalSettings,
+      lockCanvas,
+      showGrid,
+      snapEnabled,
+      steps,
+      viewState,
+    ]
+  );
+  const restoreProjectFromDraft = useCallback(
+    project => {
+      applyProjectPayload(project);
+      setStatus('Local draft restored');
+    },
+    [applyProjectPayload, setStatus]
+  );
+  const {
+    pendingDraft,
+    draftStatus,
+    restorePendingDraft,
+    discardPendingDraft,
+  } = useGraphStudioLocalDraft({
+    project: localDraftProject,
+    onRestore: restoreProjectFromDraft,
   });
   useEffect(() => {
     replaceTimeline(seedTimeline.baseGraph, seedTimeline.steps);
@@ -700,7 +751,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       delete next.showCaption;
       return next;
     });
-    setStatus(`Caption visibility reset for Frame ${currentFrame + 1}`);
+    setStatus(
+      `Caption visibility uses the project value on Frame ${currentFrame + 1}`
+    );
   }, [currentFrame, setStatus, updateStep]);
   const applyPreset = presetName => {
     const preset = GRAPH_PRESETS[presetName];
@@ -793,6 +846,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onZoomIn: zoomIn,
       onZoomOut: zoomOut,
       onZoomCommit: setZoomPercent,
+      draftStatus,
+      canUndo,
+      canRedo,
+      onUndo: undoLastAction,
+      onRedo: redoLastAction,
     },
     canvas: {
       graph: computedGraph,
@@ -964,6 +1022,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         customLegend,
         setCustomLegend,
         onClose: () => setIsLegendEditorOpen(false),
+      },
+      localDraft: {
+        draft: pendingDraft,
+        onRestore: restorePendingDraft,
+        onDiscard: discardPendingDraft,
       },
     },
     status,

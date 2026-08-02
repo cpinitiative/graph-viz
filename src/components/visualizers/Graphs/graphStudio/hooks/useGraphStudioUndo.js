@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { hasOpenModal } from '../lib/keyboardTargets';
 import {
   HISTORY_LIMIT,
@@ -16,14 +16,28 @@ export const useGraphStudioUndo = ({
   setStatus,
 }) => {
   const undoHistoryRef = useRef([]);
+  const redoHistoryRef = useRef([]);
   const historyMetaRef = useRef(null);
-  const applyingUndoRef = useRef(false);
+  const applyingHistoryRef = useRef(false);
+  const [historyAvailability, setHistoryAvailability] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
+
+  const syncHistoryAvailability = useCallback(() => {
+    setHistoryAvailability({
+      canUndo: undoHistoryRef.current.length > 0,
+      canRedo: redoHistoryRef.current.length > 0,
+    });
+  }, []);
 
   const resetUndoHistory = useCallback(() => {
     undoHistoryRef.current = [];
+    redoHistoryRef.current = [];
     historyMetaRef.current = null;
-    applyingUndoRef.current = false;
-  }, []);
+    applyingHistoryRef.current = false;
+    syncHistoryAvailability();
+  }, [syncHistoryAvailability]);
 
   useEffect(() => {
     const currentSnapshot = snapshotTimelineState({
@@ -37,9 +51,10 @@ export const useGraphStudioUndo = ({
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
       return;
     }
-    if (applyingUndoRef.current) {
-      applyingUndoRef.current = false;
+    if (applyingHistoryRef.current) {
+      applyingHistoryRef.current = false;
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      syncHistoryAvailability();
       return;
     }
     if (signature !== previous.signature) {
@@ -47,9 +62,11 @@ export const useGraphStudioUndo = ({
       if (undoHistoryRef.current.length > HISTORY_LIMIT) {
         undoHistoryRef.current.shift();
       }
+      redoHistoryRef.current = [];
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      syncHistoryAvailability();
     }
-  }, [baseGraph, settings, steps]);
+  }, [baseGraph, settings, steps, syncHistoryAvailability]);
 
   const undoLastAction = useCallback(() => {
     const previousSnapshot = undoHistoryRef.current.pop();
@@ -57,7 +74,11 @@ export const useGraphStudioUndo = ({
       setStatus('Nothing to undo');
       return;
     }
-    applyingUndoRef.current = true;
+    if (historyMetaRef.current?.snapshot) {
+      redoHistoryRef.current.push(historyMetaRef.current.snapshot);
+    }
+    applyingHistoryRef.current = true;
+    syncHistoryAvailability();
     replaceTimeline(
       previousSnapshot.baseGraph,
       previousSnapshot.steps,
@@ -65,7 +86,35 @@ export const useGraphStudioUndo = ({
     );
     restoreSettings?.(previousSnapshot.settings);
     setStatus('Undid last action');
-  }, [currentFrame, replaceTimeline, restoreSettings, setStatus]);
+  }, [
+    currentFrame,
+    replaceTimeline,
+    restoreSettings,
+    setStatus,
+    syncHistoryAvailability,
+  ]);
+
+  const redoLastAction = useCallback(() => {
+    const nextSnapshot = redoHistoryRef.current.pop();
+    if (!nextSnapshot) {
+      setStatus('Nothing to redo');
+      return;
+    }
+    if (historyMetaRef.current?.snapshot) {
+      undoHistoryRef.current.push(historyMetaRef.current.snapshot);
+    }
+    applyingHistoryRef.current = true;
+    syncHistoryAvailability();
+    replaceTimeline(nextSnapshot.baseGraph, nextSnapshot.steps, currentFrame);
+    restoreSettings?.(nextSnapshot.settings);
+    setStatus('Redid last action');
+  }, [
+    currentFrame,
+    replaceTimeline,
+    restoreSettings,
+    setStatus,
+    syncHistoryAvailability,
+  ]);
 
   useEffect(() => {
     const onKeyDown = event => {
@@ -81,13 +130,18 @@ export const useGraphStudioUndo = ({
         event.stopPropagation();
         return;
       }
-      if (!isUndo) return;
       event.preventDefault();
-      undoLastAction();
+      if (isUndo) undoLastAction();
+      else redoLastAction();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undoLastAction]);
+  }, [redoLastAction, undoLastAction]);
 
-  return { undoLastAction, resetUndoHistory };
+  return {
+    ...historyAvailability,
+    undoLastAction,
+    redoLastAction,
+    resetUndoHistory,
+  };
 };

@@ -4,74 +4,121 @@ const makePresetLegend = (title, entries) => ({
   entries,
 });
 
-const traversalLegendEntries = [
-  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Current edge', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Completed edge', color: '#22C55E' },
-];
-
-const BFS_LEGEND = makePresetLegend('BFS Legend', traversalLegendEntries);
-const DFS_LEGEND = makePresetLegend('DFS Legend', traversalLegendEntries);
-
-const DIJKSTRA_LEGEND = makePresetLegend('Dijkstra Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Current minimum', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Relaxing edge', color: '#3B82F6' },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Final shortest-path edge',
-    color: '#22C55E',
-  },
-  { group: 'Edges', kind: 'edge', label: 'Superseded edge', color: '#64748B' },
+const BFS_LEGEND = makePresetLegend('Breadth-first search', [
+  { group: 'Nodes', kind: 'node', label: 'Front of queue', color: '#3B82F6' },
+  { group: 'Nodes', kind: 'node', label: 'Waiting in queue', color: '#EAB308' },
+  { group: 'Nodes', kind: 'node', label: 'Fully explored', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Discovering edge', color: '#3B82F6' },
+  { group: 'Edges', kind: 'edge', label: 'BFS tree edge', color: '#22C55E' },
 ]);
 
-const DIJKSTRA_SHORTEST_PATHS_LEGEND = makePresetLegend('Dijkstra Legend', [
+const DFS_LEGEND = makePresetLegend('Depth-first search', [
   {
     group: 'Nodes',
     kind: 'node',
-    label: 'Current minimum',
+    label: 'On recursion stack',
     color: '#3B82F6',
   },
-  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
+  { group: 'Nodes', kind: 'node', label: 'Finished', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Exploring edge', color: '#3B82F6' },
+  { group: 'Edges', kind: 'edge', label: 'DFS tree edge', color: '#22C55E' },
+]);
+
+const DIJKSTRA_LEGEND = makePresetLegend('Dijkstra shortest paths', [
+  { group: 'Nodes', kind: 'node', label: 'Current minimum', color: '#3B82F6' },
   {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Relaxed candidate edge',
-    color: '#F59E0B',
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Tentative distance known',
+    color: '#EAB308',
   },
   {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Final shortest-path edge',
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Distance finalized',
     color: '#22C55E',
   },
   {
     group: 'Edges',
     kind: 'edge',
-    label: 'Superseded edge',
+    label: 'Edge being relaxed',
+    color: '#3B82F6',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Shortest-path tree edge',
+    color: '#22C55E',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Replaced candidate',
     color: '#64748B',
   },
 ]);
 
-const KRUSKAL_LEGEND = makePresetLegend('Kruskal MST Legend', [
+const DIJKSTRA_SHORTEST_PATHS_LEGEND = makePresetLegend(
+  'Dijkstra shortest paths',
+  [
+    {
+      group: 'Nodes',
+      kind: 'node',
+      label: 'Current minimum',
+      color: '#3B82F6',
+    },
+    {
+      group: 'Nodes',
+      kind: 'node',
+      label: 'Tentative distance known',
+      color: '#EAB308',
+    },
+    {
+      group: 'Nodes',
+      kind: 'node',
+      label: 'Distance finalized',
+      color: '#22C55E',
+    },
+    {
+      group: 'Edges',
+      kind: 'edge',
+      label: 'Latest relaxation',
+      color: '#F59E0B',
+    },
+    {
+      group: 'Edges',
+      kind: 'edge',
+      label: 'Shortest-path tree edge',
+      color: '#22C55E',
+    },
+    {
+      group: 'Edges',
+      kind: 'edge',
+      label: 'Replaced candidate',
+      color: '#64748B',
+    },
+  ]
+);
+
+const KRUSKAL_LEGEND = makePresetLegend("Kruskal's minimum spanning tree", [
   {
     group: 'Nodes',
     kind: 'node',
-    label: 'Candidate endpoints',
+    label: 'Endpoints being checked',
     color: '#3B82F6',
   },
   {
     group: 'Nodes',
     kind: 'node',
-    label: 'Unprocessed nodes',
+    label: 'Separate DSU components',
     color: '#EAB308',
   },
-  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#22C55E' },
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Connected by the MST',
+    color: '#22C55E',
+  },
   {
     group: 'Edges',
     kind: 'edge',
@@ -81,55 +128,92 @@ const KRUSKAL_LEGEND = makePresetLegend('Kruskal MST Legend', [
   {
     group: 'Edges',
     kind: 'edge',
-    label: 'Rejected cycle edge',
+    label: 'Skipped (would form a cycle)',
     color: '#DC2626',
   },
-  { group: 'Edges', kind: 'edge', label: 'Unprocessed edge', color: '#64748B' },
-]);
-
-const TOPOLOGICAL_SORT_LEGEND = makePresetLegend('Topological Sort Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Ready node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Processing node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Output node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Removing edge', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Processed edge', color: '#22C55E' },
-]);
-
-const DSU_LEGEND = makePresetLegend('DSU Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Component A', color: '#BFDBFE' },
-  { group: 'Nodes', kind: 'node', label: 'Component B', color: '#FED7AA' },
-  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#BBF7D0' },
-  { group: 'Edges', kind: 'edge', label: 'Accepted union', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Rejected cycle', color: '#DC2626' },
-]);
-
-const CONNECTED_COMPONENTS_LEGEND = makePresetLegend(
-  'Connected Components Legend',
-  [
-    { group: 'Nodes', kind: 'node', label: 'Component 1', color: '#BFDBFE' },
-    { group: 'Nodes', kind: 'node', label: 'Component 2', color: '#FED7AA' },
-    { group: 'Nodes', kind: 'node', label: 'Component 3', color: '#DDD6FE' },
-    { group: 'Nodes', kind: 'node', label: 'Frontier node', color: '#EAB308' },
-    {
-      group: 'Edges',
-      kind: 'edge',
-      label: 'Traversing edge',
-      color: '#3B82F6',
-    },
-    { group: 'Edges', kind: 'edge', label: 'Component edge', color: '#22C55E' },
-  ]
-);
-
-const MULTIGRAPH_LEGEND = makePresetLegend('Multi-Edge / Loop Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Candidate path', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Selected path', color: '#22C55E' },
   {
     group: 'Edges',
     kind: 'edge',
-    label: 'Non-selected path',
+    label: 'Not considered yet',
+    color: '#64748B',
+  },
+]);
+
+const TOPOLOGICAL_SORT_LEGEND = makePresetLegend("Kahn's topological sort", [
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'In zero-indegree queue',
+    color: '#EAB308',
+  },
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Removing from queue',
+    color: '#3B82F6',
+  },
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Added to output order',
+    color: '#22C55E',
+  },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Removing outgoing edge',
+    color: '#3B82F6',
+  },
+  { group: 'Edges', kind: 'edge', label: 'Removed edge', color: '#22C55E' },
+]);
+
+const DSU_LEGEND = makePresetLegend('Disjoint set union', [
+  { group: 'Nodes', kind: 'node', label: 'First component', color: '#BFDBFE' },
+  { group: 'Nodes', kind: 'node', label: 'Second component', color: '#FED7AA' },
+  { group: 'Nodes', kind: 'node', label: 'Joined component', color: '#BBF7D0' },
+  { group: 'Edges', kind: 'edge', label: 'Union accepted', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Union skipped: same set',
+    color: '#DC2626',
+  },
+]);
+
+const CONNECTED_COMPONENTS_LEGEND = makePresetLegend('Connected components', [
+  { group: 'Nodes', kind: 'node', label: 'First component', color: '#BFDBFE' },
+  { group: 'Nodes', kind: 'node', label: 'Second component', color: '#FED7AA' },
+  { group: 'Nodes', kind: 'node', label: 'Third component', color: '#DDD6FE' },
+  { group: 'Nodes', kind: 'node', label: 'BFS frontier', color: '#EAB308' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Discovering edge',
+    color: '#3B82F6',
+  },
+  { group: 'Edges', kind: 'edge', label: 'Explored edge', color: '#22C55E' },
+]);
+
+const MULTIGRAPH_LEGEND = makePresetLegend('Multigraph features', [
+  { group: 'Nodes', kind: 'node', label: 'Current vertex', color: '#3B82F6' },
+  {
+    group: 'Nodes',
+    kind: 'node',
+    label: 'Discovered vertex',
+    color: '#EAB308',
+  },
+  { group: 'Nodes', kind: 'node', label: 'Finished vertex', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Edge being examined',
+    color: '#3B82F6',
+  },
+  { group: 'Edges', kind: 'edge', label: 'Chosen edge', color: '#22C55E' },
+  {
+    group: 'Edges',
+    kind: 'edge',
+    label: 'Skipped parallel edge',
     color: '#64748B',
   },
 ]);
@@ -157,14 +241,14 @@ export const GRAPH_PRESETS = {
     steps: [
       {
         id: 's0',
-        description: 'Start BFS at A',
+        description: 'Start BFS at A: mark it active at the front of the queue',
         durationMs: 600,
         nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
         edgeOverrides: {},
       },
       {
         id: 's1',
-        description: 'Queue B and C',
+        description: 'Queue B and C after exploring both outgoing edges from A',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -175,7 +259,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's2',
-        description: 'Visit B, Queue D and E',
+        description: 'Remove B from the queue: discover D and E through B',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -193,7 +277,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's3',
-        description: 'Visit C, Queue F',
+        description: 'Remove C from the queue: discover F while D and E wait',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -213,7 +297,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's4',
-        description: 'Visit D, E, F',
+        description: 'Finish BFS: process D, E, and F in queue order',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -255,14 +339,14 @@ export const GRAPH_PRESETS = {
     steps: [
       {
         id: 's0',
-        description: 'Start DFS at A',
+        description: 'Start DFS at A and place A on the recursion stack',
         durationMs: 600,
         nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
         edgeOverrides: {},
       },
       {
         id: 's1',
-        description: 'Explore B',
+        description: 'Follow A→B and push B onto the recursion stack',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -272,7 +356,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's2',
-        description: 'Explore D',
+        description: 'Follow B→D; D has no unvisited outgoing neighbors',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -283,7 +367,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's3',
-        description: 'Backtrack from D',
+        description: 'Finish D and backtrack to B',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -294,7 +378,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's4',
-        description: 'Explore E',
+        description: 'Continue from B to E, its next unvisited neighbor',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -310,7 +394,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's5',
-        description: 'Backtrack from E, B',
+        description: 'Finish E, then finish B and backtrack to A',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -326,7 +410,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's6',
-        description: 'Explore C',
+        description: 'Continue from A to C and push C onto the stack',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -344,7 +428,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's7',
-        description: 'Explore F',
+        description: 'Follow C→F; F is the final unvisited node',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },
@@ -364,7 +448,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's8',
-        description: 'Finish DFS',
+        description: 'Finish F, C, and A; the DFS traversal is complete',
         durationMs: 600,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -439,14 +523,15 @@ export const GRAPH_PRESETS = {
     steps: [
       {
         id: 's0',
-        description: 'Init distances: A=0, others=∞',
+        description: 'Initialize distances: A = 0 and every other node = ∞',
         durationMs: 800,
         nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
         edgeOverrides: {},
       },
       {
         id: 's1',
-        description: 'Relax A→B (4), A→C (1)',
+        description:
+          'Relax edges from A: set distance[B] = 4 and distance[C] = 1',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -457,7 +542,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's2',
-        description: 'Pick C (min dist 1), Relax C→B (1+2=3 < 4)',
+        description: 'Finalize C at 1; C→B improves distance[B] from 4 to 3',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -472,7 +557,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's3',
-        description: 'Relax C→D (1+5=6)',
+        description: 'Relax C→D and set the first tentative distance[D] = 6',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -488,7 +573,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's4',
-        description: 'Pick B (min dist 3), Relax B→D (3+1=4 < 6)',
+        description: 'Finalize B at 3; B→D improves distance[D] from 6 to 4',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -505,7 +590,8 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's5',
-        description: 'Pick D (min dist 4), Done',
+        description:
+          'Finalize D at 4; all reachable shortest distances are complete',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -1523,14 +1609,16 @@ export const GRAPH_PRESETS = {
     steps: [
       {
         id: 's0',
-        description: 'Start at A',
+        description:
+          'Start at A before examining its three parallel edges to B',
         durationMs: 800,
         nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
         edgeOverrides: {},
       },
       {
         id: 's1',
-        description: 'Explore multiple paths to B',
+        description:
+          'Examine all three distinct A→B edges without collapsing them',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -1544,7 +1632,8 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's2',
-        description: 'Select Path 2 as optimal',
+        description:
+          'Choose Path 2; keep the other parallel edges visible but skipped',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -1558,7 +1647,8 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's3',
-        description: 'Process self-loop on B',
+        description:
+          'Examine B’s self-loop, whose source and target are the same node',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -1568,7 +1658,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's4',
-        description: 'Move to C',
+        description: 'Continue from B to C after processing the self-loop',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },
@@ -1583,7 +1673,7 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 's5',
-        description: 'Return to A (Cycle complete)',
+        description: 'Follow C→A to close the directed cycle',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'active', color: '#3b82f6' },

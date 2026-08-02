@@ -17,6 +17,7 @@ import ExportModal from './modals/ExportModal';
 import ExportVideoModal from './modals/ExportVideoModal';
 import ImportModal from './modals/ImportModal';
 import LegendModal from './modals/LegendModal';
+import LocalDraftRecoveryModal from './modals/LocalDraftRecoveryModal';
 import ParserModal from './modals/ParserModal';
 import ProjectJsonPasteModal from './modals/ProjectJsonPasteModal';
 import ScriptModal from './modals/ScriptModal';
@@ -29,7 +30,7 @@ const SIDE_PANEL_CLASS =
   'graphstudio-side-panel min-h-0 bg-[#F8F9FA] dark:bg-[#111827]';
 const STATUS_ERROR_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 const STATUS_SUCCESS_PATTERN =
-  /\b(parsed|imported|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
+  /\b(parsed|imported|restored|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
 const MODE_LABELS = {
   select: 'Select',
   pan: 'Pan',
@@ -291,6 +292,11 @@ const ModalStack = ({
       graph={exportCapture?.graph}
       step={exportCapture?.step}
       canvas={exportCapture?.canvas ?? canvas}
+    />
+    <LocalDraftRecoveryModal
+      draft={modals.localDraft?.draft}
+      onRestore={modals.localDraft?.onRestore}
+      onDiscard={modals.localDraft?.onDiscard}
     />
     <ImportModal
       open={isImportMenuOpen}
