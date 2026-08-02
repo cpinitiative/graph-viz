@@ -18,7 +18,9 @@ export const useGraphStudioUndo = ({
   const undoHistoryRef = useRef([]);
   const redoHistoryRef = useRef([]);
   const historyMetaRef = useRef(null);
+  const historyTransactionRef = useRef(null);
   const applyingHistoryRef = useRef(false);
+  const [transactionRevision, setTransactionRevision] = useState(0);
   const [historyAvailability, setHistoryAvailability] = useState({
     canUndo: false,
     canRedo: false,
@@ -35,9 +37,31 @@ export const useGraphStudioUndo = ({
     undoHistoryRef.current = [];
     redoHistoryRef.current = [];
     historyMetaRef.current = null;
+    historyTransactionRef.current = null;
     applyingHistoryRef.current = false;
     syncHistoryAvailability();
   }, [syncHistoryAvailability]);
+
+  const beginHistoryTransaction = useCallback(() => {
+    if (
+      historyTransactionRef.current ||
+      applyingHistoryRef.current ||
+      !historyMetaRef.current
+    ) {
+      return;
+    }
+    historyTransactionRef.current = {
+      startSignature: historyMetaRef.current.signature,
+      startSnapshot: historyMetaRef.current.snapshot,
+      ended: false,
+    };
+  }, []);
+
+  const endHistoryTransaction = useCallback(() => {
+    if (!historyTransactionRef.current) return;
+    historyTransactionRef.current.ended = true;
+    setTransactionRevision(revision => revision + 1);
+  }, []);
 
   useEffect(() => {
     const currentSnapshot = snapshotTimelineState({
@@ -49,6 +73,22 @@ export const useGraphStudioUndo = ({
     const previous = historyMetaRef.current;
     if (!previous) {
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      return;
+    }
+    const transaction = historyTransactionRef.current;
+    if (transaction) {
+      historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      if (transaction.ended) {
+        historyTransactionRef.current = null;
+        if (signature !== transaction.startSignature) {
+          undoHistoryRef.current.push(transaction.startSnapshot);
+          if (undoHistoryRef.current.length > HISTORY_LIMIT) {
+            undoHistoryRef.current.shift();
+          }
+          redoHistoryRef.current = [];
+        }
+        syncHistoryAvailability();
+      }
       return;
     }
     if (applyingHistoryRef.current) {
@@ -66,7 +106,13 @@ export const useGraphStudioUndo = ({
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
       syncHistoryAvailability();
     }
-  }, [baseGraph, settings, steps, syncHistoryAvailability]);
+  }, [
+    baseGraph,
+    settings,
+    steps,
+    syncHistoryAvailability,
+    transactionRevision,
+  ]);
 
   const undoLastAction = useCallback(() => {
     const previousSnapshot = undoHistoryRef.current.pop();
@@ -143,5 +189,7 @@ export const useGraphStudioUndo = ({
     undoLastAction,
     redoLastAction,
     resetUndoHistory,
+    beginHistoryTransaction,
+    endHistoryTransaction,
   };
 };

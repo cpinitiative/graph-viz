@@ -518,7 +518,7 @@ const LeftSidebar = ({
           >
             <span>Undo</span>
             <span aria-hidden="true" className="text-sm opacity-60">
-              ↶
+              ←
             </span>
           </button>
           <button
@@ -530,7 +530,7 @@ const LeftSidebar = ({
           >
             <span>Redo</span>
             <span aria-hidden="true" className="text-sm opacity-60">
-              ↷
+              →
             </span>
           </button>
         </div>

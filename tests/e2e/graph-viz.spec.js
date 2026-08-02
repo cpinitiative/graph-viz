@@ -1892,6 +1892,50 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('treats one snapped node drag as one undoable action', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByRole('checkbox', { name: 'Snap to Grid' })
+    ).toBeChecked();
+
+    const undoButton = leftSidebar(page).getByRole('button', { name: 'Undo' });
+    const redoButton = leftSidebar(page).getByRole('button', { name: 'Redo' });
+    await expect(undoButton).toContainText('←');
+    await expect(redoButton).toContainText('→');
+    await expect(undoButton).toBeDisabled();
+    await expect(redoButton).toBeDisabled();
+
+    const beforeDrag = await getNodePositionSnapshot(page);
+    await dragFirstGraphNode(page);
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .not.toBe(JSON.stringify(beforeDrag));
+    const afterDrag = await getNodePositionSnapshot(page);
+
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
+    await undoButton.click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .toBe(JSON.stringify(beforeDrag));
+    await expect(undoButton).toBeDisabled();
+    await expect(redoButton).toBeEnabled();
+
+    await redoButton.click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .toBe(JSON.stringify(afterDrag));
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
+
+    expect(errors).toEqual([]);
+  });
+
   test('stops playback before timeline mutations and invalidates old ticks', async ({
     page,
   }) => {

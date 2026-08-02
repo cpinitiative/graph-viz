@@ -261,16 +261,23 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     },
     [updateLockCanvas]
   );
-  const { canUndo, canRedo, undoLastAction, redoLastAction, resetUndoHistory } =
-    useGraphStudioUndo({
-      baseGraph,
-      steps,
-      settings: undoSettings,
-      currentFrame,
-      replaceTimeline,
-      restoreSettings: restoreUndoSettings,
-      setStatus,
-    });
+  const {
+    canUndo,
+    canRedo,
+    undoLastAction,
+    redoLastAction,
+    resetUndoHistory,
+    beginHistoryTransaction,
+    endHistoryTransaction,
+  } = useGraphStudioUndo({
+    baseGraph,
+    steps,
+    settings: undoSettings,
+    currentFrame,
+    replaceTimeline,
+    restoreSettings: restoreUndoSettings,
+    setStatus,
+  });
   const { isPlaying, stopTimeline, setPlaybackLocked, togglePlayback } =
     useGraphStudioPlayback({
       steps,
@@ -389,6 +396,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedObject,
     setSelectedNodeIds,
     clearSelection,
+    beginHistoryTransaction,
+    endHistoryTransaction,
   });
   const previousFrameRef = useRef(currentFrame);
   useEffect(() => {
