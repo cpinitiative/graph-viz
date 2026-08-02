@@ -111,14 +111,20 @@ export const computeGraphAtStep = (baseGraph, step) => {
 export const useGraphAnimation = (
   initialBaseGraph,
   initialSteps = [],
-  { onBeforeTimelineMutation } = {}
+  { initialFrame = 0, onBeforeTimelineMutation } = {}
 ) => {
   const [baseGraph, setBaseGraph] = useState(initialBaseGraph);
   const [steps, setSteps] = useState(() => {
     const normalized = normalizeAnimationSteps(initialSteps);
     return normalized.length ? normalized : [normalizeAnimationStep({}, 0)];
   });
-  const [currentFrame, setCurrentFrame] = useState(0);
+  const [currentFrame, setCurrentFrame] = useState(() => {
+    const numericFrame = Number(initialFrame);
+    return clampFrame(
+      Number.isFinite(numericFrame) ? Math.trunc(numericFrame) : 0,
+      initialSteps.length || 1
+    );
+  });
   const frameCount = steps.length;
   const computedGraph = useMemo(
     () => computeGraphAtStep(baseGraph, steps[currentFrame] ?? {}),

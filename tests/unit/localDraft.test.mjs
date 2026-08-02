@@ -104,7 +104,7 @@ test('local draft can be cleared explicitly', () => {
   assert.equal(storage.getItem(LOCAL_DRAFT_STORAGE_KEY), null);
 });
 
-test('local draft clear failures are surfaced to the recovery UI', () => {
+test('local draft clear failures remain observable during corrupt-data cleanup', () => {
   const storage = {
     removeItem: () => {
       throw new Error('Storage is blocked');

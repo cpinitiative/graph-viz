@@ -14,6 +14,7 @@ const LAYOUT_OPTIONS = [
   ['force', 'Force'],
 ];
 const PRESET_OPTIONS = [
+  ['blank', 'Blank Project'],
   ['bfs', 'Breadth-First Search (BFS)'],
   ['dfs', 'Depth-First Search (DFS)'],
   ['topological-sort', 'Topological Sort'],
@@ -70,8 +71,8 @@ const formatSavedTime = value => {
 const LocalDraftStatus = ({ status = { state: 'idle' } }) => {
   const isError = status.state === 'error';
   const label =
-    status.state === 'pending'
-      ? 'Recovery draft found'
+    status.state === 'restored'
+      ? `Restored locally${formatSavedTime(status.savedAt) ? ` · ${formatSavedTime(status.savedAt)}` : ''}`
       : status.state === 'saving'
         ? 'Saving local draft…'
         : status.state === 'saved'
@@ -553,7 +554,8 @@ const LeftSidebar = ({
           ))}
         </NativeSelect>
         <p className="px-1 text-[10px] font-medium leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-          Worked examples include explanatory frames and a teaching legend.
+          Start blank, or load a worked example with explanatory frames and a
+          teaching legend.
         </p>
       </SidebarSection>
 

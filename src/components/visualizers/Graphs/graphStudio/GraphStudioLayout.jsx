@@ -17,7 +17,6 @@ import ExportModal from './modals/ExportModal';
 import ExportVideoModal from './modals/ExportVideoModal';
 import ImportModal from './modals/ImportModal';
 import LegendModal from './modals/LegendModal';
-import LocalDraftRecoveryModal from './modals/LocalDraftRecoveryModal';
 import ParserModal from './modals/ParserModal';
 import ProjectJsonPasteModal from './modals/ProjectJsonPasteModal';
 import ScriptModal from './modals/ScriptModal';
@@ -292,11 +291,6 @@ const ModalStack = ({
       graph={exportCapture?.graph}
       step={exportCapture?.step}
       canvas={exportCapture?.canvas ?? canvas}
-    />
-    <LocalDraftRecoveryModal
-      draft={modals.localDraft?.draft}
-      onRestore={modals.localDraft?.onRestore}
-      onDiscard={modals.localDraft?.onDiscard}
     />
     <ImportModal
       open={isImportMenuOpen}

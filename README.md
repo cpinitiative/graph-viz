@@ -21,7 +21,7 @@ primary support target.
 
 ## Author Workflow
 
-1. Load an educational preset or build a graph from scratch.
+1. Load an educational preset or choose **Blank Project** to start from scratch.
 2. Edit labels, positions, weights, edge direction, colors, and styles.
 3. Add frames and describe each meaningful step of the algorithm.
 4. Adjust frame-specific appearance and visibility to show what changes.
@@ -57,8 +57,11 @@ fields retain their normal browser history while they are being edited.
 
 ## Saving and Recovery
 
-Graph Viz keeps a recovery draft in this browser as you edit. If the page closes
-or reloads unexpectedly, the editor can offer that draft when you return.
+Graph Viz keeps a recovery draft in this browser as you edit and restores it
+automatically when you return. The graph, frames, current frame, legend, and
+editor settings come back; the canvas is fit to the current workspace instead of
+replaying pan and zoom coordinates from an older window size. Choose **Blank
+Project** when you intentionally want to replace the recovered work.
 
 A browser draft is a safety net, not a durable save:
 

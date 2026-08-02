@@ -194,7 +194,7 @@ const CONNECTED_COMPONENTS_LEGEND = makePresetLegend('Connected components', [
   { group: 'Edges', kind: 'edge', label: 'Explored edge', color: '#22C55E' },
 ]);
 
-const MULTIGRAPH_LEGEND = makePresetLegend('Multigraph features', [
+const MULTIGRAPH_LEGEND = makePresetLegend('Parallel edges and self-loops', [
   { group: 'Nodes', kind: 'node', label: 'Current vertex', color: '#3B82F6' },
   {
     group: 'Nodes',
@@ -209,7 +209,7 @@ const MULTIGRAPH_LEGEND = makePresetLegend('Multigraph features', [
     label: 'Edge being examined',
     color: '#3B82F6',
   },
-  { group: 'Edges', kind: 'edge', label: 'Chosen edge', color: '#22C55E' },
+  { group: 'Edges', kind: 'edge', label: 'Processed edge', color: '#22C55E' },
   {
     group: 'Edges',
     kind: 'edge',
@@ -491,7 +491,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 2,
           directed: true,
-          label: '1',
+          label: '#1',
           visible: true,
         },
         {
@@ -499,7 +499,7 @@ export const GRAPH_PRESETS = {
           from: 2,
           to: 1,
           directed: true,
-          label: '2',
+          label: '#2',
           visible: true,
         },
         {
@@ -642,7 +642,7 @@ export const GRAPH_PRESETS = {
           from: 2,
           to: 4,
           directed: false,
-          label: '3',
+          label: '#3',
           color: '#64748b',
           visible: true,
         },
@@ -651,7 +651,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 2,
           directed: false,
-          label: '4',
+          label: '#4',
           color: '#64748b',
           visible: true,
         },
@@ -660,7 +660,7 @@ export const GRAPH_PRESETS = {
           from: 3,
           to: 4,
           directed: false,
-          label: '5',
+          label: '#5',
           color: '#64748b',
           visible: true,
         },
@@ -669,7 +669,7 @@ export const GRAPH_PRESETS = {
           from: 4,
           to: 5,
           directed: false,
-          label: '6',
+          label: '#6',
           color: '#64748b',
           visible: true,
         },
@@ -1250,7 +1250,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 2,
           directed: false,
-          label: 'cycle',
+          label: '6',
           visible: true,
         },
       ],
@@ -1272,7 +1272,8 @@ export const GRAPH_PRESETS = {
       },
       {
         id: 'dsu-s1',
-        description: 'find(0) and find(1) differ, so union accepts edge 0-1',
+        description:
+          'Operation #1: find(0) and find(1) differ, so union accepts edge 0-1',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#bfdbfe' },
@@ -1287,7 +1288,7 @@ export const GRAPH_PRESETS = {
       {
         id: 'dsu-s2',
         description:
-          'find(1) and find(2) differ, so union merges 2 into component {0,1}',
+          'Operation #2: find(1) and find(2) differ, so union merges 2 into component {0,1}',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#bfdbfe' },
@@ -1305,7 +1306,7 @@ export const GRAPH_PRESETS = {
       {
         id: 'dsu-s3',
         description:
-          'find(3) and find(4) differ, so union starts a second component',
+          'Operation #3: find(3) and find(4) differ, so union starts a second component',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#bfdbfe' },
@@ -1324,7 +1325,7 @@ export const GRAPH_PRESETS = {
       {
         id: 'dsu-s4',
         description:
-          'find(4) and find(5) differ, so union adds 5 to the second component',
+          'Operation #4: find(4) and find(5) differ, so union adds 5 to the second component',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#bfdbfe' },
@@ -1344,7 +1345,7 @@ export const GRAPH_PRESETS = {
       {
         id: 'dsu-s5',
         description:
-          'find(2) and find(5) differ, so union merges the two components',
+          'Operation #5: find(2) and find(5) differ, so union merges the two components',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#bbf7d0' },
@@ -1365,7 +1366,7 @@ export const GRAPH_PRESETS = {
       {
         id: 'dsu-s6',
         description:
-          'find(0) equals find(2), so edge 0-2 is rejected as a cycle',
+          'Operation #6: find(0) equals find(2), so edge 0-2 is rejected as a cycle',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'active', color: '#bbf7d0' },
@@ -1561,7 +1562,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 1,
           directed: true,
-          label: 'Path 1',
+          label: '4',
           visible: true,
         },
         {
@@ -1569,7 +1570,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 1,
           directed: true,
-          label: 'Path 2',
+          label: '2',
           visible: true,
         },
         {
@@ -1577,7 +1578,7 @@ export const GRAPH_PRESETS = {
           from: 0,
           to: 1,
           directed: true,
-          label: 'Path 3',
+          label: '7',
           visible: true,
         },
         {
@@ -1585,7 +1586,7 @@ export const GRAPH_PRESETS = {
           from: 1,
           to: 1,
           directed: true,
-          label: 'Loop',
+          label: '',
           visible: true,
         },
         {
@@ -1593,7 +1594,7 @@ export const GRAPH_PRESETS = {
           from: 1,
           to: 2,
           directed: true,
-          label: 'To C',
+          label: '3',
           visible: true,
         },
         {
@@ -1601,7 +1602,7 @@ export const GRAPH_PRESETS = {
           from: 2,
           to: 0,
           directed: true,
-          label: 'Back to A',
+          label: '5',
           visible: true,
         },
       ],
@@ -1633,7 +1634,7 @@ export const GRAPH_PRESETS = {
       {
         id: 's2',
         description:
-          'Choose Path 2; keep the other parallel edges visible but skipped',
+          'Choose the weight-2 edge; keep the other parallel edges visible but skipped',
         durationMs: 800,
         nodeOverrides: {
           0: { status: 'visited', color: '#22c55e' },

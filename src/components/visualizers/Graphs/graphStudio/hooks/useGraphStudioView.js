@@ -5,21 +5,19 @@ import { createInitialViewState } from '../lib/viewStateUtils';
 const DEFAULT_VIEWPORT_WIDTH = 1280;
 const DEFAULT_VIEWPORT_HEIGHT = 760;
 
-export const useGraphStudioView = ({ initialNodes = [] }) => {
+export const useGraphStudioView = ({
+  initialNodes = [],
+  initialLockCanvas = false,
+}) => {
   const [viewState, setViewState] = useState(() =>
     createInitialViewState(initialNodes)
   );
   const [viewResetCounter, setViewResetCounter] = useState(0);
-  const [lockCanvas, setLockCanvas] = useState(false);
+  const [lockCanvas, setLockCanvas] = useState(Boolean(initialLockCanvas));
   const viewportSizeRef = useRef({
     width: DEFAULT_VIEWPORT_WIDTH,
     height: DEFAULT_VIEWPORT_HEIGHT,
   });
-
-  const setViewFromNodes = useCallback(nodes => {
-    const { width, height } = viewportSizeRef.current;
-    setViewState(createInitialViewState(nodes, width, height));
-  }, []);
 
   const setZoomViewportSize = useCallback(size => {
     const width = Number(size?.width);
@@ -96,7 +94,6 @@ export const useGraphStudioView = ({ initialNodes = [] }) => {
     viewResetCounter,
     lockCanvas,
     setLockCanvas,
-    setViewFromNodes,
     setZoomViewportSize,
     getZoomViewportSize,
     bumpViewReset,

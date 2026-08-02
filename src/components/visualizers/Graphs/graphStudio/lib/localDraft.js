@@ -65,6 +65,19 @@ export const readLocalDraft = storage => {
   }
 };
 
+export const readBrowserLocalDraft = () => {
+  let storage = null;
+  try {
+    storage = typeof window === 'undefined' ? null : window.localStorage;
+  } catch (error) {
+    return {
+      storage: null,
+      result: { draft: null, error },
+    };
+  }
+  return { storage, result: readLocalDraft(storage) };
+};
+
 export const writeLocalDraft = ({ storage, project, savedAt = new Date() }) => {
   if (!storage?.setItem) throw new Error('Browser storage is unavailable');
   const envelope = createLocalDraftEnvelope({ project, savedAt });

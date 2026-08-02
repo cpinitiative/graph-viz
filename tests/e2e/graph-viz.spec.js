@@ -529,7 +529,8 @@ const educationalPresets = [
   {
     value: 'disjoint-set-union',
     firstDescription: 'Initialize DSU: each node is its own component',
-    secondDescription: 'find(0) and find(1) differ, so union accepts edge 0-1',
+    secondDescription:
+      'Operation #1: find(0) and find(1) differ, so union accepts edge 0-1',
   },
   {
     value: 'connected-components',
@@ -621,8 +622,8 @@ const presetLegends = [
   },
   {
     value: 'multigraph',
-    title: 'Multigraph features',
-    entries: ['Edge being examined', 'Chosen edge', 'Skipped parallel edge'],
+    title: 'Parallel edges and self-loops',
+    entries: ['Edge being examined', 'Processed edge', 'Skipped parallel edge'],
   },
 ];
 
@@ -687,6 +688,11 @@ const recoveryDraftEnvelope = {
   savedAt: '2026-08-01T12:34:56.000Z',
   project: {
     ...pastedProject,
+    settings: {
+      ...pastedProject.settings,
+      lockCanvas: false,
+      viewState: { zoom: 2.6, x: -1800, y: -1400 },
+    },
     graph: {
       ...pastedProject.graph,
       nodes: pastedProject.graph.nodes.map((node, index) =>
@@ -695,9 +701,18 @@ const recoveryDraftEnvelope = {
     },
     timeline: {
       ...pastedProject.timeline,
-      steps: pastedProject.timeline.steps.map((step, index) =>
-        index === 0 ? { ...step, description: 'Recovered browser draft' } : step
-      ),
+      currentFrame: 1,
+      steps: [
+        {
+          ...pastedProject.timeline.steps[0],
+          description: 'Earlier recovered frame',
+        },
+        {
+          ...pastedProject.timeline.steps[0],
+          id: 'step-1',
+          description: 'Recovered browser draft',
+        },
+      ],
     },
   },
 };
@@ -766,7 +781,7 @@ test.describe('Graph Studio desktop smoke', () => {
     expect(errors).toEqual([]);
   });
 
-  test('recovers, autosaves, and discards a validated browser draft', async ({
+  test('automatically restores and autosaves a validated browser draft', async ({
     page,
   }) => {
     const errors = watchForUnexpectedErrors(page);
@@ -780,13 +795,35 @@ test.describe('Graph Studio desktop smoke', () => {
     );
 
     await page.goto('/');
-    const recoveryModal = page.getByTestId('local-draft-recovery-modal');
-    await expect(recoveryModal).toBeVisible();
+    await expect(page.getByTestId('local-draft-recovery-modal')).toHaveCount(0);
+    await expect(page.getByText('Local draft restored')).toBeVisible();
     await expect(
-      recoveryModal.getByRole('heading', { name: 'Recover local draft' })
-    ).toBeVisible();
-    await expect(recoveryModal.getByText('2 nodes')).toBeVisible();
-    await expect(recoveryModal.getByText('1 frame')).toBeVisible();
+      graphCanvas(page).locator('[data-node-label-id="A"]')
+    ).toContainText('Recovered Start');
+    const description = page.getByPlaceholder(
+      'Describe what happens on this frame...'
+    );
+    await expect(description).toHaveValue('Recovered browser draft');
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Restored locally'
+    );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+    const recoveredZoom = Number(
+      await graphCanvas(page).getAttribute('data-view-zoom')
+    );
+    expect(recoveredZoom).toBeGreaterThanOrEqual(0.8);
+    expect(recoveredZoom).toBeLessThanOrEqual(1);
 
     await page.waitForTimeout(1000);
     await expect
@@ -798,20 +835,6 @@ test.describe('Graph Studio desktop smoke', () => {
       )
       .toBe(recoveryDraftEnvelope.savedAt);
 
-    await recoveryModal.getByRole('button', { name: 'Restore draft' }).click();
-    await expect(recoveryModal).toBeHidden();
-    await expect(page.getByText('Local draft restored')).toBeVisible();
-    await expect(
-      graphCanvas(page).locator('[data-node-label-id="A"]')
-    ).toContainText('Recovered Start');
-    const description = page.getByPlaceholder(
-      'Describe what happens on this frame...'
-    );
-    await expect(description).toHaveValue('Recovered browser draft');
-    await expect(page.getByTestId('local-draft-status')).toContainText(
-      'Saved locally'
-    );
-
     await description.fill('Recovered and autosaved');
     await expect(page.getByTestId('local-draft-status')).toContainText(
       'Saving local draft'
@@ -821,30 +844,54 @@ test.describe('Graph Studio desktop smoke', () => {
         page.evaluate(
           key =>
             JSON.parse(window.localStorage.getItem(key)).project.timeline
-              .steps[0].description,
+              .steps[1].description,
           localDraftStorageKey
         )
       )
       .toBe('Recovered and autosaved');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key =>
+            Object.prototype.hasOwnProperty.call(
+              JSON.parse(window.localStorage.getItem(key)).project.settings,
+              'viewState'
+            ),
+          localDraftStorageKey
+        )
+      )
+      .toBe(false);
     await expect(page.getByTestId('local-draft-status')).toContainText(
       'Saved locally'
     );
 
     await page.reload();
-    await expect(recoveryModal).toBeVisible();
-    await recoveryModal.getByRole('button', { name: 'Start fresh' }).click();
-    await expect(recoveryModal).toBeHidden();
+    await expect(description).toHaveValue('Recovered and autosaved');
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Restored locally'
+    );
+
+    await choosePreset(page, 'blank');
     await expect(
-      graphCanvas(page).locator('[data-node-label-id="A"]')
-    ).toHaveCount(0);
+      page.getByPlaceholder('Describe what happens on this frame...')
+    ).toHaveValue('');
+    await expect(graphNodeCircles(page)).toHaveCount(0);
     await expect
       .poll(() =>
         page.evaluate(
-          key => window.localStorage.getItem(key),
+          key =>
+            JSON.parse(window.localStorage.getItem(key)).project.graph.nodes
+              .length,
           localDraftStorageKey
         )
       )
-      .toBeNull();
+      .toBe(0);
+
+    await page.reload();
+    await expect(graphNodeCircles(page)).toHaveCount(0);
+    await expect(
+      page.getByPlaceholder('Describe what happens on this frame...')
+    ).toHaveValue('');
 
     await choosePreset(page, 'bfs');
     await expect
@@ -2528,6 +2575,59 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('fits every loaded preset once and keeps the viewport stable', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    const presetValues = [
+      'bfs',
+      'dfs',
+      'topological-sort',
+      'disjoint-set-union',
+      'connected-components',
+      'kruskal-mst',
+      'dijkstra',
+      'dijkstra-shortest-paths',
+      'multigraph',
+    ];
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    for (const presetValue of presetValues) {
+      await commitInputValue(page.getByLabel('Zoom percent'), 250);
+      await choosePreset(page, presetValue);
+      await expect
+        .poll(async () => {
+          const bounds = await getRenderedContentViewportBounds(page);
+          return Boolean(
+            bounds &&
+            bounds.left >= 20 &&
+            bounds.top >= 20 &&
+            bounds.right <= bounds.viewportWidth - 20 &&
+            bounds.bottom <= bounds.viewportHeight - 20
+          );
+        })
+        .toBe(true);
+
+      const fittedView = await getCanvasViewSnapshot(page);
+      expect(Number(fittedView.zoom)).toBeLessThanOrEqual(1);
+      await page.waitForTimeout(300);
+      const settledView = await getCanvasViewSnapshot(page);
+      expect(Number(settledView.x)).toBeCloseTo(Number(fittedView.x), 5);
+      expect(Number(settledView.y)).toBeCloseTo(Number(fittedView.y), 5);
+      expect(Number(settledView.zoom)).toBeCloseTo(Number(fittedView.zoom), 5);
+    }
+
+    await expect(graphCanvas(page).getByText('Path 1')).toHaveCount(0);
+    await expect(graphCanvas(page).getByText('Loop')).toHaveCount(0);
+    await expect(graphCanvas(page).getByText('Back to A')).toHaveCount(0);
+    await choosePreset(page, 'disjoint-set-union');
+    await expect(graphCanvas(page).getByText('cycle')).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
   test('loads custom accurate legends for graph presets', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
@@ -4057,7 +4157,7 @@ while (true) {}
     );
     const exported = await page.evaluate(() => navigator.clipboard.readText());
     expect(exported).toBe(
-      ['3 6', '0 1', '0 1', '0 1', '1 1', '1 2', '2 0'].join('\n')
+      ['3 6', '0 1 4', '0 1 2', '0 1 7', '1 1', '1 2 3', '2 0 5'].join('\n')
     );
     await closeExportMenu(page);
 
@@ -4888,6 +4988,7 @@ while (true) {}
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await commitInputValue(page.getByLabel('Zoom percent'), 250);
 
     await openImportMenu(page);
     await page.getByTestId('project-paste-json-button').click();
@@ -4935,6 +5036,21 @@ while (true) {}
       'data-caption-font-size',
       '12'
     );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+    expect(
+      Number(await graphCanvas(page).getAttribute('data-view-zoom'))
+    ).toBeLessThanOrEqual(1);
     await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
       'data-caption-position-x',
       '0.2'

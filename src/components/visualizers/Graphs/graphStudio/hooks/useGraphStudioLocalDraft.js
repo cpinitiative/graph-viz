@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   clearLocalDraft,
-  readLocalDraft,
+  readBrowserLocalDraft,
   writeLocalDraft,
 } from '../lib/localDraft';
 
 const AUTOSAVE_DELAY_MS = 750;
 const STARTUP_SETTLE_DELAY_MS = 250;
-
-const getBrowserStorage = () => {
-  try {
-    return typeof window === 'undefined' ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-};
 
 const getProjectSignature = project => {
   if (!project) return '';
@@ -30,13 +22,9 @@ const getMeaningfulProjectSignature = project => {
   return JSON.stringify({ ...stableProject, settings });
 };
 
-export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
-  const [initialState] = useState(() => {
-    const storage = getBrowserStorage();
-    return { storage, result: readLocalDraft(storage) };
-  });
+export const useGraphStudioLocalDraft = ({ project, startup }) => {
+  const [initialState] = useState(() => startup ?? readBrowserLocalDraft());
   const storageRef = useRef(initialState.storage);
-  const [pendingDraft, setPendingDraft] = useState(initialState.result.draft);
   const [autosaveReady, setAutosaveReady] = useState(false);
   const [draftStatus, setDraftStatus] = useState(() => {
     if (initialState.result.error) {
@@ -48,7 +36,7 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
     }
     if (initialState.result.draft) {
       return {
-        state: 'pending',
+        state: 'restored',
         savedAt: initialState.result.draft.savedAt,
       };
     }
@@ -67,17 +55,12 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
   const lastSavedSignatureRef = useRef('');
   const latestProjectRef = useRef(project);
   const latestSignatureRef = useRef(projectSignature);
-  const pendingDraftRef = useRef(pendingDraft);
   const autosaveDisabledRef = useRef(Boolean(initialState.result.error));
 
   useEffect(() => {
     latestProjectRef.current = project;
     latestSignatureRef.current = projectSignature;
   }, [project, projectSignature]);
-
-  useEffect(() => {
-    pendingDraftRef.current = pendingDraft;
-  }, [pendingDraft]);
 
   useEffect(() => {
     if (!initialState.result.error) return undefined;
@@ -94,7 +77,6 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
   useEffect(() => {
     if (
       autosaveReady ||
-      pendingDraft ||
       autosaveDisabledRef.current ||
       meaningfulProjectSignature !== initialMeaningfulSignatureRef.current
     ) {
@@ -105,10 +87,10 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
       setAutosaveReady(true);
     }, STARTUP_SETTLE_DELAY_MS);
     return () => window.clearTimeout(timeout);
-  }, [autosaveReady, meaningfulProjectSignature, pendingDraft]);
+  }, [autosaveReady, meaningfulProjectSignature]);
 
   const persistLatestProject = useCallback((updateStatus = true) => {
-    if (pendingDraftRef.current || autosaveDisabledRef.current) return false;
+    if (autosaveDisabledRef.current) return false;
     const nextProject = latestProjectRef.current;
     const nextSignature = latestSignatureRef.current;
     if (
@@ -151,7 +133,7 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
   }, []);
 
   useEffect(() => {
-    if (pendingDraft || autosaveDisabledRef.current) return undefined;
+    if (autosaveDisabledRef.current) return undefined;
     if (!autosaveReady) {
       if (
         meaningfulProjectSignature !== initialMeaningfulSignatureRef.current
@@ -179,7 +161,6 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
   }, [
     autosaveReady,
     meaningfulProjectSignature,
-    pendingDraft,
     persistLatestProject,
     projectSignature,
   ]);
@@ -190,39 +171,5 @@ export const useGraphStudioLocalDraft = ({ project, onRestore }) => {
     return () => window.removeEventListener('pagehide', flushDraft);
   }, [persistLatestProject]);
 
-  const restorePendingDraft = useCallback(() => {
-    if (!pendingDraft) return;
-    onRestore?.(pendingDraft.project);
-    lastSavedSignatureRef.current = getProjectSignature({
-      format: 'graph-viz-project',
-      version: 1,
-      graph: pendingDraft.project.graph,
-      timeline: pendingDraft.project.timeline,
-      settings: pendingDraft.project.settings,
-    });
-    setDraftStatus({ state: 'saved', savedAt: pendingDraft.savedAt });
-    setPendingDraft(null);
-  }, [onRestore, pendingDraft]);
-
-  const discardPendingDraft = useCallback(() => {
-    try {
-      clearLocalDraft(storageRef.current);
-      setDraftStatus({ state: 'idle' });
-    } catch {
-      autosaveDisabledRef.current = true;
-      setDraftStatus({
-        state: 'error',
-        message:
-          'Recovery draft could not be cleared. Browser storage may be unavailable.',
-      });
-    }
-    setPendingDraft(null);
-  }, []);
-
-  return {
-    pendingDraft,
-    draftStatus,
-    restorePendingDraft,
-    discardPendingDraft,
-  };
+  return { draftStatus };
 };
