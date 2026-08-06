@@ -1,167 +1,156 @@
 # Graph Viz
 
-Graph Viz is a USACO Guide graph-animation authoring tool for creating, editing,
-scripting, saving, and exporting graph algorithm visualizations.
+Graph Viz is a desktop-first authoring tool for turning graph algorithms into
+clear, editable teaching visuals. It is built for USACO Guide authors, but works
+for anyone creating step-by-step graph explanations.
 
-## Live Demo
+Use the editor at [graph-viz.usaco.guide](https://graph-viz.usaco.guide/).
 
-Use the deployed editor at:
+## What You Can Make
 
-https://graph-viz.usaco.guide
+- Frame-by-frame animations with captions, timing, and a custom legend
+- Static PNG and SVG figures
+- PPTX slideshows with one slide per selected frame
+- MP4 videos for lessons and presentations
+- Editable `.graphviz.json` project files
 
-## Feature Overview
-
-- Interactive graph editing with draggable nodes, edges, labels, weights, and
-  directed-edge styling.
-- Timeline/frame animation for step-by-step algorithm explanations.
-- USACO-aligned graph presets for common teaching examples.
-- Full project JSON import/export with editor state, timeline, viewport, and
-  settings.
-- PPTX slideshow export for slide-based lessons.
-- MP4 export for embedding animations in written or video material.
-- Edge-list import/export for simple graph structure exchange.
-- Script Mode for generating timeline frames from small JavaScript traces.
-- Visual state legend for active, queued, visited, highlighted, and selected
-  elements.
-- Playwright E2E coverage for key editor, import/export, preset, and export
-  workflows.
-
-## USACO Guide Alignment
-
-Graph Viz is designed for USACO Guide authors and students who need clear,
-repeatable graph algorithm visuals. The current preset set covers graph topics
-such as:
-
-- graph traversal and connected components
-- disjoint set union
-- topological sort
-- shortest paths with non-negative weights
-- minimum spanning trees
-
-These presets are starting points. Authors can load a preset, adjust the graph
-and timeline, then export the result for guide modules, slides, classroom
-material, or video explanations.
+Graph Viz is intended for authoring—not for running algorithms or analyzing an
+input graph. The editor is designed around a mouse, keyboard, and desktop-sized
+screen. Mobile layouts may be useful for review, but mobile editing is not a
+primary support target.
 
 ## Author Workflow
 
-A typical author workflow looks like this:
+1. Load an educational preset or choose **Blank Project** to start from scratch.
+2. Edit labels, positions, weights, edge direction, colors, and styles.
+3. Add frames and describe each meaningful step of the algorithm.
+4. Adjust frame-specific appearance and visibility to show what changes.
+5. Review the animation, then export the format your lesson needs.
+6. Export the project JSON when you want a durable, shareable source file.
 
-1. Choose a USACO preset or create a graph from scratch.
-2. Edit nodes, edges, labels, weights, routing, and visual states.
-3. Build or revise timeline frames with descriptions for each step.
-4. Save the work as a `.graphviz.json` project file.
-5. Export the timeline as a PPTX slideshow or MP4 video.
-6. Drop the slides or video into teaching material.
+Presets are ready-made teaching examples rather than unlabeled graph shapes.
+They include a labeled graph, explanatory frame sequence, and algorithm-specific
+legend for topics including BFS, DFS, connected components, disjoint set union,
+topological sort, Dijkstra's algorithm, and Kruskal's algorithm. Multi-edge and
+self-loop examples are also available for testing graph structure and routing.
 
-## Project JSON Workflow
+## How Frames Work
 
-`Export Project` saves the full editor state as a `.graphviz.json` file. This
-includes the graph, timeline frames, current frame, viewport, canvas settings,
-and rendering settings.
+The editor separates information that defines the project from information that
+changes during an explanation:
 
-`Import Project` restores that saved state so authors can continue editing,
-share examples, or keep reusable lesson assets in version control.
+- **Project details**—such as labels, positions, and canvas settings—are shared
+  by every frame.
+- **Appearance**—such as state, color, and visibility—can differ on each frame.
+- New nodes and edges begin on the frame where they are added.
+- Visibility changes can target this frame or this and following frames.
+- Frame-specific style changes can be promoted across all frames when they
+  should become the project default.
 
-Project files are regular JSON. They can be edited manually or generated with AI
-assistance, then imported into the editor for validation and visual review. This
-is useful when drafting larger examples from an algorithm trace, lesson outline,
-or existing explanation.
+This lets an author express an algorithm's progression without maintaining a
+separate copy of the whole graph for every step.
 
-Edge-list import/export is separate and simpler. It is meant for basic graph
-structure exchange, not full timeline or editor-state persistence.
+Use the visible **Undo** and **Redo** controls, or press
+<kbd>Ctrl</kbd>/<kbd>Command</kbd>+<kbd>Z</kbd> to undo and
+<kbd>Ctrl</kbd>/<kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo. Text
+fields retain their normal browser history while they are being edited.
+
+## Saving and Recovery
+
+Graph Viz keeps a recovery draft in this browser as you edit and restores it
+automatically when you return. The graph, frames, current frame, legend, and
+editor settings come back; the canvas is fit to the current workspace instead of
+replaying pan and zoom coordinates from an older window size. Choose **Blank
+Project** when you intentionally want to replace the recovered work.
+
+A browser draft is a safety net, not a durable save:
+
+- It stays on the current browser and device.
+- Clearing site data or using a private browsing session may remove it.
+- It is not synced to USACO Guide or shared with collaborators.
+
+Use **Export Project** to download a `.graphviz.json` file for long-term
+storage, version control, or handoff. **Import Project** restores the graph,
+timeline, current frame, viewport, canvas settings, legend, and rendering
+settings.
+
+Project files are regular JSON, so they can also be generated or edited with
+code or AI assistance before being imported for visual review. Edge-list import
+and export is intentionally simpler: it transfers graph structure, not the
+timeline or editor settings.
 
 ## Script Mode
 
-Script Mode lets advanced authors write small JavaScript traces that generate
-timeline frames. A script can mark nodes active, queued, or visited; highlight
-edges; or push structured timeline patches.
+Script Mode is an optional power-user workflow for building timeline frames from
+small JavaScript traces. A script can mark nodes and edges, change their
+appearance, and push structured frame updates. Scripts run in a Web Worker with
+timeout protection, and their output is validated before it replaces the
+timeline.
 
-Scripts run in a Web Worker and include timeout protection, so accidental
-infinite loops do not lock the editor. Script output is validated before it is
-used to replace the timeline.
+Basic editing does not require code. Start with the visual editor or a preset;
+use Script Mode when a longer animation would be clearer and faster to generate
+from an algorithm trace.
 
-Basic editing does not require Script Mode. It is a power-user workflow for
-authors who want to produce many consistent frames from code.
+## Export Guide
 
-## Exporting Animations
+- **PNG / SVG:** a selected frame for articles, problem statements, and notes
+- **Export Slideshow:** selected frames as a PPTX for PowerPoint or Google
+  Slides
+- **Export MP4:** selected animation frames as a video
+- **Export Project:** the complete editable project as `.graphviz.json`
+- **Export Edge List:** graph structure only
 
-Graph Viz supports several export paths:
-
-- `Export Slideshow` downloads a PPTX file with one slide per timeline frame.
-- `Export MP4` opens video export settings and renders the timeline to an MP4.
-- `Export Project` saves the editable `.graphviz.json` project, which is the
-  best format for future revisions.
-- `Export Edge List` copies a simple edge-list representation for graph
-  structure only.
-
-PPTX exports can be opened in PowerPoint or uploaded to Google Slides.
-
-## Demo Media
-
-Screenshots and GIFs will be added here later.
-
-Suggested examples:
-
-- main editor with a Dijkstra or Kruskal preset
-- sidebar import/export controls
-- Script Mode modal
-- PPTX or MP4 export workflow
+Review the selected frames and export settings before rendering. Keep the
+project JSON alongside published media so the visualization can be revised
+later.
 
 ## Development
 
-Use the Node version in `.nvmrc`.
+Use the Node version in `.nvmrc`, then install dependencies and start Vite:
 
 ```bash
 npm ci
 npm run dev
+```
+
+Before opening a pull request, run:
+
+```bash
 npm run test:unit
 npm run check
 npm run test:e2e:smoke
 npm run test:e2e
+```
+
+Useful interactive E2E commands are also available:
+
+```bash
 npm run test:e2e:headed
 npm run test:e2e:ui
 npm run check:e2e
 ```
 
-`npm run dev` starts the local Vite development server.
+`npm run check` verifies formatting, ESLint, and the production build.
+Playwright covers the editor shell and core graph, preset, timeline,
+import/export, Script Mode, and rendering workflows.
 
-`npm run check` runs formatting checks, ESLint, and the production build. Unit
-tests name the current test files explicitly so the command works on the
-recommended Node 20.19 release and on newer Node releases that no longer accept
-a test directory. Local Playwright builds and serves the production bundle
-through Vite preview.
-
-To run the focused smoke test against the deployed site:
+To run the smoke test against production:
 
 ```bash
 PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e:smoke
 ```
 
-The deployment is public, so this command needs no secret. To also prove that a
-specific commit is deployed, set the optional expected 7–40 character SHA:
+To additionally confirm that a particular commit is deployed, provide its SHA:
 
 ```bash
 PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide EXPECTED_GRAPH_STUDIO_COMMIT_SHA=$(git rev-parse HEAD) npm run test:e2e:smoke
 ```
 
-The smoke checks the document and core asset responses, the Graph Studio shell,
-the graph canvas, theme toggling, browser errors, and the build marker. A
-regular production build writes commit, build timestamp, and deployment label
-metadata to `data-build-*` attributes on `graph-studio-root`. Build systems can
-override the detected values with `GRAPH_STUDIO_COMMIT_SHA`,
-`GRAPH_STUDIO_BUILD_TIMESTAMP`, and `GRAPH_STUDIO_DEPLOYMENT`. If a build has
-neither repository metadata nor an injected commit, the marker reports
-`unknown`; setting `EXPECTED_GRAPH_STUDIO_COMMIT_SHA` makes that a smoke
-failure.
+Production builds expose commit, build timestamp, and deployment metadata on the
+`graph-studio-root` element. Build systems may override detected values with
+`GRAPH_STUDIO_COMMIT_SHA`, `GRAPH_STUDIO_BUILD_TIMESTAMP`, and
+`GRAPH_STUDIO_DEPLOYMENT`.
 
-## Validation and CI
-
-GitHub Actions runs CI and E2E workflows on pull requests and pushes to `main`.
-
-- `npm run check` verifies formatting, linting, and production build output.
-- `npm run test:unit` runs the deterministic graph-state and layout unit tests.
-- `npm run test:e2e:smoke` runs the local/deployed shell smoke path.
-- `npm run test:e2e` runs Playwright tests for core user flows.
-- The E2E suite covers app load, graph editing, presets, timeline editing,
-  project import/export, Script Mode timeout protection, self-loop rendering,
-  directed arrowhead coloring, MP4 modal access, and PPTX slideshow export.
+GitHub Actions runs validation and browser tests for pull requests and pushes to
+`main`. When changing editor behavior, add deterministic unit coverage for state
+logic and Playwright coverage for the author-visible workflow.

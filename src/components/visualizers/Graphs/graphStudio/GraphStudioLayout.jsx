@@ -29,7 +29,7 @@ const SIDE_PANEL_CLASS =
   'graphstudio-side-panel min-h-0 bg-[#F8F9FA] dark:bg-[#111827]';
 const STATUS_ERROR_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 const STATUS_SUCCESS_PATTERN =
-  /\b(parsed|imported|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
+  /\b(parsed|imported|restored|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
 const MODE_LABELS = {
   select: 'Select',
   pan: 'Pan',

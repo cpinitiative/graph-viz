@@ -16,6 +16,8 @@ export const useGraphStudioCanvasHandlers = ({
   setSelectedObject,
   setSelectedNodeIds,
   clearSelection,
+  beginHistoryTransaction,
+  endHistoryTransaction,
 }) => {
   const [drawFrom, setDrawFrom] = useState(null);
   const dragStateRef = useRef(null);
@@ -144,8 +146,9 @@ export const useGraphStudioCanvasHandlers = ({
         nodeIds: dragNodeIds,
         offsets,
       };
+      beginHistoryTransaction?.();
     },
-    [baseGraph.nodes, selectedNodeIdSet]
+    [baseGraph.nodes, beginHistoryTransaction, selectedNodeIdSet]
   );
 
   const onNodeMove = useCallback(
@@ -169,7 +172,8 @@ export const useGraphStudioCanvasHandlers = ({
 
   const onNodePointerUp = useCallback(() => {
     dragStateRef.current = null;
-  }, []);
+    endHistoryTransaction?.();
+  }, [endHistoryTransaction]);
 
   return {
     drawFrom,

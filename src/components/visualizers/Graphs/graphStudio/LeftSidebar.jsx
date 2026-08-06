@@ -14,15 +14,16 @@ const LAYOUT_OPTIONS = [
   ['force', 'Force'],
 ];
 const PRESET_OPTIONS = [
-  ['bfs', 'BFS'],
-  ['dfs', 'DFS'],
+  ['blank', 'Blank Project'],
+  ['bfs', 'Breadth-First Search (BFS)'],
+  ['dfs', 'Depth-First Search (DFS)'],
   ['topological-sort', 'Topological Sort'],
-  ['disjoint-set-union', 'Disjoint Set Union'],
+  ['disjoint-set-union', 'Disjoint Set Union (DSU)'],
   ['connected-components', 'Connected Components'],
-  ['kruskal-mst', 'Kruskal MST'],
-  ['dijkstra', 'Dijkstra'],
-  ['dijkstra-shortest-paths', 'Dijkstra Shortest Paths'],
-  ['multigraph', 'Multi-Edge / Loop'],
+  ['kruskal-mst', 'Kruskal Minimum Spanning Tree'],
+  ['dijkstra', 'Dijkstra — Compact Example'],
+  ['dijkstra-shortest-paths', 'Dijkstra — Worked Shortest Paths'],
+  ['multigraph', 'Multigraph and Self-Loop'],
 ];
 
 const sectionTitleClass =
@@ -47,6 +48,8 @@ const checkboxClass =
   'h-4 w-4 rounded-sm accent-[#0F2747] focus:ring-[#0F2747] dark:accent-[#3B82F6] dark:focus:ring-[#3B82F6]';
 const dataButtonClass =
   'min-h-[44px] rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] disabled:cursor-not-allowed disabled:opacity-50 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] md:min-h-9';
+const historyButtonClass =
+  'flex min-h-8 items-center justify-between gap-2 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-1.5 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:bg-[#F8F9FA] disabled:text-[#94A3B8] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA] dark:disabled:bg-[#111827] dark:disabled:text-[#64748B]';
 const sidebarControlLabelClass =
   'text-[11px] font-medium text-[#475569] dark:text-[#CBD5E1]';
 const compactNumberInputClass =
@@ -55,6 +58,56 @@ const helpButtonClass =
   'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent text-[9px] font-bold leading-none text-[#94A3B8] transition-colors hover:border-[#CBD5E1] hover:text-[#475569] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#64748B] dark:hover:border-[#475569] dark:hover:text-[#CBD5E1] dark:focus-visible:ring-[#60A5FA]';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
+
+const formatSavedTime = value => {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+};
+
+const LocalDraftStatus = ({ status = { state: 'idle' } }) => {
+  const isError = status.state === 'error';
+  const label =
+    status.state === 'restored'
+      ? `Restored locally${formatSavedTime(status.savedAt) ? ` · ${formatSavedTime(status.savedAt)}` : ''}`
+      : status.state === 'saving'
+        ? 'Saving local draft…'
+        : status.state === 'saved'
+          ? `Saved locally${formatSavedTime(status.savedAt) ? ` · ${formatSavedTime(status.savedAt)}` : ''}`
+          : isError
+            ? status.message
+            : 'Local recovery ready';
+
+  return (
+    <div
+      className={joinClasses(
+        'flex items-start gap-2 px-1 text-[10px] font-medium leading-relaxed',
+        isError
+          ? 'text-[#B91C1C] dark:text-[#FCA5A5]'
+          : 'text-[#64748B] dark:text-[#94A3B8]'
+      )}
+      data-testid="local-draft-status"
+      role={isError ? 'alert' : 'status'}
+      aria-live="polite"
+    >
+      <span
+        aria-hidden="true"
+        className={joinClasses(
+          'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
+          isError
+            ? 'bg-[#DC2626] dark:bg-[#F87171]'
+            : status.state === 'saving' || status.state === 'pending'
+              ? 'bg-[#D97706] dark:bg-[#FBBF24]'
+              : 'bg-[#059669] dark:bg-[#34D399]'
+        )}
+      />
+      <span>{label}</span>
+    </div>
+  );
+};
 
 const SectionTitle = ({ children }) => (
   <div className={sectionTitleClass}>{children}</div>
@@ -391,6 +444,11 @@ const LeftSidebar = ({
   onZoomIn,
   onZoomOut,
   onZoomCommit,
+  draftStatus,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }) => {
   const fitViewTitle = lockCanvas
     ? 'Unlock view to change the viewport'
@@ -451,6 +509,32 @@ const LeftSidebar = ({
             </p>
           )}
         </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            className={historyButtonClass}
+            disabled={!canUndo}
+            onClick={onUndo}
+            title="Undo (Ctrl/Command+Z)"
+          >
+            <span>Undo</span>
+            <span aria-hidden="true" className="text-sm opacity-60">
+              ←
+            </span>
+          </button>
+          <button
+            type="button"
+            className={historyButtonClass}
+            disabled={!canRedo}
+            onClick={onRedo}
+            title="Redo (Ctrl/Command+Shift+Z)"
+          >
+            <span>Redo</span>
+            <span aria-hidden="true" className="text-sm opacity-60">
+              →
+            </span>
+          </button>
+        </div>
       </SidebarSection>
 
       <SidebarSection>
@@ -469,6 +553,10 @@ const LeftSidebar = ({
             </option>
           ))}
         </NativeSelect>
+        <p className="px-1 text-[10px] font-medium leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
+          Start blank, or load a worked example with explanatory frames and a
+          teaching legend.
+        </p>
       </SidebarSection>
 
       <SidebarSection>
@@ -608,6 +696,7 @@ const LeftSidebar = ({
             Export...
           </button>
         </div>
+        <LocalDraftStatus status={draftStatus} />
       </SidebarSection>
 
       <SidebarSection>

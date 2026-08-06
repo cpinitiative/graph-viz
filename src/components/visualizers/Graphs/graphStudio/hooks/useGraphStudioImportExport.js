@@ -66,7 +66,6 @@ export const useGraphStudioImportExport = ({
   viewState,
   getZoomViewportSize,
   setViewState,
-  setViewFromNodes,
   bumpViewReset,
   globalSettings,
   theme,
@@ -314,7 +313,6 @@ export const useGraphStudioImportExport = ({
         },
       ]);
       if (!lockCanvas) {
-        setViewFromNodes?.(graph.nodes);
         bumpViewReset?.();
       }
       setMode('select');
@@ -336,7 +334,6 @@ export const useGraphStudioImportExport = ({
     lockCanvas,
     parserText,
     replaceTimeline,
-    setViewFromNodes,
     setMode,
     setStatus,
   ]);
@@ -477,6 +474,8 @@ export const useGraphStudioImportExport = ({
         setViewState(project.settings.viewState);
         // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
         window.setTimeout(() => setViewState(project.settings.viewState), 0);
+      } else {
+        bumpViewReset?.();
       }
       setMode('select');
       clearSelection?.();
@@ -487,6 +486,7 @@ export const useGraphStudioImportExport = ({
     [
       clearDrawState,
       clearSelection,
+      bumpViewReset,
       replaceTimeline,
       resetUndoHistory,
       setEdgeRouting,
