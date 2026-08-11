@@ -76,6 +76,10 @@ export const useGraphStudioImportExport = ({
   resetUndoHistory,
   stopTimeline,
   setPlaybackLocked,
+  onProjectGenerated,
+  onProjectImported,
+  onTimelineGenerated,
+  onExportCompleted,
 }) => {
   const getExportCanvasSnapshot = useCallback(
     () => ({
@@ -322,6 +326,7 @@ export const useGraphStudioImportExport = ({
       setStatus(
         `Graph parsed: ${meta}${lockCanvas ? ' · view preserved' : ''}`
       );
+      onProjectGenerated?.('parser', { hasTimeline: false });
     } catch (error) {
       const message = `Parse failed: ${error.message}`;
       setParserError(message);
@@ -332,6 +337,7 @@ export const useGraphStudioImportExport = ({
     clearSelection,
     bumpViewReset,
     lockCanvas,
+    onProjectGenerated,
     parserText,
     replaceTimeline,
     setMode,
@@ -353,12 +359,13 @@ export const useGraphStudioImportExport = ({
     try {
       await navigator.clipboard.writeText(output);
       setStatus('Edge list copied to clipboard');
+      onExportCompleted?.('edge-list');
     } catch {
       setStatus('Clipboard unavailable; open parser and paste manually');
       setIsParserOpen(true);
       setParserText(output);
     }
-  }, [baseGraph, setStatus]);
+  }, [baseGraph, onExportCompleted, setStatus]);
 
   const exportProject = useCallback(() => {
     const payload = exportProjectJson({
@@ -378,6 +385,7 @@ export const useGraphStudioImportExport = ({
     });
     downloadProjectJson(payload);
     setStatus('Project exported');
+    onExportCompleted?.('project');
   }, [
     baseGraph,
     currentFrame,
@@ -386,6 +394,7 @@ export const useGraphStudioImportExport = ({
     edgeRouting,
     globalSettings,
     lockCanvas,
+    onExportCompleted,
     setStatus,
     showGrid,
     snapEnabled,
@@ -411,6 +420,7 @@ export const useGraphStudioImportExport = ({
           captureToken: capture.captureToken,
         });
         setStatus('SVG exported');
+        onExportCompleted?.('svg');
       } catch (error) {
         console.error(error);
         setStatus(`SVG export error: ${error.message}`);
@@ -418,7 +428,13 @@ export const useGraphStudioImportExport = ({
         finishVisualExport();
       }
     },
-    [beginVisualExport, finishVisualExport, getReviewedImageCapture, setStatus]
+    [
+      beginVisualExport,
+      finishVisualExport,
+      getReviewedImageCapture,
+      onExportCompleted,
+      setStatus,
+    ]
   );
 
   const exportPng = useCallback(
@@ -440,6 +456,7 @@ export const useGraphStudioImportExport = ({
           captureToken: capture.captureToken,
         });
         setStatus('PNG exported');
+        onExportCompleted?.('png');
       } catch (error) {
         console.error(error);
         setStatus(`PNG export error: ${error.message}`);
@@ -451,6 +468,7 @@ export const useGraphStudioImportExport = ({
       beginVisualExport,
       finishVisualExport,
       getReviewedImageCapture,
+      onExportCompleted,
       pngScale,
       setStatus,
     ]
@@ -482,11 +500,15 @@ export const useGraphStudioImportExport = ({
       clearDrawState?.();
       resetUndoHistory?.();
       setStatus('Project imported');
+      onProjectImported?.({
+        hasTimeline: project.timeline.steps.length > 1,
+      });
     },
     [
       clearDrawState,
       clearSelection,
       bumpViewReset,
+      onProjectImported,
       replaceTimeline,
       resetUndoHistory,
       setEdgeRouting,
@@ -596,6 +618,7 @@ export const useGraphStudioImportExport = ({
           ).svgEl,
       });
       setStatus('Video exported successfully');
+      onExportCompleted?.('mp4');
     } catch (error) {
       console.error(error);
       setStatus(`Export failed: ${error.message}`);
@@ -613,6 +636,7 @@ export const useGraphStudioImportExport = ({
     exportCapture,
     finishVisualExport,
     getExportFrameIndexes,
+    onExportCompleted,
     prepareExportFrame,
     setStatus,
   ]);
@@ -639,6 +663,7 @@ export const useGraphStudioImportExport = ({
           ).svgEl,
       });
       setStatus('Slideshow exported');
+      onExportCompleted?.('pptx');
     } catch (error) {
       console.error(error);
       setStatus(`Slideshow export error: ${error.message}`);
@@ -656,6 +681,7 @@ export const useGraphStudioImportExport = ({
     exportCapture,
     finishVisualExport,
     getExportFrameIndexes,
+    onExportCompleted,
     prepareExportFrame,
     setStatus,
   ]);
@@ -688,6 +714,7 @@ export const useGraphStudioImportExport = ({
       setIsScriptOpen(false);
       setScriptError('');
       setStatus(`Script generated ${traceSteps.length} frames`);
+      onTimelineGenerated?.('script');
     } catch (error) {
       const message = `Script error: ${error.message}`;
       setScriptError(previous => (previous === message ? previous : message));
@@ -700,6 +727,7 @@ export const useGraphStudioImportExport = ({
     baseGraph,
     clearDrawState,
     clearSelection,
+    onTimelineGenerated,
     replaceTimeline,
     scriptText,
     setMode,

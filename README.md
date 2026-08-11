@@ -151,6 +151,36 @@ Production builds expose commit, build timestamp, and deployment metadata on the
 `GRAPH_STUDIO_COMMIT_SHA`, `GRAPH_STUDIO_BUILD_TIMESTAMP`, and
 `GRAPH_STUDIO_DEPLOYMENT`.
 
+### Private Usage Analytics
+
+The public production site uses Vercel Web Analytics for aggregate, internal
+product metrics. Analytics are not rendered in the editor. Preview deployments,
+localhost, and `127.0.0.1` do not load the analytics client, keeping team QA out
+of adoption numbers.
+
+Tracked custom events are deliberately limited to controlled metadata:
+
+- **Project Started** records one meaningful start per in-memory project
+  lifecycle. Restored and imported projects begin in an already-started state so
+  a reload or import does not inflate this number.
+- **Timeline Created** records the first manually or script-generated timeline
+  in that lifecycle.
+- **Preset Loaded** records only the preset identifier.
+- **Project Imported** records a successful import without its filename or
+  contents.
+- **Export Completed** records only the format after a successful export.
+
+Graph contents, labels, scripts, filenames, project JSON, and persistent user
+identifiers are never included in custom events. Query strings and URL fragments
+are removed before page-view or custom-event collection. To disable collection
+in a particular browser, set `localStorage['va-disable']` to a non-empty value.
+
+After this code is deployed, a Vercel project administrator must open
+**Analytics** for the `graph-viz` project and enable Web Analytics. Page views
+and anonymous visitor metrics are available on all plans; custom events require
+a plan that supports them. Collection starts when analytics is enabled and
+cannot backfill earlier traffic.
+
 GitHub Actions runs validation and browser tests for pull requests and pushes to
 `main`. When changing editor behavior, add deterministic unit coverage for state
 logic and Playwright coverage for the author-visible workflow.
