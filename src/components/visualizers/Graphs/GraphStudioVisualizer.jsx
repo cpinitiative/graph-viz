@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createProjectUsageTracker } from '../../../analytics.js';
 import { useTheme } from '../../../context/useTheme';
 import { EDGE_ROUTING } from './graphStudio/constants';
 import { GRAPH_PRESETS } from './graphStudio/data/graphPresets';
@@ -132,6 +133,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     [recoveredProject, seedTimeline]
   );
   const initialSettings = recoveredProject?.settings;
+  const [usageTracker] = useState(() =>
+    createProjectUsageTracker({
+      initialProjectStarted: Boolean(recoveredProject),
+      initialHasTimeline: initialTimeline.steps.length > 1,
+    })
+  );
   const playbackStopRef = useRef(null);
   const stopPlaybackBeforeTimelineMutation = useCallback(() => {
     playbackStopRef.current?.();
@@ -391,6 +398,20 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setSelectedObject,
     setSelectedNodeIds,
   });
+  const addTrackedNodeAt = useCallback(
+    point => {
+      addNodeAt(point);
+      usageTracker.markProjectStarted('canvas');
+    },
+    [addNodeAt, usageTracker]
+  );
+  const addTrackedEdge = useCallback(
+    (from, to) => {
+      addEdge(from, to);
+      usageTracker.markProjectStarted('canvas');
+    },
+    [addEdge, usageTracker]
+  );
   const {
     updateSelectedNode,
     updateSelectedEdge,
@@ -439,7 +460,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setStatus,
     baseGraph,
     computedGraph,
-    addEdge,
+    addEdge: addTrackedEdge,
     updateBaseNodesBulk,
     selectedObject,
     selectedNodeIds,
@@ -456,6 +477,22 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     previousFrameRef.current = currentFrame;
     clearDrawState();
   }, [clearDrawState, currentFrame]);
+  const recordGeneratedProject = useCallback(
+    (source, options) => usageTracker.recordGeneratedProject(source, options),
+    [usageTracker]
+  );
+  const recordImportedProject = useCallback(
+    options => usageTracker.recordProjectImported(options),
+    [usageTracker]
+  );
+  const recordGeneratedTimeline = useCallback(
+    source => usageTracker.markTimelineCreated(source),
+    [usageTracker]
+  );
+  const recordCompletedExport = useCallback(
+    format => usageTracker.recordExport(format),
+    [usageTracker]
+  );
   const {
     isParserOpen,
     setIsParserOpen,
@@ -531,6 +568,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     resetUndoHistory,
     stopTimeline,
     setPlaybackLocked,
+    onProjectGenerated: recordGeneratedProject,
+    onProjectImported: recordImportedProject,
+    onTimelineGenerated: recordGeneratedTimeline,
+    onExportCompleted: recordCompletedExport,
   });
   const localDraftProject = useMemo(
     () =>
@@ -829,6 +870,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
             enabled: Boolean(prev?.enabled),
           })
     );
+    usageTracker.recordPresetLoaded(presetName, {
+      hasTimeline: nextSteps.length > 1,
+    });
     setStatus(
       `Loaded ${PRESET_STATUS_LABELS[presetName] ?? presetName}${lockCanvas ? ' · view preserved' : ''}`
     );
@@ -934,7 +978,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onNodeMove,
       onNodePointerUp,
       onNodeClickForDraw,
-      onCanvasAddNode: addNodeAt,
+      onCanvasAddNode: addTrackedNodeAt,
       onViewportSizeChange: setZoomViewportSize,
       captionOverlay: currentCaptionOverlay,
       baseCaptionOverlay: normalizedCaptionOverlay,
@@ -1016,6 +1060,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         })),
       onAddStep: () => {
         addStep(currentFrame);
+        usageTracker.markTimelineCreated('manual');
         setCurrentFrame(currentFrame + 1, frameCount + 1);
         setStatus(
           `Frame ${currentFrame + 2} created from current visual state`
@@ -1023,6 +1068,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       },
       onDuplicateStep: () => {
         duplicateStep(currentFrame);
+        usageTracker.markTimelineCreated('manual');
         setCurrentFrame(currentFrame + 1, frameCount + 1);
         setStatus(`Frame ${currentFrame + 2} duplicated exactly`);
       },
