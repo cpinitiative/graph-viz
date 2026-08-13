@@ -426,6 +426,7 @@ const LeftSidebar = ({
   showGrid,
   setShowGrid,
   customLegend = DEFAULT_CUSTOM_LEGEND,
+  legendEntryCount = 0,
   setCustomLegend,
   lockCanvas,
   setLockCanvas,
@@ -467,7 +468,7 @@ const LeftSidebar = ({
       data-testid="left-sidebar"
     >
       <SidebarSection>
-        <SectionTitle>Tools</SectionTitle>
+        <SectionTitle>Build</SectionTitle>
         <div className="grid grid-cols-2 gap-2">
           {TOOL_OPTIONS.map(tool => (
             <button
@@ -538,7 +539,7 @@ const LeftSidebar = ({
       </SidebarSection>
 
       <SidebarSection>
-        <SectionTitle>Presets</SectionTitle>
+        <SectionTitle>Start</SectionTitle>
         <NativeSelect
           aria-label="Load graph preset"
           onChange={event => {
@@ -646,7 +647,7 @@ const LeftSidebar = ({
       </SidebarSection>
 
       <SidebarSection>
-        <SectionTitle>Legend</SectionTitle>
+        <SectionTitle>Explain</SectionTitle>
         <div className="space-y-2.5" data-testid="custom-legend-controls">
           <div className="flex min-h-10 items-center justify-between gap-3 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-1.5 dark:border-[#475569] dark:bg-[#1E293B]">
             <label className="flex min-w-0 cursor-pointer items-center gap-2 text-xs font-semibold text-[#1E293B] dark:text-[#F8FAFC]">
@@ -659,7 +660,14 @@ const LeftSidebar = ({
                 }
                 className={checkboxClass}
               />
-              <span className="whitespace-nowrap">Show legend</span>
+              <span className="min-w-0">
+                <span className="block whitespace-nowrap">Show legend</span>
+                <span className="block text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+                  {customLegend.mode === 'custom' ? 'Custom' : 'Smart'} ·{' '}
+                  {legendEntryCount}{' '}
+                  {legendEntryCount === 1 ? 'entry' : 'entries'}
+                </span>
+              </span>
             </label>
             <button
               type="button"
@@ -670,14 +678,14 @@ const LeftSidebar = ({
               onClick={onOpenLegendEditor}
               className="min-h-8 shrink-0 rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]"
             >
-              Edit
+              {customLegend.mode === 'custom' ? 'Edit' : 'Edit states'}
             </button>
           </div>
         </div>
       </SidebarSection>
 
       <SidebarSection>
-        <SectionTitle>Data</SectionTitle>
+        <SectionTitle>Project</SectionTitle>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"

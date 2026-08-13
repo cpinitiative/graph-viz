@@ -69,8 +69,18 @@ test('project import drops unsupported node override keys without mutating input
   const imported = validateProjectPayload(payload);
 
   assert.deepEqual(imported.timeline.steps[0].nodeOverrides, {
-    A: { status: 'active', color: '#FF0000', visible: false },
+    A: {
+      status: 'active',
+      color: '#FF0000',
+      visible: false,
+      stateId: 'legacy-node-active',
+    },
   });
+  assert.ok(
+    imported.settings.visualStates.some(
+      state => state.id === 'legacy-node-active' && state.color === '#FF0000'
+    )
+  );
   assert.deepEqual(payload, original);
 });
 

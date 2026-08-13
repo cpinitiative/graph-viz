@@ -7,14 +7,7 @@ import {
   getDefaultNodeLabelFontSize,
   NODE_LABEL_FONT_SIZE_RANGE,
 } from './lib/fontSizing';
-
-const NODE_STATUS_OPTIONS = [
-  ['default', 'Default'],
-  ['active', 'Active'],
-  ['queued', 'Queued'],
-  ['visited', 'Visited'],
-  ['discarded', 'Discarded'],
-];
+import { getVisualStatesForKind } from './lib/visualStates';
 
 const panelClass =
   'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
@@ -209,6 +202,63 @@ const ColorField = ({
     </div>
   </Field>
 );
+
+const VisualStateField = ({
+  kind,
+  value,
+  visualStates,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+  onOpenStateEditor,
+}) => {
+  const states = getVisualStatesForKind(visualStates, kind);
+  const selectedState = states.find(state => state.id === value);
+
+  return (
+    <Field
+      label="Visual state"
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
+    >
+      <NativeSelect
+        aria-label={`${kind === 'edge' ? 'Edge' : 'Node'} visual state`}
+        value={selectedState?.id ?? ''}
+        onChange={event => onChange(event.target.value)}
+      >
+        <option value="">No visual state</option>
+        {states.map(state => (
+          <option key={state.id} value={state.id}>
+            {state.label}
+          </option>
+        ))}
+      </NativeSelect>
+      <div className="flex items-center justify-between gap-2 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 dark:border-[#475569] dark:bg-[#1E293B]">
+        <span className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+          <span
+            aria-hidden="true"
+            className="h-3 w-3 shrink-0 rounded-full border border-black/15 dark:border-white/30"
+            style={{ backgroundColor: selectedState?.color ?? '#CBD5E1' }}
+          />
+          <span className="min-w-0 leading-snug">
+            {selectedState
+              ? 'Color and legend label stay linked.'
+              : 'Use a state to keep meaning consistent.'}
+          </span>
+        </span>
+        <button
+          type="button"
+          className={`${inlineActionButtonClass} shrink-0`}
+          onClick={onOpenStateEditor}
+        >
+          Edit states
+        </button>
+      </div>
+    </Field>
+  );
+};
 
 const ToggleRow = ({
   label,
@@ -581,6 +631,8 @@ const MultiSelectionPanel = ({
   onSetVisibilityFromFrame,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => (
   <PanelShell
     title="Selection"
@@ -605,14 +657,31 @@ const MultiSelectionPanel = ({
         onSetVisibilityFromFrame={onSetVisibilityFromFrame}
       />
       <div className="space-y-2">
-        <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
-          Set visited
-        </ActionButton>
-        <ActionButton onClick={() => onApplyToSelection({ status: 'active' })}>
-          Set active
-        </ActionButton>
+        <Field label="Apply visual state">
+          <NativeSelect
+            aria-label="Apply node visual state to selection"
+            value=""
+            onChange={event => {
+              if (event.target.value) {
+                onApplyToSelection({
+                  stateId: event.target.value,
+                });
+              }
+            }}
+          >
+            <option value="">Choose a state…</option>
+            {getVisualStatesForKind(visualStates, 'node').map(state => (
+              <option key={state.id} value={state.id}>
+                {state.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
         <ActionButton onClick={() => onApplyToSelection({ color: '#22c55e' })}>
           Color green
+        </ActionButton>
+        <ActionButton onClick={onOpenStateEditor}>
+          Edit visual states
         </ActionButton>
         <DeleteButton
           ariaLabel="Delete selected nodes from project"
@@ -639,9 +708,11 @@ const NodeInspector = ({
   onSelectEdge,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => {
   const nodeColor = selectedNode.color ?? '';
-  const nodeStatus = String(selectedNode.status ?? 'default');
+  const nodeStateId = String(selectedNode.stateId ?? '');
   const nodeVisible = selectedNode.visible !== false;
   const frameNumber = currentFrame + 1;
   const connectedEdgeCount = connectedEdges.length;
@@ -691,34 +762,28 @@ const NodeInspector = ({
             Node {selectedNode.id} is hidden on Frame {frameNumber}
           </PresenceNotice>
         )}
-        <Field
-          label="Status / Style"
-          hasOverride={frameOverrides.status}
-          onResetOverride={() => onResetOverride?.('status')}
-          onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
-        >
-          <NativeSelect
-            aria-label="Status / Style"
-            value={nodeStatus}
-            onChange={event => onUpdateNode({ status: event.target.value })}
-          >
-            {NODE_STATUS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <ColorField
-          label="Color"
-          value={nodeColor}
-          fallback="#3b82f6"
-          placeholder="#22c55e or blank"
-          hasOverride={frameOverrides.color}
-          onResetOverride={() => onResetOverride?.('color')}
-          onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
-          onChange={value => onUpdateNode({ color: value })}
+        <VisualStateField
+          kind="node"
+          value={nodeStateId}
+          visualStates={visualStates}
+          hasOverride={frameOverrides.stateId}
+          onResetOverride={() => onResetOverride?.('stateId')}
+          onApplyToAll={() => onApplyToAllFrames?.({ stateId: nodeStateId })}
+          onChange={stateId => onUpdateNode({ stateId })}
+          onOpenStateEditor={onOpenStateEditor}
         />
+        {!nodeStateId && (
+          <ColorField
+            label="Custom color"
+            value={nodeColor}
+            fallback="#3b82f6"
+            placeholder="#22c55e or blank"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
+            onChange={value => onUpdateNode({ color: value })}
+          />
+        )}
         <VisibilityControl
           visible={nodeVisible}
           frameNumber={frameNumber}
@@ -772,8 +837,11 @@ const EdgeInspector = ({
   onSelectNode,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
+  const edgeStateId = String(selectedEdge.stateId ?? '');
   const edgeVisible = selectedEdge.visible !== false;
   const frameNumber = currentFrame + 1;
   const notShownEndpointNodes = connectedNodes.filter(
@@ -823,16 +891,28 @@ const EdgeInspector = ({
         {edgePresenceNotice && (
           <PresenceNotice>{edgePresenceNotice}</PresenceNotice>
         )}
-        <ColorField
-          label="Color"
-          value={edgeColor}
-          fallback="#64748b"
-          placeholder="#64748b"
-          hasOverride={frameOverrides.color}
-          onResetOverride={() => onResetOverride?.('color')}
-          onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
-          onChange={value => onUpdateEdge({ color: value })}
+        <VisualStateField
+          kind="edge"
+          value={edgeStateId}
+          visualStates={visualStates}
+          hasOverride={frameOverrides.stateId}
+          onResetOverride={() => onResetOverride?.('stateId')}
+          onApplyToAll={() => onApplyToAllFrames?.({ stateId: edgeStateId })}
+          onChange={stateId => onUpdateEdge({ stateId })}
+          onOpenStateEditor={onOpenStateEditor}
         />
+        {!edgeStateId && (
+          <ColorField
+            label="Custom color"
+            value={edgeColor}
+            fallback="#64748b"
+            placeholder="#64748b"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
+            onChange={value => onUpdateEdge({ color: value })}
+          />
+        )}
         <VisibilityControl
           visible={edgeVisible}
           frameNumber={frameNumber}
@@ -980,6 +1060,8 @@ const PropertyPanel = ({
   onClearSelection,
   onUpdateGlobal,
   onEdgeRoutingChange,
+  visualStates,
+  onOpenLegendEditor,
 }) => {
   if (multiSelection.length > 1) {
     return (
@@ -992,6 +1074,8 @@ const PropertyPanel = ({
         onSetVisibilityFromFrame={onSetSelectionVisibilityFromFrame}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }
@@ -1011,6 +1095,8 @@ const PropertyPanel = ({
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }
@@ -1030,6 +1116,8 @@ const PropertyPanel = ({
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }

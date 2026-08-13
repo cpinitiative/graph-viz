@@ -29,6 +29,7 @@ import {
   IMAGE_FRAMING,
   waitForExportReady,
 } from '../lib/timelineFrameCapture';
+import { normalizeVisualStates } from '../lib/visualStates';
 
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
 
@@ -60,7 +61,10 @@ export const useGraphStudioImportExport = ({
   captionOverlay,
   setCaptionOverlay,
   customLegend,
+  renderLegend,
   setCustomLegend,
+  visualStates,
+  setVisualStates,
   lockCanvas,
   setLockCanvas,
   viewState,
@@ -93,7 +97,7 @@ export const useGraphStudioImportExport = ({
       edgeLabelFontSize: globalSettings?.edgeLabelFontSize,
       theme,
       baseCaptionOverlay: normalizeCaptionOverlay(captionOverlay),
-      customLegend: normalizeCustomLegend(customLegend),
+      customLegend: normalizeCustomLegend(renderLegend ?? customLegend),
     }),
     [
       captionOverlay,
@@ -101,6 +105,7 @@ export const useGraphStudioImportExport = ({
       edgeRouting,
       getZoomViewportSize,
       globalSettings,
+      renderLegend,
       theme,
       viewState,
     ]
@@ -378,6 +383,9 @@ export const useGraphStudioImportExport = ({
         showGrid,
         captionOverlay: normalizeCaptionOverlay(captionOverlay),
         customLegend: normalizeCustomLegend(customLegend),
+        visualStates: normalizeVisualStates(visualStates, {
+          useDefaults: true,
+        }),
         lockCanvas,
         viewState,
         globalSettings,
@@ -400,6 +408,7 @@ export const useGraphStudioImportExport = ({
     snapEnabled,
     steps,
     viewState,
+    visualStates,
   ]);
 
   const exportSvg = useCallback(
@@ -486,6 +495,7 @@ export const useGraphStudioImportExport = ({
       setShowGrid(project.settings.showGrid);
       setCaptionOverlay(project.settings.captionOverlay);
       setCustomLegend(project.settings.customLegend);
+      setVisualStates(project.settings.visualStates);
       setLockCanvas(project.settings.lockCanvas);
       setGlobalSettings(project.settings.globalSettings);
       if (project.settings.viewState) {
@@ -518,6 +528,7 @@ export const useGraphStudioImportExport = ({
       setShowGrid,
       setCaptionOverlay,
       setCustomLegend,
+      setVisualStates,
       setSnapEnabled,
       setStatus,
       setViewState,

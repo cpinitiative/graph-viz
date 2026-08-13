@@ -5,6 +5,7 @@ import {
   getDefaultNodeLabelFontSize,
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
+import { getReadableTextColor } from './lib/visualStates';
 
 const EDITOR_RING_COLORS = {
   light: {
@@ -22,7 +23,11 @@ const EDITOR_RING_COLORS = {
 const getNodePalette = (node, theme) => {
   if (theme === 'dark') {
     if (node?.color) {
-      return { fill: node.color, stroke: '#E2E8F0', text: '#0F172A' };
+      return {
+        fill: node.color,
+        stroke: '#E2E8F0',
+        text: getReadableTextColor(node.color),
+      };
     }
     const status = String(node?.status ?? 'default').toLowerCase();
     const darkPalettes = {
@@ -36,7 +41,11 @@ const getNodePalette = (node, theme) => {
   }
 
   if (node?.color) {
-    return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
+    return {
+      fill: node.color,
+      stroke: '#1b1b1b',
+      text: getReadableTextColor(node.color),
+    };
   }
   return (
     NODE_STATUS_COLORS[String(node?.status ?? 'default').toLowerCase()] ??

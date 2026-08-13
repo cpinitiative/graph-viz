@@ -740,7 +740,7 @@ test.describe('Graph Studio desktop smoke', () => {
         .first()
     ).toBeVisible();
     await expect(page.getByAltText('USACO Guide Logo')).toBeVisible();
-    await expect(page.getByText('Tools')).toBeVisible();
+    await expect(page.getByText('Build', { exact: true })).toBeVisible();
     for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
@@ -1873,13 +1873,12 @@ while (true) {}
     const nodeLabel = graphCanvas(page).locator('[data-node-label-id="0"]');
     const nodeCircle = nodeLabel.locator('xpath=..').locator('circle').first();
     await nodeCircle.click();
-    const colorInput = propertyPanel(page).getByLabel('Color', {
-      exact: true,
-    });
-    const originalColor = await colorInput.inputValue();
-    await colorInput.fill('#ff00ff');
-    await expect(colorInput).toHaveValue('#ff00ff');
-    await expect(nodeCircle).toHaveAttribute('fill', '#ff00ff');
+    const stateInput = propertyPanel(page).getByLabel('Node visual state');
+    const originalState = await stateInput.inputValue();
+    const originalFill = await nodeCircle.getAttribute('fill');
+    await stateInput.selectOption('bfs-node-waiting-in-queue');
+    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
+    await expect(nodeCircle).toHaveAttribute('fill', '#EAB308');
     const undoButton = leftSidebar(page).getByRole('button', { name: 'Undo' });
     const redoButton = leftSidebar(page).getByRole('button', { name: 'Redo' });
     await expect(undoButton).toBeEnabled();
@@ -1901,19 +1900,19 @@ while (true) {}
     await page.getByRole('button', { name: 'Pause timeline' }).click();
 
     await cards.nth(1).click();
-    await expect(colorInput).toHaveValue('#ff00ff');
+    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
     await undoButton.click();
 
     await expect(page.getByText('Undid last action')).toBeVisible();
-    await expect(colorInput).toHaveValue(originalColor);
-    await expect(nodeCircle).toHaveAttribute('fill', originalColor);
+    await expect(stateInput).toHaveValue(originalState);
+    await expect(nodeCircle).toHaveAttribute('fill', originalFill);
     await expect(redoButton).toBeEnabled();
     await redoButton.click();
     await expect(page.getByText('Redid last action')).toBeVisible();
-    await expect(colorInput).toHaveValue('#ff00ff');
-    await expect(nodeCircle).toHaveAttribute('fill', '#ff00ff');
+    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
+    await expect(nodeCircle).toHaveAttribute('fill', '#EAB308');
     await page.keyboard.press('Control+z');
-    await expect(colorInput).toHaveValue(originalColor);
+    await expect(stateInput).toHaveValue(originalState);
 
     await cards.last().click();
     await page.getByRole('button', { name: '+ Keyframe' }).click();
@@ -2544,7 +2543,7 @@ while (true) {}
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
-    await expect(page.getByText('Presets', { exact: true })).toBeVisible();
+    await expect(page.getByText('Start', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Load graph preset')).toHaveValue('');
     await expect(
       page.getByLabel('Load graph preset').locator('option[value=""]')
@@ -2664,6 +2663,57 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('keeps semantic states and the smart legend synchronized', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await page.getByRole('checkbox', { name: /^Legend$/ }).check();
+    await expandLegendEditor(page);
+
+    await expect(page.getByTestId('custom-legend-mode-select')).toHaveValue(
+      'smart'
+    );
+    await expect(page.locator('[data-visual-state-id]')).toHaveCount(5);
+    const firstStateLabel = page.getByLabel('node state label').first();
+    await expect(firstStateLabel).toHaveValue('Front of queue');
+    await firstStateLabel.fill('Current vertex');
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('Current vertex', {
+        exact: true,
+      })
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add node state' }).click();
+    await expect(page.locator('[data-visual-state-id]')).toHaveCount(6);
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('New node state', {
+        exact: true,
+      })
+    ).toHaveCount(0);
+    await page.getByLabel('Pin New node state in legend').check();
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('New node state', {
+        exact: true,
+      })
+    ).toBeVisible();
+
+    await closeLegendEditor(page);
+    await graphNodeCircles(page).first().click();
+    const nodeState = propertyPanel(page).getByLabel('Node visual state');
+    await expect(nodeState).toHaveValue('bfs-node-front-of-queue');
+    await nodeState.selectOption('bfs-node-waiting-in-queue');
+    await expect(graphNodeCircles(page).first()).toHaveAttribute(
+      'fill',
+      '#EAB308'
+    );
+
+    expect(errors).toEqual([]);
+  });
+
   test('supports unified editable legend preview and position reset', async ({
     page,
   }) => {
@@ -2717,6 +2767,7 @@ while (true) {}
     await legendEditToggle.click();
     await expect(legendModal).toBeVisible();
     await expect(legendEditor).toBeVisible();
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await expect(
       page.getByTestId('custom-legend-entries-header')
     ).not.toHaveClass(/sticky/);
@@ -5159,6 +5210,7 @@ while (true) {}
     ).toBeVisible();
 
     await legendTitle.fill('Traversal Key');
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await page.getByTestId('custom-legend-add-entry').click();
     await page.getByTestId('custom-legend-entry-group-0').fill('hi');
     await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
@@ -5677,8 +5729,8 @@ api.edge('loop', '#3b82f6');
     await closeExportMenu(page);
 
     await page.getByText('Frame 2').click();
-    await expect(directedEdge).toHaveAttribute('stroke', '#3b82f6');
-    await expect(arrowhead).toHaveAttribute('fill', '#3b82f6');
+    await expect(directedEdge).toHaveAttribute('stroke', '#3B82F6');
+    await expect(arrowhead).toHaveAttribute('fill', '#3B82F6');
     await expectBodyOverlapsArrowBase();
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
@@ -5877,6 +5929,7 @@ api.edge('e0', '#f59e0b');
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await expandLegendEditor(page);
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await page.getByTestId('custom-legend-add-entry').click();
     await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
     await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');

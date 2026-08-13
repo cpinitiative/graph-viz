@@ -23,6 +23,10 @@ import {
   sanitizeTemporalOverrideMap,
   sanitizeTemporalOverridePatch,
 } from './temporalOverrideSchema.js';
+import {
+  migrateLegacyVisualStates,
+  normalizeVisualStates,
+} from './visualStates.js';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
@@ -39,6 +43,7 @@ const DEFAULT_SETTINGS = {
   showGrid: true,
   captionOverlay: DEFAULT_CAPTION_OVERLAY,
   customLegend: DEFAULT_CUSTOM_LEGEND,
+  visualStates: null,
   lockCanvas: false,
   viewState: null,
   globalSettings: {
@@ -208,6 +213,9 @@ const sanitizeSettings = settings => {
     showGrid,
     captionOverlay: normalizeCaptionOverlay(input.captionOverlay),
     customLegend,
+    visualStates: normalizeVisualStates(input.visualStates, {
+      useDefaults: true,
+    }),
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
     globalSettings: {
@@ -341,10 +349,17 @@ export const validateProjectPayload = payload => {
       ? rawFrame
       : 0;
 
-  return {
+  const settings = sanitizeSettings(payload.settings);
+  const migrated = migrateLegacyVisualStates({
     graph: { nodes, edges },
-    timeline: { steps, currentFrame },
-    settings: sanitizeSettings(payload.settings),
+    steps,
+    visualStates: settings.visualStates,
+  });
+
+  return {
+    graph: migrated.graph,
+    timeline: { steps: migrated.steps, currentFrame },
+    settings: { ...settings, visualStates: migrated.visualStates },
   };
 };
 
