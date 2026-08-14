@@ -2609,6 +2609,7 @@ while (true) {}
 
     for (const presetValue of presetValues) {
       await commitInputValue(page.getByLabel('Zoom percent'), 250);
+      const beforePreset = await getCanvasViewSnapshot(page);
       await choosePreset(page, presetValue);
       await expect
         .poll(async () => {
@@ -2624,6 +2625,7 @@ while (true) {}
         .toBe(true);
 
       const fittedView = await getCanvasViewSnapshot(page);
+      expect(fittedView).not.toEqual(beforePreset);
       expect(Number(fittedView.zoom)).toBeLessThanOrEqual(1);
       await page.waitForTimeout(300);
       const settledView = await getCanvasViewSnapshot(page);

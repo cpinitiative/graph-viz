@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../../../context/useTheme';
 import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
@@ -1046,7 +1046,7 @@ const GraphCanvas = ({
       );
     });
   }, [canvasSize, isExporting, setViewState]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
     previousResetTriggerRef.current = resetViewTrigger;
     if (hasInitializedViewRef.current && !resetChanged) return undefined;
@@ -1106,6 +1106,13 @@ const GraphCanvas = ({
       hasInitializedViewRef.current = true;
       return true;
     };
+    if (hasInitializedViewRef.current && resetChanged) {
+      // Presets and explicit Fit View requests already have stable canvas
+      // geometry. Fit synchronously so the replacement graph is never painted
+      // in the previous graph's viewport.
+      doInit();
+      return undefined;
+    }
     const cleanupListeners = () => {
       ro.disconnect();
       window.removeEventListener('resize', scheduleInit);
