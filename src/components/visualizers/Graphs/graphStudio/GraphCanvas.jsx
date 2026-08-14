@@ -11,6 +11,7 @@ import {
   createFitViewState,
   EPSILON,
   getRectSelection,
+  recenterViewStateForViewportResize,
   toWorld,
 } from './graphCanvasUtils';
 import { normalizeCaptionOverlay } from './lib/captionOverlay';
@@ -923,6 +924,7 @@ const GraphCanvas = ({
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
+  const fittedViewportSizeRef = useRef({ width: 0, height: 0 });
   const previousResetTriggerRef = useRef(resetViewTrigger);
   const nodeMap = useMemo(() => {
     const map = new Map();
@@ -1020,12 +1022,40 @@ const GraphCanvas = ({
     };
   }, [onViewportSizeChange]);
   useEffect(() => {
+    if (!hasInitializedViewRef.current || isExporting) return;
+    const previousViewport = fittedViewportSizeRef.current;
+    const nextViewport = canvasSize;
+    fittedViewportSizeRef.current = nextViewport;
+    if (
+      previousViewport.width <= 0 ||
+      previousViewport.height <= 0 ||
+      nextViewport.width <= 0 ||
+      nextViewport.height <= 0 ||
+      (previousViewport.width === nextViewport.width &&
+        previousViewport.height === nextViewport.height)
+    ) {
+      return;
+    }
+    setViewState(previousView => {
+      return (
+        recenterViewStateForViewportResize({
+          viewState: previousView,
+          previousViewport,
+          nextViewport,
+        }) ?? previousView
+      );
+    });
+  }, [canvasSize, isExporting, setViewState]);
+  useEffect(() => {
     const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
     previousResetTriggerRef.current = resetViewTrigger;
     if (hasInitializedViewRef.current && !resetChanged) return undefined;
 
     const el = svgRef.current;
     if (!el) return undefined;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let disposed = false;
     const doInit = () => {
       const bounds = el.getBoundingClientRect();
       if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
@@ -1039,6 +1069,10 @@ const GraphCanvas = ({
           x: (viewportWidth - VIEWBOX_WIDTH * zoom) / 2,
           y: (viewportHeight - VIEWBOX_HEIGHT * zoom) / 2,
         });
+        fittedViewportSizeRef.current = {
+          width: viewportWidth,
+          height: viewportHeight,
+        };
         hasInitializedViewRef.current = true;
         return true;
       }
@@ -1065,24 +1099,35 @@ const GraphCanvas = ({
       });
       if (!nextView) return false;
       setViewState(nextView);
+      fittedViewportSizeRef.current = {
+        width: viewportWidth,
+        height: viewportHeight,
+      };
       hasInitializedViewRef.current = true;
       return true;
     };
-    if (doInit()) return;
-    const ro = new ResizeObserver(() => {
-      if (doInit()) ro.disconnect();
-    });
-    ro.observe(el);
-    const onWindowResize = () => {
-      if (doInit()) {
-        ro.disconnect();
-        window.removeEventListener('resize', onWindowResize);
-      }
-    };
-    window.addEventListener('resize', onWindowResize);
-    return () => {
+    const cleanupListeners = () => {
       ro.disconnect();
-      window.removeEventListener('resize', onWindowResize);
+      window.removeEventListener('resize', scheduleInit);
+    };
+    const scheduleInit = () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
+          if (!disposed && doInit()) cleanupListeners();
+        });
+      });
+    };
+    const ro = new ResizeObserver(scheduleInit);
+    ro.observe(el);
+    window.addEventListener('resize', scheduleInit);
+    scheduleInit();
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      cleanupListeners();
     };
   }, [graph.nodes, nodeRadius, setViewState, resetViewTrigger]);
   useEffect(() => {

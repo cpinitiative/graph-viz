@@ -82,6 +82,38 @@ export const createFitViewState = ({
   };
 };
 
+export const recenterViewStateForViewportResize = ({
+  viewState,
+  previousViewport,
+  nextViewport,
+}) => {
+  const x = Number(viewState?.x);
+  const y = Number(viewState?.y);
+  const zoom = Number(viewState?.zoom);
+  const previousWidth = Number(previousViewport?.width);
+  const previousHeight = Number(previousViewport?.height);
+  const nextWidth = Number(nextViewport?.width);
+  const nextHeight = Number(nextViewport?.height);
+  if (
+    ![x, y, zoom, previousWidth, previousHeight, nextWidth, nextHeight].every(
+      Number.isFinite
+    ) ||
+    zoom <= 0 ||
+    previousWidth <= 0 ||
+    previousHeight <= 0 ||
+    nextWidth <= 0 ||
+    nextHeight <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    ...viewState,
+    x: x + (nextWidth - previousWidth) / 2,
+    y: y + (nextHeight - previousHeight) / 2,
+  };
+};
+
 export const toWorld = ({ x, y }, viewState) => ({
   x: (x - viewState.x) / viewState.zoom,
   y: (y - viewState.y) / viewState.zoom,

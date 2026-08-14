@@ -5,6 +5,7 @@ import {
   clampZoom,
   computeMinZoom,
   createFitViewState,
+  recenterViewStateForViewportResize,
 } from '../../src/components/visualizers/Graphs/graphStudio/graphCanvasUtils.js';
 
 const mapBoundsToViewport = (bounds, viewState) => ({
@@ -101,4 +102,35 @@ test('fit view can go below the manual zoom floor for unbounded content', () => 
   assert.ok(mapped.right <= 980 + 1e-9);
   assert.equal(clampFitZoom(0.0001), 0.001);
   assert.equal(clampZoom(0.0001), 0.05);
+});
+
+test('viewport resize keeps the same world point at the canvas center', () => {
+  const viewState = { x: -310, y: -180, zoom: 0.8 };
+  const previousViewport = { width: 640, height: 420 };
+  const nextViewport = { width: 980, height: 600 };
+  const resized = recenterViewStateForViewportResize({
+    viewState,
+    previousViewport,
+    nextViewport,
+  });
+
+  const previousWorldCenter = {
+    x: (previousViewport.width / 2 - viewState.x) / viewState.zoom,
+    y: (previousViewport.height / 2 - viewState.y) / viewState.zoom,
+  };
+  const nextWorldCenter = {
+    x: (nextViewport.width / 2 - resized.x) / resized.zoom,
+    y: (nextViewport.height / 2 - resized.y) / resized.zoom,
+  };
+
+  assert.deepEqual(nextWorldCenter, previousWorldCenter);
+  assert.equal(resized.zoom, viewState.zoom);
+  assert.equal(
+    recenterViewStateForViewportResize({
+      viewState,
+      previousViewport: { width: 0, height: 420 },
+      nextViewport,
+    }),
+    null
+  );
 });

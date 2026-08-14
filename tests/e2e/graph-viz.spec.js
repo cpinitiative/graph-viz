@@ -777,6 +777,20 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(page.getByTestId('local-draft-status')).toHaveText(
       'Local recovery ready'
     );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        if (!bounds) return null;
+        return {
+          x: Math.round(
+            (bounds.left + bounds.right - bounds.viewportWidth) * 10
+          ),
+          y: Math.round(
+            (bounds.top + bounds.bottom - bounds.viewportHeight) * 10
+          ),
+        };
+      })
+      .toEqual({ x: 0, y: 0 });
 
     expect(errors).toEqual([]);
   });
