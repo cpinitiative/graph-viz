@@ -11,6 +11,7 @@ import {
   createFitViewState,
   EPSILON,
   getRectSelection,
+  getWheelZoomFactor,
   recenterViewStateForViewportResize,
   toWorld,
 } from './graphCanvasUtils';
@@ -889,6 +890,7 @@ const GraphCanvas = ({
   nodeLabelFontSize,
   edgeLabelFontSize,
   resetViewTrigger = 0,
+  contentEpoch = 0,
   svgElementId = 'graph-studio-canvas-svg',
   svgTestId = 'graph-canvas-svg',
   svgResourcePrefix = '',
@@ -921,6 +923,8 @@ const GraphCanvas = ({
           height: Number(canvasSizeOverride.height),
         }
       : canvasSize;
+  const contentEpochKey = isExporting ? 'export' : `editor-${contentEpoch}`;
+  const contentLayoutIdPrefix = `${layoutIdPrefix}${contentEpochKey}-`;
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
@@ -1106,7 +1110,7 @@ const GraphCanvas = ({
       hasInitializedViewRef.current = true;
       return true;
     };
-    if (hasInitializedViewRef.current && resetChanged) {
+    if (resetChanged) {
       // Presets and explicit Fit View requests already have stable canvas
       // geometry. Fit synchronously so the replacement graph is never painted
       // in the previous graph's viewport.
@@ -1159,14 +1163,16 @@ const GraphCanvas = ({
       if (!bounds) return;
       const cursorX = event.clientX - bounds.left;
       const cursorY = event.clientY - bounds.top;
-      const worldBefore = toWorld({ x: cursorX, y: cursorY }, viewState);
-      const zoomDelta = event.deltaY > 0 ? -0.1 : 0.1;
-      const nextZoom = clampZoom(
-        viewState.zoom + zoomDelta,
-        bounds.width,
-        bounds.height
-      );
       setViewState(prev => {
+        const worldBefore = toWorld({ x: cursorX, y: cursorY }, prev);
+        const nextZoom = clampZoom(
+          prev.zoom *
+            getWheelZoomFactor({
+              deltaY: event.deltaY,
+              deltaMode: event.deltaMode,
+              viewportHeight: bounds.height,
+            })
+        );
         const candidate = {
           ...prev,
           zoom: nextZoom,
@@ -1182,7 +1188,7 @@ const GraphCanvas = ({
     };
     svg.addEventListener('wheel', handleWheel, { passive: false });
     return () => svg.removeEventListener('wheel', handleWheel);
-  }, [isExporting, lockCanvas, viewState, setViewState]);
+  }, [isExporting, lockCanvas, setViewState]);
   const onPointerDownBackground = event => {
     svgRef.current?.focus();
     const bounds = svgRef.current?.getBoundingClientRect();
@@ -1364,6 +1370,8 @@ const GraphCanvas = ({
         onPointerDown={isExporting ? undefined : onPointerDownBackground}
         onPointerMove={isExporting ? undefined : onPointerMove}
         onPointerUp={isExporting ? undefined : onPointerUp}
+        onPointerCancel={isExporting ? undefined : onPointerUp}
+        onLostPointerCapture={isExporting ? undefined : onPointerUp}
         onPointerLeave={isExporting ? undefined : onPointerUp}
         style={
           isExporting
@@ -1445,7 +1453,7 @@ const GraphCanvas = ({
               />
             </g>
           )}
-          <g data-export-content="true">
+          <g key={contentEpochKey} data-export-content="true">
             {edgeVisualData.map(
               ({
                 edge,
@@ -1474,7 +1482,7 @@ const GraphCanvas = ({
                     labelPosition={labelPosition}
                     labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}
-                    layoutIdPrefix={layoutIdPrefix}
+                    layoutIdPrefix={contentLayoutIdPrefix}
                     shouldAnimate={
                       !isExporting &&
                       (endpointMoved || diff.changedEdges.has(String(edge.id)))
@@ -1516,7 +1524,7 @@ const GraphCanvas = ({
                     }
                     isExporting={isExporting}
                     themeOverride={themeOverride}
-                    layoutIdPrefix={layoutIdPrefix}
+                    layoutIdPrefix={contentLayoutIdPrefix}
                     mode={mode}
                     onPointerDown={event =>
                       handleNodePointerDown(event, node.id)

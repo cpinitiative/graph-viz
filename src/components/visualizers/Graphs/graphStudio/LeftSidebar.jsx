@@ -554,10 +554,6 @@ const LeftSidebar = ({
             </option>
           ))}
         </NativeSelect>
-        <p className="px-1 text-[10px] font-medium leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-          Start blank, or load a worked example with explanatory frames and a
-          teaching legend.
-        </p>
       </SidebarSection>
 
       <SidebarSection>

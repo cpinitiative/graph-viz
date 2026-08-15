@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   visualStates: null,
   lockCanvas: false,
   viewState: null,
+  viewportSize: null,
   globalSettings: {
     forceStrength: 1,
     edgeCurvature: 46,
@@ -185,6 +186,16 @@ const sanitizeViewState = value => {
   return { zoom: clamp(zoom, 0.001, 2.6), x, y };
 };
 
+const sanitizeViewportSize = value => {
+  if (!isRecord(value)) return DEFAULT_SETTINGS.viewportSize;
+  const width = Number(value.width);
+  const height = Number(value.height);
+  if (![width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+    return DEFAULT_SETTINGS.viewportSize;
+  }
+  return { width, height };
+};
+
 const sanitizeSettings = settings => {
   const input = isRecord(settings) ? settings : {};
   const globalInput = isRecord(input.globalSettings)
@@ -218,6 +229,7 @@ const sanitizeSettings = settings => {
     }),
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
+    viewportSize: sanitizeViewportSize(input.viewportSize),
     globalSettings: {
       forceStrength: numberOrDefault(
         globalInput.forceStrength,

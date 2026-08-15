@@ -5,6 +5,7 @@ import {
   clampZoom,
   computeMinZoom,
   createFitViewState,
+  getWheelZoomFactor,
   recenterViewStateForViewportResize,
 } from '../../src/components/visualizers/Graphs/graphStudio/graphCanvasUtils.js';
 
@@ -132,5 +133,21 @@ test('viewport resize keeps the same world point at the canvas center', () => {
       nextViewport,
     }),
     null
+  );
+});
+
+test('wheel zoom scales smoothly with trackpad delta magnitude', () => {
+  const tinyZoomIn = getWheelZoomFactor({ deltaY: -10 });
+  const largeZoomIn = getWheelZoomFactor({ deltaY: -120 });
+  const tinyZoomOut = getWheelZoomFactor({ deltaY: 10 });
+
+  assert.ok(tinyZoomIn > 1);
+  assert.ok(largeZoomIn > tinyZoomIn);
+  assert.ok(tinyZoomOut < 1);
+  assert.ok(Math.abs(tinyZoomIn - 1) < 0.02);
+  assert.equal(getWheelZoomFactor({ deltaY: 0 }), 1);
+  assert.equal(
+    getWheelZoomFactor({ deltaY: -10000 }),
+    getWheelZoomFactor({ deltaY: -240 })
   );
 });

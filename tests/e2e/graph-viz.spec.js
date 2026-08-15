@@ -11,7 +11,10 @@ const watchForUnexpectedErrors = page => {
 
   page.on('console', message => {
     if (unexpectedConsoleTypes.has(message.type())) {
-      errors.push(`console.${message.type()}: ${message.text()}`);
+      const sourceUrl = message.location().url;
+      errors.push(
+        `console.${message.type()}: ${message.text()}${sourceUrl ? ` (${sourceUrl})` : ''}`
+      );
     }
   });
 
@@ -1952,6 +1955,47 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('keeps the active frame visible in long timelines', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await choosePreset(page, 'bfs');
+    const cards = page.getByTestId('timeline-frame-card');
+    const scroller = page.getByTestId('timeline-frame-scroller');
+
+    for (let index = 0; index < 12; index += 1) {
+      await page.getByRole('button', { name: 'Duplicate' }).click();
+    }
+    await expect(cards).toHaveCount(17);
+    await scroller.evaluate(element => {
+      element.scrollLeft = 0;
+    });
+    await cards.last().evaluate(element => element.click());
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect
+      .poll(async () => {
+        const scrollerBox = await scroller.boundingBox();
+        const cardBox = await cards.last().boundingBox();
+        return Boolean(
+          scrollerBox &&
+          cardBox &&
+          cardBox.x >= scrollerBox.x &&
+          cardBox.x + cardBox.width <= scrollerBox.x + scrollerBox.width
+        );
+      })
+      .toBe(true);
+    expect(
+      await scroller.evaluate(element => element.scrollLeft)
+    ).toBeGreaterThan(0);
+
+    await cards.first().evaluate(element => element.click());
+    await expect(cards.first()).toHaveAttribute('data-current', 'true');
+    await expect
+      .poll(() => scroller.evaluate(element => element.scrollLeft))
+      .toBeLessThanOrEqual(4);
+    expect(errors).toEqual([]);
+  });
+
   test('treats one snapped node drag as one undoable action', async ({
     page,
   }) => {
@@ -1993,6 +2037,43 @@ while (true) {}
     await expect(undoButton).toBeEnabled();
     await expect(redoButton).toBeDisabled();
 
+    expect(errors).toEqual([]);
+  });
+
+  test('preserves selected-node spacing during snapped group drags', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    const nodes = graphNodeCircles(page);
+    await nodes.nth(0).click();
+    await nodes.nth(1).click({ modifiers: ['Shift'] });
+
+    const before = await getNodePositionSnapshot(page);
+    const beforeDelta = {
+      x: before[1].x - before[0].x,
+      y: before[1].y - before[0].y,
+    };
+    const firstNodeBox = await getRequiredBox(nodes.nth(0));
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2,
+      firstNodeBox.y + firstNodeBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2 + 70,
+      firstNodeBox.y + firstNodeBox.height / 2 + 45,
+      { steps: 6 }
+    );
+    await page.mouse.up();
+
+    const after = await getNodePositionSnapshot(page);
+    expect(after[0]).not.toEqual(before[0]);
+    expect(after[1]).not.toEqual(before[1]);
+    expect(after[1].x - after[0].x).toBeCloseTo(beforeDelta.x, 8);
+    expect(after[1].y - after[0].y).toBeCloseTo(beforeDelta.y, 8);
     expect(errors).toEqual([]);
   });
 
@@ -2639,6 +2720,97 @@ while (true) {}
     await expect(graphCanvas(page).getByText('Back to A')).toHaveCount(0);
     await choosePreset(page, 'disjoint-set-union');
     await expect(graphCanvas(page).getByText('cycle')).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('centers the first preset load exactly like later preset loads', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const showCaption = page.getByRole('checkbox', { name: 'Show caption' });
+    await showCaption.check();
+    await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await expect(showCaption).not.toBeChecked();
+    await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
+    const firstBfsView = await getCanvasViewSnapshot(page);
+    const firstBfsBounds = await getRenderedContentViewportBounds(page);
+    expect(firstBfsBounds).not.toBeNull();
+    expect(
+      firstBfsBounds.left + firstBfsBounds.right - firstBfsBounds.viewportWidth
+    ).toBeCloseTo(0, 5);
+    expect(
+      firstBfsBounds.top + firstBfsBounds.bottom - firstBfsBounds.viewportHeight
+    ).toBeCloseTo(0, 5);
+    await page.waitForTimeout(400);
+    const settledBfsView = await getCanvasViewSnapshot(page);
+    const settledBfsBounds = await getRenderedContentViewportBounds(page);
+    expect(settledBfsBounds).not.toBeNull();
+    for (const dimension of ['left', 'right', 'top', 'bottom']) {
+      expect(Number(settledBfsBounds[dimension])).toBeCloseTo(
+        Number(firstBfsBounds[dimension]),
+        5
+      );
+    }
+    expect(Number(settledBfsView.x)).toBeCloseTo(Number(firstBfsView.x), 5);
+    expect(Number(settledBfsView.y)).toBeCloseTo(Number(firstBfsView.y), 5);
+    expect(Number(settledBfsView.zoom)).toBeCloseTo(
+      Number(firstBfsView.zoom),
+      5
+    );
+
+    await choosePreset(page, 'dfs');
+    await choosePreset(page, 'bfs');
+    const repeatedBfsView = await getCanvasViewSnapshot(page);
+
+    expect(Number(firstBfsView.x)).toBeCloseTo(Number(repeatedBfsView.x), 5);
+    expect(Number(firstBfsView.y)).toBeCloseTo(Number(repeatedBfsView.y), 5);
+    expect(Number(firstBfsView.zoom)).toBeCloseTo(
+      Number(repeatedBfsView.zoom),
+      5
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('centers every preset when it is the first project replacement', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    const presetValues = [
+      'bfs',
+      'dfs',
+      'topological-sort',
+      'disjoint-set-union',
+      'connected-components',
+      'kruskal-mst',
+      'dijkstra',
+      'dijkstra-shortest-paths',
+      'multigraph',
+    ];
+
+    for (const presetValue of presetValues) {
+      await page.goto('/');
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      await expect(graphCanvas(page)).toBeVisible();
+      await choosePreset(page, presetValue);
+
+      const bounds = await getRenderedContentViewportBounds(page);
+      expect(bounds, presetValue).not.toBeNull();
+      expect(
+        bounds.left + bounds.right - bounds.viewportWidth,
+        `${presetValue} horizontal center error`
+      ).toBeCloseTo(0, 3);
+      expect(
+        bounds.top + bounds.bottom - bounds.viewportHeight,
+        `${presetValue} vertical center error`
+      ).toBeCloseTo(0, 3);
+    }
 
     expect(errors).toEqual([]);
   });
@@ -3648,6 +3820,9 @@ while (true) {}
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.graphviz\.json$/);
+    const exportedProject = await readJsonDownload(download);
+    expect(exportedProject.settings.viewportSize.width).toBeGreaterThan(0);
+    expect(exportedProject.settings.viewportSize.height).toBeGreaterThan(0);
     await closeExportMenu(page);
 
     await openImportMenu(page);
@@ -3700,6 +3875,8 @@ while (true) {}
       x: 120,
       y: 80,
     });
+    expect(roundTripProject.settings.viewportSize.width).toBeGreaterThan(0);
+    expect(roundTripProject.settings.viewportSize.height).toBeGreaterThan(0);
     expect(roundTripProject.settings.globalSettings.forceStrength).toBe(1.2);
     await closeExportMenu(page);
 

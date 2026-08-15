@@ -104,6 +104,7 @@ const GraphNode = ({
         stroke={palette.stroke}
         strokeWidth="2"
         layoutId={`${layoutIdPrefix}node-${node.id}`}
+        initial={false}
         animate={{ cx: node.x, cy: node.y }}
         transition={
           shouldAnimate

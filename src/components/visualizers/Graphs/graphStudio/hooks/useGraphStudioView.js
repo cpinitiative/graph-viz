@@ -13,6 +13,7 @@ export const useGraphStudioView = ({
     createInitialViewState(initialNodes)
   );
   const [viewResetCounter, setViewResetCounter] = useState(0);
+  const [contentEpoch, setContentEpoch] = useState(0);
   const [lockCanvas, setLockCanvas] = useState(Boolean(initialLockCanvas));
   const viewportSizeRef = useRef({
     width: DEFAULT_VIEWPORT_WIDTH,
@@ -34,6 +35,10 @@ export const useGraphStudioView = ({
 
   const bumpViewReset = useCallback(() => {
     setViewResetCounter(count => count + 1);
+  }, []);
+
+  const bumpContentEpoch = useCallback(() => {
+    setContentEpoch(epoch => epoch + 1);
   }, []);
 
   const centerViewOnContent = useCallback(() => {
@@ -92,11 +97,13 @@ export const useGraphStudioView = ({
     viewState,
     setViewState,
     viewResetCounter,
+    contentEpoch,
     lockCanvas,
     setLockCanvas,
     setZoomViewportSize,
     getZoomViewportSize,
     bumpViewReset,
+    bumpContentEpoch,
     centerViewOnContent,
     zoomIn,
     zoomOut,

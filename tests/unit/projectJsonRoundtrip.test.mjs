@@ -91,6 +91,7 @@ test('real project serializer and parser preserve resolved temporal state', () =
     },
     lockCanvas: true,
     viewState: { x: 12, y: -18, zoom: 1.2 },
+    viewportSize: { width: 1440, height: 900 },
     globalSettings: {
       forceStrength: 1,
       edgeCurvature: 46,
@@ -123,6 +124,10 @@ test('real project serializer and parser preserve resolved temporal state', () =
     y: 0.15,
   });
   assert.equal(imported.settings.showGrid, true);
+  assert.deepEqual(imported.settings.viewportSize, {
+    width: 1440,
+    height: 900,
+  });
 
   assert.deepEqual(exported.timeline.steps[0].nodeOverrides.B, {
     visible: false,

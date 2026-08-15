@@ -221,11 +221,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     viewState,
     setViewState,
     viewResetCounter,
+    contentEpoch,
     lockCanvas,
     setLockCanvas,
     setZoomViewportSize,
     getZoomViewportSize,
     bumpViewReset,
+    bumpContentEpoch,
     centerViewOnContent,
     zoomIn,
     zoomOut,
@@ -622,6 +624,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     getZoomViewportSize,
     setViewState,
     bumpViewReset,
+    bumpContentEpoch,
     globalSettings,
     theme,
     setGlobalSettings,
@@ -687,12 +690,14 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     clearSelection();
     clearDrawState();
     resetUndoHistory();
+    bumpContentEpoch();
     if (!lockCanvas) bumpViewReset();
   }, [
     seedTimeline,
     replaceTimeline,
     resetUndoHistory,
     bumpViewReset,
+    bumpContentEpoch,
     clearSelection,
     clearDrawState,
     lockCanvas,
@@ -937,6 +942,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextGraph = cloneJson(semanticPreset.graph);
     const nextSteps = cloneJson(semanticPreset.steps);
     replaceTimeline(nextGraph, nextSteps);
+    bumpContentEpoch();
     if (!lockCanvas) {
       bumpViewReset();
     }
@@ -953,6 +959,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         enabled: presetName === 'blank' ? false : Boolean(prev?.enabled),
       })
     );
+    setCaptionOverlay(prev => ({
+      ...normalizeCaptionOverlay(prev),
+      enabled: false,
+    }));
     usageTracker.recordPresetLoaded(presetName, {
       hasTimeline: nextSteps.length > 1,
     });
@@ -1088,6 +1098,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       nodeLabelFontSize: globalSettings.nodeLabelFontSize,
       edgeLabelFontSize: globalSettings.edgeLabelFontSize,
       resetViewTrigger: viewResetCounter,
+      contentEpoch,
       onSelectNode,
       onSelectEdge,
       onSelectNodes,
