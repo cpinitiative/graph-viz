@@ -7,6 +7,11 @@ import {
 } from '../../src/components/visualizers/Graphs/graphStudio/lib/projectJson.js';
 import { resolveFrameGraph } from '../../src/components/visualizers/Graphs/graphStudio/lib/temporalGraphState.js';
 
+const withoutSemanticStateRefs = graph => ({
+  nodes: graph.nodes.map(({ stateId: _stateId, ...node }) => node),
+  edges: graph.edges.map(({ stateId: _stateId, ...edge }) => edge),
+});
+
 test('real project serializer and parser preserve resolved temporal state', () => {
   const baseGraph = {
     nodes: [
@@ -86,6 +91,7 @@ test('real project serializer and parser preserve resolved temporal state', () =
     },
     lockCanvas: true,
     viewState: { x: 12, y: -18, zoom: 1.2 },
+    viewportSize: { width: 1440, height: 900 },
     globalSettings: {
       forceStrength: 1,
       edgeCurvature: 46,
@@ -118,6 +124,10 @@ test('real project serializer and parser preserve resolved temporal state', () =
     y: 0.15,
   });
   assert.equal(imported.settings.showGrid, true);
+  assert.deepEqual(imported.settings.viewportSize, {
+    width: 1440,
+    height: 900,
+  });
 
   assert.deepEqual(exported.timeline.steps[0].nodeOverrides.B, {
     visible: false,
@@ -133,8 +143,10 @@ test('real project serializer and parser preserve resolved temporal state', () =
 
   imported.timeline.steps.forEach((step, index) => {
     assert.deepEqual(
-      resolveFrameGraph(imported.graph, step),
-      resolveFrameGraph(exported.graph, exported.timeline.steps[index])
+      withoutSemanticStateRefs(resolveFrameGraph(imported.graph, step)),
+      withoutSemanticStateRefs(
+        resolveFrameGraph(exported.graph, exported.timeline.steps[index])
+      )
     );
   });
 
@@ -148,4 +160,45 @@ test('real project serializer and parser preserve resolved temporal state', () =
   const incidentEdge = derivedFrame.edges.find(edge => edge.id === 'e1');
   assert.equal(isEdgeEffectivelyVisible(incidentEdge, nodeMap), false);
   assert.deepEqual(imported.timeline.steps[2].edgeOverrides, {});
+});
+
+test('project roundtrip preserves semantic visual states and smart legend mode', () => {
+  const visualStates = [
+    {
+      id: 'node-frontier',
+      kind: 'node',
+      label: 'Frontier node',
+      color: '#3B82F6',
+      pinned: true,
+    },
+  ];
+  const payload = exportProjectJson({
+    baseGraph: {
+      nodes: [{ id: 'A', label: 'A', x: 40, y: 40, stateId: 'node-frontier' }],
+      edges: [],
+    },
+    steps: [
+      {
+        id: 'frame-1',
+        description: 'Frontier',
+        durationMs: 600,
+        nodeOverrides: { A: { stateId: 'node-frontier' } },
+        edgeOverrides: {},
+      },
+    ],
+    currentFrame: 0,
+    settings: {
+      visualStates,
+      customLegend: { enabled: true, mode: 'smart', title: 'Search state' },
+    },
+  });
+
+  const imported = parseProjectJson(JSON.stringify(payload));
+  assert.deepEqual(imported.settings.visualStates, visualStates);
+  assert.equal(imported.settings.customLegend.mode, 'smart');
+  assert.equal(imported.graph.nodes[0].stateId, 'node-frontier');
+  assert.equal(
+    imported.timeline.steps[0].nodeOverrides.A.stateId,
+    'node-frontier'
+  );
 });

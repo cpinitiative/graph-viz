@@ -9,6 +9,9 @@ const MIN_ZOOM_FLOOR = 0.05;
 const FIT_ZOOM_FLOOR = 0.001;
 const MAX_ZOOM = 2.6;
 const EPSILON = 0.001;
+const MAX_WHEEL_DELTA_PX = 240;
+const WHEEL_ZOOM_SENSITIVITY = 0.001;
+const WHEEL_LINE_HEIGHT_PX = 16;
 const STRAIGHT_PARALLEL_SPACING = 24;
 const CURVED_PARALLEL_SPACING = 20;
 const MAX_STRAIGHT_FAN_SHIFT = 60;
@@ -31,6 +34,27 @@ export const clampZoom = zoom => {
 
 export const clampFitZoom = zoom =>
   Math.max(FIT_ZOOM_FLOOR, Math.min(MAX_ZOOM, zoom));
+
+export const getWheelZoomFactor = ({
+  deltaY,
+  deltaMode = 0,
+  viewportHeight = 0,
+}) => {
+  const rawDelta = Number(deltaY);
+  if (!Number.isFinite(rawDelta) || rawDelta === 0) return 1;
+  const pageHeight = Math.max(1, Number(viewportHeight) || 1);
+  const pixelDelta =
+    deltaMode === 1
+      ? rawDelta * WHEEL_LINE_HEIGHT_PX
+      : deltaMode === 2
+        ? rawDelta * pageHeight
+        : rawDelta;
+  const boundedDelta = Math.max(
+    -MAX_WHEEL_DELTA_PX,
+    Math.min(MAX_WHEEL_DELTA_PX, pixelDelta)
+  );
+  return Math.exp(-boundedDelta * WHEEL_ZOOM_SENSITIVITY);
+};
 
 export const createFitViewState = ({
   bounds,
@@ -79,6 +103,38 @@ export const createFitViewState = ({
     zoom,
     x: viewportW / 2 - centerX * zoom,
     y: viewportH / 2 - centerY * zoom,
+  };
+};
+
+export const recenterViewStateForViewportResize = ({
+  viewState,
+  previousViewport,
+  nextViewport,
+}) => {
+  const x = Number(viewState?.x);
+  const y = Number(viewState?.y);
+  const zoom = Number(viewState?.zoom);
+  const previousWidth = Number(previousViewport?.width);
+  const previousHeight = Number(previousViewport?.height);
+  const nextWidth = Number(nextViewport?.width);
+  const nextHeight = Number(nextViewport?.height);
+  if (
+    ![x, y, zoom, previousWidth, previousHeight, nextWidth, nextHeight].every(
+      Number.isFinite
+    ) ||
+    zoom <= 0 ||
+    previousWidth <= 0 ||
+    previousHeight <= 0 ||
+    nextWidth <= 0 ||
+    nextHeight <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    ...viewState,
+    x: x + (nextWidth - previousWidth) / 2,
+    y: y + (nextHeight - previousHeight) / 2,
   };
 };
 

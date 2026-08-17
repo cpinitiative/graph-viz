@@ -8,7 +8,7 @@ Use the editor at [graph-viz.usaco.guide](https://graph-viz.usaco.guide/).
 
 ## What You Can Make
 
-- Frame-by-frame animations with captions, timing, and a custom legend
+- Frame-by-frame animations with captions, timing, and a smart or custom legend
 - Static PNG and SVG figures
 - PPTX slideshows with one slide per selected frame
 - MP4 videos for lessons and presentations
@@ -22,7 +22,7 @@ primary support target.
 ## Author Workflow
 
 1. Load an educational preset or choose **Blank Project** to start from scratch.
-2. Edit labels, positions, weights, edge direction, colors, and styles.
+2. Edit labels, positions, weights, edge direction, and reusable visual states.
 3. Add frames and describe each meaningful step of the algorithm.
 4. Adjust frame-specific appearance and visibility to show what changes.
 5. Review the animation, then export the format your lesson needs.
@@ -50,6 +50,22 @@ changes during an explanation:
 This lets an author express an algorithm's progression without maintaining a
 separate copy of the whole graph for every step.
 
+## Visual States and Legends
+
+A visual state gives a color a project-specific meaning, such as **Front of
+queue**, **Distance finalized**, or **Rejected edge**. Apply states from the
+node and edge inspectors instead of repeatedly choosing raw colors. Renaming or
+recoloring a state updates every frame that uses it.
+
+The default **Smart** legend is derived from states used anywhere in the
+project—not only the current frame—so its entries remain stable during playback.
+Unused states stay out of the legend unless they are pinned. Use **Custom** mode
+when the explanation needs entries that are independent from graph styling;
+switching from Smart to Custom starts with a copy of the current smart entries.
+
+Older project files and presets remain importable. Legacy node styles are
+preserved and converted to project states where needed.
+
 Use the visible **Undo** and **Redo** controls, or press
 <kbd>Ctrl</kbd>/<kbd>Command</kbd>+<kbd>Z</kbd> to undo and
 <kbd>Ctrl</kbd>/<kbd>Command</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> to redo. Text
@@ -58,10 +74,11 @@ fields retain their normal browser history while they are being edited.
 ## Saving and Recovery
 
 Graph Viz keeps a recovery draft in this browser as you edit and restores it
-automatically when you return. The graph, frames, current frame, legend, and
-editor settings come back; the canvas is fit to the current workspace instead of
-replaying pan and zoom coordinates from an older window size. Choose **Blank
-Project** when you intentionally want to replace the recovered work.
+automatically when you return. The graph, frames, current frame, visual states,
+legend, and editor settings come back; the canvas is fit to the current
+workspace instead of replaying pan and zoom coordinates from an older window
+size. Choose **Blank Project** when you intentionally want to replace the
+recovered work.
 
 A browser draft is a safety net, not a durable save:
 

@@ -23,6 +23,10 @@ import {
   sanitizeTemporalOverrideMap,
   sanitizeTemporalOverridePatch,
 } from './temporalOverrideSchema.js';
+import {
+  migrateLegacyVisualStates,
+  normalizeVisualStates,
+} from './visualStates.js';
 
 const PROJECT_FORMAT = 'graph-viz-project';
 const PROJECT_VERSION = 1;
@@ -39,8 +43,10 @@ const DEFAULT_SETTINGS = {
   showGrid: true,
   captionOverlay: DEFAULT_CAPTION_OVERLAY,
   customLegend: DEFAULT_CUSTOM_LEGEND,
+  visualStates: null,
   lockCanvas: false,
   viewState: null,
+  viewportSize: null,
   globalSettings: {
     forceStrength: 1,
     edgeCurvature: 46,
@@ -180,6 +186,16 @@ const sanitizeViewState = value => {
   return { zoom: clamp(zoom, 0.001, 2.6), x, y };
 };
 
+const sanitizeViewportSize = value => {
+  if (!isRecord(value)) return DEFAULT_SETTINGS.viewportSize;
+  const width = Number(value.width);
+  const height = Number(value.height);
+  if (![width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+    return DEFAULT_SETTINGS.viewportSize;
+  }
+  return { width, height };
+};
+
 const sanitizeSettings = settings => {
   const input = isRecord(settings) ? settings : {};
   const globalInput = isRecord(input.globalSettings)
@@ -208,8 +224,12 @@ const sanitizeSettings = settings => {
     showGrid,
     captionOverlay: normalizeCaptionOverlay(input.captionOverlay),
     customLegend,
+    visualStates: normalizeVisualStates(input.visualStates, {
+      useDefaults: true,
+    }),
     lockCanvas: booleanOrDefault(input.lockCanvas, DEFAULT_SETTINGS.lockCanvas),
     viewState: sanitizeViewState(input.viewState),
+    viewportSize: sanitizeViewportSize(input.viewportSize),
     globalSettings: {
       forceStrength: numberOrDefault(
         globalInput.forceStrength,
@@ -341,10 +361,17 @@ export const validateProjectPayload = payload => {
       ? rawFrame
       : 0;
 
-  return {
+  const settings = sanitizeSettings(payload.settings);
+  const migrated = migrateLegacyVisualStates({
     graph: { nodes, edges },
-    timeline: { steps, currentFrame },
-    settings: sanitizeSettings(payload.settings),
+    steps,
+    visualStates: settings.visualStates,
+  });
+
+  return {
+    graph: migrated.graph,
+    timeline: { steps: migrated.steps, currentFrame },
+    settings: { ...settings, visualStates: migrated.visualStates },
   };
 };
 

@@ -1,4 +1,7 @@
 import { GRAPH_STATE_COLORS } from './stateColors.js';
+import { deriveSmartLegendEntries } from './visualStates.js';
+
+export const LEGEND_MODES = Object.freeze(['smart', 'custom']);
 
 export const CUSTOM_LEGEND_POSITIONS = [
   'auto',
@@ -63,6 +66,7 @@ export const DEFAULT_CUSTOM_LEGEND_ENTRIES = [
 
 export const DEFAULT_CUSTOM_LEGEND = {
   enabled: false,
+  mode: 'smart',
   title: 'Legend',
   position: 'auto',
   customPosition: {
@@ -140,6 +144,11 @@ export const normalizeCustomLegend = value => {
       typeof value.enabled === 'boolean'
         ? value.enabled
         : DEFAULT_CUSTOM_LEGEND.enabled,
+    mode: LEGEND_MODES.includes(value.mode)
+      ? value.mode
+      : Array.isArray(value.entries)
+        ? 'custom'
+        : DEFAULT_CUSTOM_LEGEND.mode,
     title: title || DEFAULT_CUSTOM_LEGEND.title,
     entries,
     position: CUSTOM_LEGEND_POSITIONS.includes(value.position)
@@ -149,5 +158,19 @@ export const normalizeCustomLegend = value => {
       x: x ?? DEFAULT_CUSTOM_LEGEND.customPosition.x,
       y: y ?? DEFAULT_CUSTOM_LEGEND.customPosition.y,
     },
+  };
+};
+
+export const resolveProjectLegend = ({
+  customLegend,
+  visualStates,
+  baseGraph,
+  steps,
+}) => {
+  const legend = normalizeCustomLegend(customLegend);
+  if (legend.mode !== 'smart') return legend;
+  return {
+    ...legend,
+    entries: deriveSmartLegendEntries({ visualStates, baseGraph, steps }),
   };
 };

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SCRIPT } from '../data/defaultScript';
+import { recenterViewStateForViewportResize } from '../graphCanvasUtils';
 import {
   exportEdgeListText,
   parseEdgeListText,
@@ -29,6 +30,7 @@ import {
   IMAGE_FRAMING,
   waitForExportReady,
 } from '../lib/timelineFrameCapture';
+import { normalizeVisualStates } from '../lib/visualStates';
 
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
 
@@ -60,13 +62,17 @@ export const useGraphStudioImportExport = ({
   captionOverlay,
   setCaptionOverlay,
   customLegend,
+  renderLegend,
   setCustomLegend,
+  visualStates,
+  setVisualStates,
   lockCanvas,
   setLockCanvas,
   viewState,
   getZoomViewportSize,
   setViewState,
   bumpViewReset,
+  bumpContentEpoch,
   globalSettings,
   theme,
   setGlobalSettings,
@@ -93,7 +99,7 @@ export const useGraphStudioImportExport = ({
       edgeLabelFontSize: globalSettings?.edgeLabelFontSize,
       theme,
       baseCaptionOverlay: normalizeCaptionOverlay(captionOverlay),
-      customLegend: normalizeCustomLegend(customLegend),
+      customLegend: normalizeCustomLegend(renderLegend ?? customLegend),
     }),
     [
       captionOverlay,
@@ -101,6 +107,7 @@ export const useGraphStudioImportExport = ({
       edgeRouting,
       getZoomViewportSize,
       globalSettings,
+      renderLegend,
       theme,
       viewState,
     ]
@@ -316,6 +323,7 @@ export const useGraphStudioImportExport = ({
           edgeOverrides: {},
         },
       ]);
+      bumpContentEpoch?.();
       if (!lockCanvas) {
         bumpViewReset?.();
       }
@@ -336,6 +344,7 @@ export const useGraphStudioImportExport = ({
     clearDrawState,
     clearSelection,
     bumpViewReset,
+    bumpContentEpoch,
     lockCanvas,
     onProjectGenerated,
     parserText,
@@ -378,8 +387,12 @@ export const useGraphStudioImportExport = ({
         showGrid,
         captionOverlay: normalizeCaptionOverlay(captionOverlay),
         customLegend: normalizeCustomLegend(customLegend),
+        visualStates: normalizeVisualStates(visualStates, {
+          useDefaults: true,
+        }),
         lockCanvas,
         viewState,
+        viewportSize: getZoomViewportSize?.(),
         globalSettings,
       },
     });
@@ -400,6 +413,8 @@ export const useGraphStudioImportExport = ({
     snapEnabled,
     steps,
     viewState,
+    getZoomViewportSize,
+    visualStates,
   ]);
 
   const exportSvg = useCallback(
@@ -486,12 +501,18 @@ export const useGraphStudioImportExport = ({
       setShowGrid(project.settings.showGrid);
       setCaptionOverlay(project.settings.captionOverlay);
       setCustomLegend(project.settings.customLegend);
+      setVisualStates(project.settings.visualStates);
       setLockCanvas(project.settings.lockCanvas);
       setGlobalSettings(project.settings.globalSettings);
+      bumpContentEpoch?.();
       if (project.settings.viewState) {
-        setViewState(project.settings.viewState);
-        // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
-        window.setTimeout(() => setViewState(project.settings.viewState), 0);
+        const mappedViewState =
+          recenterViewStateForViewportResize({
+            viewState: project.settings.viewState,
+            previousViewport: project.settings.viewportSize,
+            nextViewport: getZoomViewportSize?.(),
+          }) ?? project.settings.viewState;
+        setViewState(mappedViewState);
       } else {
         bumpViewReset?.();
       }
@@ -508,6 +529,8 @@ export const useGraphStudioImportExport = ({
       clearDrawState,
       clearSelection,
       bumpViewReset,
+      bumpContentEpoch,
+      getZoomViewportSize,
       onProjectImported,
       replaceTimeline,
       resetUndoHistory,
@@ -518,6 +541,7 @@ export const useGraphStudioImportExport = ({
       setShowGrid,
       setCaptionOverlay,
       setCustomLegend,
+      setVisualStates,
       setSnapEnabled,
       setStatus,
       setViewState,

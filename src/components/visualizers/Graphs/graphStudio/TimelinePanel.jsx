@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
@@ -287,6 +287,19 @@ const TimelinePanel = ({
   playbackDisabled = false,
 }) => {
   const frameRefs = useRef([]);
+  const frameScrollerRef = useRef(null);
+  useLayoutEffect(() => {
+    const scroller = frameScrollerRef.current;
+    const currentCard = frameRefs.current[currentFrame];
+    if (!scroller || !currentCard) return;
+    const scrollerBounds = scroller.getBoundingClientRect();
+    const cardBounds = currentCard.getBoundingClientRect();
+    if (cardBounds.left < scrollerBounds.left) {
+      scroller.scrollLeft -= scrollerBounds.left - cardBounds.left + 4;
+    } else if (cardBounds.right > scrollerBounds.right) {
+      scroller.scrollLeft += cardBounds.right - scrollerBounds.right + 4;
+    }
+  }, [currentFrame, steps.length]);
   const moveFrameFocus = (index, delta) => {
     const nextIndex = Math.max(0, Math.min(steps.length - 1, index + delta));
     onFrameChange(nextIndex);
@@ -409,7 +422,11 @@ const TimelinePanel = ({
         </div>
       </div>
 
-      <div className="min-h-[58px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
+      <div
+        ref={frameScrollerRef}
+        className="min-h-[58px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]"
+        data-testid="timeline-frame-scroller"
+      >
         <div
           aria-label="Timeline frames"
           className="flex h-full min-w-max items-center gap-2"

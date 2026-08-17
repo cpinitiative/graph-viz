@@ -357,6 +357,12 @@ const ModalStack = ({
       open={modals.legend.open}
       customLegend={modals.legend.customLegend}
       setCustomLegend={modals.legend.setCustomLegend}
+      resolvedLegend={modals.legend.resolvedLegend}
+      visualStates={modals.legend.visualStates}
+      onAddVisualState={modals.legend.onAddVisualState}
+      onUpdateVisualState={modals.legend.onUpdateVisualState}
+      onMoveVisualState={modals.legend.onMoveVisualState}
+      onRemoveVisualState={modals.legend.onRemoveVisualState}
       onClose={modals.legend.onClose}
     />
   </>
