@@ -10,6 +10,8 @@ export const useGraphStudioCanvasHandlers = ({
   computedGraph,
   addEdge,
   updateBaseNodesBulk,
+  beginTransaction,
+  endTransaction,
   selectedObject,
   selectedNodeIds,
   selectedNodeIdSet,
@@ -133,6 +135,7 @@ export const useGraphStudioCanvasHandlers = ({
       );
       const anchor = nodeMap.get(String(nodeId));
       if (!anchor) return;
+      beginTransaction?.();
       const offsets = {};
       dragNodeIds.forEach(id => {
         const node = nodeMap.get(String(id));
@@ -145,7 +148,7 @@ export const useGraphStudioCanvasHandlers = ({
         offsets,
       };
     },
-    [baseGraph.nodes, selectedNodeIdSet]
+    [baseGraph.nodes, selectedNodeIdSet, beginTransaction]
   );
 
   const onNodeMove = useCallback(
@@ -169,7 +172,8 @@ export const useGraphStudioCanvasHandlers = ({
 
   const onNodePointerUp = useCallback(() => {
     dragStateRef.current = null;
-  }, []);
+    endTransaction?.();
+  }, [endTransaction]);
 
   return {
     drawFrom,

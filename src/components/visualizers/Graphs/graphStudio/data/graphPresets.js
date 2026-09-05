@@ -1,1602 +1,614 @@
-const makePresetLegend = (title, entries) => ({
-  title,
-  position: 'bottom-right',
-  entries,
+import { GRAPH_STATE_COLORS as C } from '../lib/stateColors.js';
+
+const nodeKey = (label, status, color) => ({
+  kind: 'node',
+  group: 'Nodes',
+  label,
+  status,
+  color: color ?? C[`node${status[0].toUpperCase()}${status.slice(1)}`],
 });
+const edgeKey = (label, color, status = 'default') => ({
+  kind: 'edge',
+  group: 'Edges',
+  label,
+  color,
+  status,
+});
+const legend = (title, entries) => ({
+  title,
+  entries,
+  enabled: true,
+  layout: 'compact',
+  position: 'top-left',
+});
+const graph = (labels, points, edges, directed = false) => ({
+  nodes: labels.map((label, id) => ({
+    id,
+    label,
+    x: points[id][0],
+    y: points[id][1],
+    visible: true,
+  })),
+  edges: edges.map(([from, to, label = ''], i) => ({
+    id: `e${i}`,
+    from,
+    to,
+    label: String(label),
+    directed,
+    visible: true,
+    color: C.edgeDefault,
+  })),
+});
+// Every frame owns a complete visual snapshot: selecting frames out of order
+// must never leave a stale candidate edge or a stale distance on screen.
+const timeline = g => {
+  const nodes = Object.fromEntries(
+    g.nodes.map(n => [n.id, { status: 'default', color: '', annotation: '' }])
+  );
+  const edges = Object.fromEntries(
+    g.edges.map(e => [e.id, { status: 'default', color: C.edgeDefault }])
+  );
+  const steps = [];
+  const frame = description =>
+    steps.push({
+      id: `s${steps.length}`,
+      description,
+      durationMs: Math.min(3000, Math.max(1800, 600 + description.length * 45)),
+      nodeOverrides: structuredClone(nodes),
+      edgeOverrides: structuredClone(edges),
+    });
+  const node = (id, status, extra = {}) => {
+    nodes[id] = { ...nodes[id], status, color: '', ...extra };
+  };
+  const edge = (id, color, status = 'default') => {
+    edges[id] = { color, status };
+  };
+  return { nodes, edges, steps, frame, node, edge };
+};
+const presentation = (g, t, key) => ({
+  graph: g,
+  steps: t.steps,
+  legend: key,
+  settings: {
+    nodeSize: 32,
+    nodeLabelFontSize: 18,
+    edgeWidth: 3,
+    edgeLabelFontSize: 18,
+    edgeCurvature: 0.3,
+  },
+  captionOverlay: {
+    enabled: true,
+    position: { x: 0, y: 1 },
+    style: 'subtle',
+    size: 'large',
+    fontSize: 18,
+  },
+});
+const tree = directed =>
+  graph(
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    [
+      [360, 80],
+      [200, 240],
+      [520, 240],
+      [80, 400],
+      [320, 400],
+      [600, 400],
+    ],
+    [
+      [0, 1],
+      [0, 2],
+      [1, 3],
+      [1, 4],
+      [2, 5],
+    ],
+    directed
+  );
 
-const traversalLegendEntries = [
-  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Current edge', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Completed edge', color: '#22C55E' },
-];
-
-const BFS_LEGEND = makePresetLegend('BFS Legend', traversalLegendEntries);
-const DFS_LEGEND = makePresetLegend('DFS Legend', traversalLegendEntries);
-
-const DIJKSTRA_LEGEND = makePresetLegend('Dijkstra Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Current minimum', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Relaxing edge', color: '#3B82F6' },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Final shortest-path edge',
-    color: '#22C55E',
-  },
-  { group: 'Edges', kind: 'edge', label: 'Superseded edge', color: '#64748B' },
-]);
-
-const DIJKSTRA_SHORTEST_PATHS_LEGEND = makePresetLegend('Dijkstra Legend', [
-  {
-    group: 'Nodes',
-    kind: 'node',
-    label: 'Current minimum',
-    color: '#3B82F6',
-  },
-  { group: 'Nodes', kind: 'node', label: 'Candidate node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Finalized node', color: '#22C55E' },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Relaxed candidate edge',
-    color: '#F59E0B',
-  },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Final shortest-path edge',
-    color: '#22C55E',
-  },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Superseded edge',
-    color: '#64748B',
-  },
-]);
-
-const KRUSKAL_LEGEND = makePresetLegend('Kruskal MST Legend', [
-  {
-    group: 'Nodes',
-    kind: 'node',
-    label: 'Candidate endpoints',
-    color: '#3B82F6',
-  },
-  {
-    group: 'Nodes',
-    kind: 'node',
-    label: 'Unprocessed nodes',
-    color: '#EAB308',
-  },
-  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#22C55E' },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Accepted MST edge',
-    color: '#22C55E',
-  },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Rejected cycle edge',
-    color: '#DC2626',
-  },
-  { group: 'Edges', kind: 'edge', label: 'Unprocessed edge', color: '#64748B' },
-]);
-
-const TOPOLOGICAL_SORT_LEGEND = makePresetLegend('Topological Sort Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Ready node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Processing node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Output node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Removing edge', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Processed edge', color: '#22C55E' },
-]);
-
-const DSU_LEGEND = makePresetLegend('DSU Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Component A', color: '#BFDBFE' },
-  { group: 'Nodes', kind: 'node', label: 'Component B', color: '#FED7AA' },
-  { group: 'Nodes', kind: 'node', label: 'Merged component', color: '#BBF7D0' },
-  { group: 'Edges', kind: 'edge', label: 'Accepted union', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Rejected cycle', color: '#DC2626' },
-]);
-
-const CONNECTED_COMPONENTS_LEGEND = makePresetLegend(
-  'Connected Components Legend',
-  [
-    { group: 'Nodes', kind: 'node', label: 'Component 1', color: '#BFDBFE' },
-    { group: 'Nodes', kind: 'node', label: 'Component 2', color: '#FED7AA' },
-    { group: 'Nodes', kind: 'node', label: 'Component 3', color: '#DDD6FE' },
-    { group: 'Nodes', kind: 'node', label: 'Frontier node', color: '#EAB308' },
-    {
-      group: 'Edges',
-      kind: 'edge',
-      label: 'Traversing edge',
-      color: '#3B82F6',
-    },
-    { group: 'Edges', kind: 'edge', label: 'Component edge', color: '#22C55E' },
-  ]
-);
-
-const MULTIGRAPH_LEGEND = makePresetLegend('Multi-Edge / Loop Legend', [
-  { group: 'Nodes', kind: 'node', label: 'Active node', color: '#3B82F6' },
-  { group: 'Nodes', kind: 'node', label: 'Queued node', color: '#EAB308' },
-  { group: 'Nodes', kind: 'node', label: 'Visited node', color: '#22C55E' },
-  { group: 'Edges', kind: 'edge', label: 'Candidate path', color: '#3B82F6' },
-  { group: 'Edges', kind: 'edge', label: 'Selected path', color: '#22C55E' },
-  {
-    group: 'Edges',
-    kind: 'edge',
-    label: 'Non-selected path',
-    color: '#64748B',
-  },
-]);
+const bfs = () => {
+  const g = tree(false),
+    t = timeline(g),
+    queue = [0],
+    seen = new Set([0]);
+  t.node(0, 'queued');
+  t.frame('BFS · Queue: A');
+  while (queue.length) {
+    const id = queue.shift();
+    t.node(id, 'active');
+    t.frame(
+      `Visit ${g.nodes[id].label} · Queue: ${queue.map(i => g.nodes[i].label).join(', ') || 'empty'}`
+    );
+    const discovered = [];
+    for (const e of g.edges.filter(e => e.from === id)) {
+      if (seen.has(e.to)) continue;
+      seen.add(e.to);
+      queue.push(e.to);
+      discovered.push(g.nodes[e.to].label);
+      t.node(e.to, 'queued');
+      t.edge(e.id, C.nodeActive, 'active');
+    }
+    if (discovered.length)
+      t.frame(`Queue ${discovered.join(', ')} · FIFO order`);
+    t.node(id, 'visited');
+    g.edges
+      .filter(e => e.from === id)
+      .forEach(e => t.edge(e.id, C.edgeCompleted, 'completed'));
+  }
+  t.frame('BFS order: A, B, C, D, E, F');
+  return presentation(
+    g,
+    t,
+    legend('BFS', [
+      nodeKey('Current', 'active'),
+      nodeKey('Queued', 'queued'),
+      nodeKey('Done', 'visited'),
+      edgeKey('Discover', C.nodeActive, 'active'),
+      edgeKey('Tree edge', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
+const dfs = () => {
+  const g = tree(true),
+    t = timeline(g),
+    stack = [],
+    order = [];
+  const visit = id => {
+    stack.push(id);
+    order.push(g.nodes[id].label);
+    t.node(id, 'active');
+    t.frame(
+      `Enter ${g.nodes[id].label} · Stack: ${stack.map(i => g.nodes[i].label).join(' → ')}`
+    );
+    for (const e of g.edges.filter(e => e.from === id)) {
+      t.edge(e.id, C.nodeActive, 'active');
+      visit(e.to);
+      t.edge(e.id, C.edgeCompleted, 'completed');
+    }
+    stack.pop();
+    t.node(id, 'visited');
+    t.frame(
+      stack.length
+        ? `Return ${g.nodes[id].label} → ${g.nodes[stack.at(-1)].label}`
+        : 'Return from A · Stack empty'
+    );
+  };
+  visit(0);
+  t.frame(`DFS order: ${order.join(', ')}`);
+  return presentation(
+    g,
+    t,
+    legend('DFS', [
+      nodeKey('On stack', 'active'),
+      nodeKey('Finished', 'visited'),
+      edgeKey('Descend', C.nodeActive, 'active'),
+      edgeKey('Returned', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
+const dijkstra = extended => {
+  const g = extended
+    ? graph(
+        ['S', 'A', 'B', 'C', 'D', 'T'],
+        [
+          [0, 180],
+          [220, 0],
+          [220, 360],
+          [460, 0],
+          [460, 360],
+          [680, 180],
+        ],
+        [
+          [0, 1, 2],
+          [0, 2, 5],
+          [1, 2, 1],
+          [1, 3, 2],
+          [2, 4, 2],
+          [3, 4, 1],
+          [3, 5, 7],
+          [4, 5, 3],
+        ],
+        true
+      )
+    : graph(
+        ['A', 'B', 'C', 'D'],
+        [
+          [0, 180],
+          [240, 0],
+          [240, 360],
+          [480, 180],
+        ],
+        [
+          [0, 1, 4],
+          [0, 2, 1],
+          [2, 1, 2],
+          [1, 3, 1],
+          [2, 3, 5],
+        ],
+        true
+      );
+  const t = timeline(g),
+    distance = g.nodes.map(() => Infinity),
+    parent = new Map(),
+    done = new Set();
+  distance[0] = 0;
+  const labels = () =>
+    g.nodes.forEach(n => {
+      t.nodes[n.id].annotation =
+        `${n.label}:${Number.isFinite(distance[n.id]) ? distance[n.id] : '∞'}`;
+    });
+  labels();
+  t.node(0, 'queued');
+  t.frame(`Dijkstra · ${g.nodes[0].label}=0; others=∞`);
+  while (done.size < g.nodes.length) {
+    const id = g.nodes
+      .filter(n => !done.has(n.id))
+      .sort((a, b) => distance[a.id] - distance[b.id])[0]?.id;
+    if (id === undefined || !Number.isFinite(distance[id])) break;
+    t.node(id, 'active');
+    if (parent.has(id)) t.edge(parent.get(id), C.edgeCompleted, 'completed');
+    t.frame(`Settle ${g.nodes[id].label} · Minimum distance ${distance[id]}`);
+    for (const e of g.edges.filter(e => e.from === id && !done.has(e.to))) {
+      const next = distance[id] + Number(e.label),
+        old = distance[e.to];
+      if (next < old) {
+        if (parent.has(e.to)) t.edge(parent.get(e.to), C.edgeDefault);
+        parent.set(e.to, e.id);
+        distance[e.to] = next;
+        t.node(e.to, 'queued');
+        t.edge(e.id, C.nodeActive, 'active');
+        labels();
+        t.frame(
+          `${g.nodes[id].label} → ${g.nodes[e.to].label}: ${distance[id]} + ${e.label} = ${next}${Number.isFinite(old) ? ` < ${old}` : ''}`
+        );
+      } else if (next === old) {
+        t.frame(
+          `${g.nodes[id].label} → ${g.nodes[e.to].label}: tie at ${old} · Keep first parent`
+        );
+      }
+    }
+    done.add(id);
+    t.node(id, 'visited');
+  }
+  t.frame(
+    extended ? 'Shortest paths from S · T = 8' : 'Shortest paths from A · D = 4'
+  );
+  return presentation(
+    g,
+    t,
+    legend('Dijkstra · node:distance', [
+      nodeKey('Current', 'active'),
+      nodeKey('Candidate', 'queued'),
+      nodeKey('Settled', 'visited'),
+      edgeKey('Best so far', C.nodeActive, 'active'),
+      edgeKey('Tree edge', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
+const kruskal = () => {
+  const g = graph(
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    [
+      [0, 0],
+      [100, 230],
+      [280, 0],
+      [380, 230],
+      [560, 0],
+      [560, 400],
+    ],
+    [
+      [0, 1, 1],
+      [1, 3, 2],
+      [2, 4, 3],
+      [0, 2, 4],
+      [3, 4, 5],
+      [4, 5, 6],
+      [2, 3, 7],
+      [1, 2, 8],
+      [3, 5, 9],
+    ]
+  );
+  const t = timeline(g),
+    parent = g.nodes.map(n => n.id);
+  const find = id => (parent[id] === id ? id : find(parent[id]));
+  let count = 0,
+    total = 0;
+  t.frame('Kruskal · Try edges from lightest to heaviest');
+  for (const e of [...g.edges].sort(
+    (a, b) => Number(a.label) - Number(b.label)
+  )) {
+    t.edge(e.id, C.nodeActive, 'active');
+    t.node(e.from, 'active');
+    t.node(e.to, 'active');
+    t.frame(
+      `Try ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Weight ${e.label}`
+    );
+    if (find(e.from) === find(e.to)) {
+      t.edge(e.id, C.edgeRejected, 'rejected');
+      t.frame(
+        `Reject ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Would form a cycle`
+      );
+    } else {
+      parent[find(e.to)] = find(e.from);
+      count++;
+      total += Number(e.label);
+      t.edge(e.id, C.edgeCompleted, 'completed');
+      t.frame(
+        `Accept ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Total weight ${total}`
+      );
+    }
+    t.node(e.from, 'default');
+    t.node(e.to, 'default');
+    if (count === g.nodes.length - 1) break;
+  }
+  t.frame(`MST complete · ${count} edges · Weight ${total}`);
+  return presentation(
+    g,
+    t,
+    legend('Kruskal MST', [
+      nodeKey('Endpoints', 'active'),
+      edgeKey('Try', C.nodeActive, 'active'),
+      edgeKey('Accept', C.edgeCompleted, 'completed'),
+      edgeKey('Reject', C.edgeRejected, 'rejected'),
+      edgeKey('Unprocessed', C.edgeDefault),
+    ])
+  );
+};
+const topological = () => {
+  const g = graph(
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    [
+      [0, 0],
+      [0, 260],
+      [230, 130],
+      [460, 0],
+      [460, 260],
+      [690, 130],
+    ],
+    [
+      [0, 2],
+      [1, 2],
+      [2, 3],
+      [2, 4],
+      [3, 5],
+      [4, 5],
+    ],
+    true
+  );
+  const t = timeline(g),
+    indegree = g.nodes.map(n => g.edges.filter(e => e.to === n.id).length),
+    queue = [],
+    order = [];
+  const labels = () =>
+    g.nodes.forEach(n => {
+      t.nodes[n.id].annotation = `${n.label}:${indegree[n.id]}`;
+    });
+  g.nodes
+    .filter(n => indegree[n.id] === 0)
+    .forEach(n => {
+      queue.push(n.id);
+      t.node(n.id, 'queued');
+    });
+  labels();
+  t.frame('Kahn’s algorithm · A and B have indegree 0');
+  while (queue.length) {
+    const id = queue.shift();
+    t.node(id, 'active');
+    order.push(g.nodes[id].label);
+    t.frame(`Output ${g.nodes[id].label} · Order: ${order.join(', ')}`);
+    for (const e of g.edges.filter(e => e.from === id)) {
+      t.edge(e.id, C.edgeCompleted, 'completed');
+      indegree[e.to]--;
+      if (indegree[e.to] === 0) {
+        queue.push(e.to);
+        t.node(e.to, 'queued');
+      }
+    }
+    labels();
+    t.node(id, 'visited');
+    if (queue.length)
+      t.frame(
+        `Remove outgoing edges · Ready: ${queue.map(i => g.nodes[i].label).join(', ')}`
+      );
+  }
+  t.frame(`Topological order: ${order.join(', ')}`);
+  return presentation(
+    g,
+    t,
+    legend('Topological sort · node:indegree', [
+      nodeKey('Ready', 'queued'),
+      nodeKey('Current', 'active'),
+      nodeKey('Output', 'visited'),
+      edgeKey('Removed', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
+const componentColors = ['#BFDBFE', '#FED7AA', '#DDD6FE'];
+const dsu = () => {
+  // The cycle edge clears node 1; it must not look like two adjacent edges.
+  const g = graph(
+    ['0', '1', '2', '3', '4', '5'],
+    [
+      [0, 0],
+      [220, -100],
+      [440, 0],
+      [0, 260],
+      [220, 360],
+      [440, 260],
+    ],
+    [
+      [0, 1],
+      [1, 2],
+      [3, 4],
+      [4, 5],
+      [2, 5],
+      [0, 2],
+    ]
+  );
+  const t = timeline(g),
+    parent = g.nodes.map(n => n.id);
+  const find = id => (parent[id] === id ? id : find(parent[id]));
+  const mark = () =>
+    g.nodes.forEach(n => {
+      const root = find(n.id),
+        members = g.nodes.filter(m => find(m.id) === root).length;
+      t.node(n.id, 'default', {
+        annotation: `${n.id}:${root}`,
+        color:
+          members === 1
+            ? C.nodeDefault
+            : root === 0
+              ? componentColors[0]
+              : componentColors[1],
+      });
+    });
+  mark();
+  t.frame('DSU · Each node starts in its own set');
+  for (const e of g.edges) {
+    const a = find(e.from),
+      b = find(e.to);
+    if (a === b) {
+      t.edge(e.id, C.edgeRejected, 'rejected');
+      t.frame(`${e.from} and ${e.to}: same root ${a} · Reject cycle`);
+    } else {
+      parent[b] = a;
+      mark();
+      t.edge(e.id, C.edgeCompleted, 'completed');
+      t.frame(`Union(${e.from}, ${e.to}) · Merge roots ${a} and ${b}`);
+    }
+  }
+  t.frame('One set · All nodes have root 0');
+  return presentation(
+    g,
+    t,
+    legend('DSU · node:root', [
+      nodeKey('Root 0', 'default', componentColors[0]),
+      nodeKey('Root 3', 'default', componentColors[1]),
+      edgeKey('Union', C.edgeCompleted, 'completed'),
+      edgeKey('Cycle', C.edgeRejected, 'rejected'),
+    ])
+  );
+};
+const components = () => {
+  const g = graph(
+    ['0', '1', '2', '3', '4', '5', '6', '7'],
+    [
+      [0, 80],
+      [160, 0],
+      [160, 170],
+      [390, 0],
+      [560, 0],
+      [390, 250],
+      [560, 170],
+      [710, 250],
+    ],
+    [
+      [0, 1],
+      [0, 2],
+      [3, 4],
+      [5, 6],
+      [6, 7],
+    ]
+  );
+  const t = timeline(g),
+    seen = new Set();
+  let component = 0;
+  for (const start of g.nodes) {
+    if (seen.has(start.id)) continue;
+    component++;
+    const queue = [start.id];
+    seen.add(start.id);
+    t.node(start.id, 'queued');
+    t.frame(`Component ${component} · Start at ${start.label}`);
+    const members = [];
+    while (queue.length) {
+      const id = queue.shift();
+      members.push(id);
+      t.node(id, 'default', {
+        color: componentColors[component - 1],
+        annotation: `${id}:${component}`,
+      });
+      for (const e of g.edges.filter(e => e.from === id || e.to === id)) {
+        const next = e.from === id ? e.to : e.from;
+        if (seen.has(next)) continue;
+        seen.add(next);
+        queue.push(next);
+        t.node(next, 'queued');
+        t.edge(e.id, C.edgeCompleted, 'completed');
+      }
+      t.frame(`Component ${component} · Found ${members.join(', ')}`);
+    }
+  }
+  t.frame('3 components · {0,1,2}  {3,4}  {5,6,7}');
+  return presentation(
+    g,
+    t,
+    legend('Components · node:group', [
+      ...componentColors.map((c, i) => nodeKey(`Group ${i + 1}`, 'default', c)),
+      nodeKey('Frontier', 'queued'),
+      edgeKey('Tree edge', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
+const multigraph = () => {
+  const g = graph(
+    ['A', 'B', 'C'],
+    [
+      [0, 0],
+      [360, 0],
+      [180, 280],
+    ],
+    [
+      [0, 1, 'e1'],
+      [0, 1, 'e2'],
+      [0, 1, 'e3'],
+      [1, 1, 'loop'],
+      [1, 2],
+      [2, 0],
+    ],
+    true
+  );
+  const t = timeline(g);
+  t.node(0, 'active');
+  t.frame('Multigraph · Three distinct edges join A → B');
+  ['e0', 'e1', 'e2'].forEach(id => t.edge(id, C.nodeActive, 'active'));
+  t.frame('Parallel edges share endpoints, not identity');
+  t.edge('e0', C.edgeDefault);
+  t.edge('e2', C.edgeDefault);
+  t.edge('e1', C.edgeCompleted, 'completed');
+  t.node(0, 'visited');
+  t.node(1, 'active');
+  t.frame('Choose e2 · No weights imply no “best” edge');
+  t.edge('e3', C.nodeActive, 'active');
+  t.frame('Self-loop · B → B stays at the same node');
+  t.edge('e3', C.edgeDefault);
+  t.edge('e4', C.edgeCompleted, 'completed');
+  t.node(1, 'visited');
+  t.node(2, 'active');
+  t.frame('Follow B → C');
+  t.edge('e5', C.edgeCompleted, 'completed');
+  t.node(2, 'visited');
+  t.node(0, 'active');
+  t.frame('Return C → A · A directed cycle');
+  return presentation(
+    g,
+    t,
+    legend('Parallel edges & loops', [
+      nodeKey('Current', 'active'),
+      nodeKey('Visited', 'visited'),
+      edgeKey('Inspect', C.nodeActive, 'active'),
+      edgeKey('Chosen', C.edgeCompleted, 'completed'),
+    ])
+  );
+};
 
 export const GRAPH_PRESETS = {
-  bfs: {
-    legend: BFS_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 400, y: 200, visible: true },
-        { id: 1, label: 'B', x: 300, y: 300, visible: true },
-        { id: 2, label: 'C', x: 500, y: 300, visible: true },
-        { id: 3, label: 'D', x: 200, y: 400, visible: true },
-        { id: 4, label: 'E', x: 400, y: 400, visible: true },
-        { id: 5, label: 'F', x: 600, y: 400, visible: true },
-      ],
-      edges: [
-        { id: 'e0', from: 0, to: 1, directed: false, visible: true },
-        { id: 'e1', from: 0, to: 2, directed: false, visible: true },
-        { id: 'e2', from: 1, to: 3, directed: false, visible: true },
-        { id: 'e3', from: 1, to: 4, directed: false, visible: true },
-        { id: 'e4', from: 2, to: 5, directed: false, visible: true },
-      ],
-    },
-    steps: [
-      {
-        id: 's0',
-        description: 'Start BFS at A',
-        durationMs: 600,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 's1',
-        description: 'Queue B and C',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' }, e1: { color: '#3b82f6' } },
-      },
-      {
-        id: 's2',
-        description: 'Visit B, Queue D and E',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'queued', color: '#eab308' },
-          3: { status: 'queued', color: '#eab308' },
-          4: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#3b82f6' },
-          e2: { color: '#3b82f6' },
-          e3: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's3',
-        description: 'Visit C, Queue F',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'queued', color: '#eab308' },
-          4: { status: 'queued', color: '#eab308' },
-          5: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#3b82f6' },
-          e3: { color: '#3b82f6' },
-          e4: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's4',
-        description: 'Visit D, E, F',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  dfs: {
-    legend: DFS_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 400, y: 200, visible: true },
-        { id: 1, label: 'B', x: 300, y: 300, visible: true },
-        { id: 2, label: 'C', x: 500, y: 300, visible: true },
-        { id: 3, label: 'D', x: 200, y: 400, visible: true },
-        { id: 4, label: 'E', x: 400, y: 400, visible: true },
-        { id: 5, label: 'F', x: 600, y: 400, visible: true },
-      ],
-      edges: [
-        { id: 'e0', from: 0, to: 1, directed: true, visible: true },
-        { id: 'e1', from: 0, to: 2, directed: true, visible: true },
-        { id: 'e2', from: 1, to: 3, directed: true, visible: true },
-        { id: 'e3', from: 1, to: 4, directed: true, visible: true },
-        { id: 'e4', from: 2, to: 5, directed: true, visible: true },
-      ],
-    },
-    steps: [
-      {
-        id: 's0',
-        description: 'Start DFS at A',
-        durationMs: 600,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 's1',
-        description: 'Explore B',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' } },
-      },
-      {
-        id: 's2',
-        description: 'Explore D',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'active', color: '#3b82f6' },
-          3: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' }, e2: { color: '#3b82f6' } },
-      },
-      {
-        id: 's3',
-        description: 'Backtrack from D',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' }, e2: { color: '#22c55e' } },
-      },
-      {
-        id: 's4',
-        description: 'Explore E',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#3b82f6' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's5',
-        description: 'Backtrack from E, B',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 's6',
-        description: 'Explore C',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#3b82f6' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 's7',
-        description: 'Explore F',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#3b82f6' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's8',
-        description: 'Finish DFS',
-        durationMs: 600,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  dijkstra: {
-    legend: DIJKSTRA_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 200, y: 300, visible: true },
-        { id: 1, label: 'B', x: 400, y: 200, visible: true },
-        { id: 2, label: 'C', x: 400, y: 400, visible: true },
-        { id: 3, label: 'D', x: 600, y: 300, visible: true },
-      ],
-      edges: [
-        {
-          id: 'e0',
-          from: 0,
-          to: 1,
-          directed: true,
-          label: '4',
-          visible: true,
-        },
-        {
-          id: 'e1',
-          from: 0,
-          to: 2,
-          directed: true,
-          label: '1',
-          visible: true,
-        },
-        {
-          id: 'e2',
-          from: 2,
-          to: 1,
-          directed: true,
-          label: '2',
-          visible: true,
-        },
-        {
-          id: 'e3',
-          from: 1,
-          to: 3,
-          directed: true,
-          label: '1',
-          visible: true,
-        },
-        {
-          id: 'e4',
-          from: 2,
-          to: 3,
-          directed: true,
-          label: '5',
-          visible: true,
-        },
-      ],
-    },
-    steps: [
-      {
-        id: 's0',
-        description: 'Init distances: A=0, others=∞',
-        durationMs: 800,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 's1',
-        description: 'Relax A→B (4), A→C (1)',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' }, e1: { color: '#3b82f6' } },
-      },
-      {
-        id: 's2',
-        description: 'Pick C (min dist 1), Relax C→B (1+2=3 < 4)',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#64748b' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's3',
-        description: 'Relax C→D (1+5=6)',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e4: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's4',
-        description: 'Pick B (min dist 3), Relax B→D (3+1=4 < 6)',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#3b82f6' },
-          e4: { color: '#64748b' },
-        },
-      },
-      {
-        id: 's5',
-        description: 'Pick D (min dist 4), Done',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  'kruskal-mst': {
-    legend: KRUSKAL_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 600, y: 420, visible: true },
-        { id: 1, label: 'B', x: 750, y: 650, visible: true },
-        { id: 2, label: 'C', x: 900, y: 420, visible: true },
-        { id: 3, label: 'D', x: 1050, y: 650, visible: true },
-        { id: 4, label: 'E', x: 1200, y: 420, visible: true },
-        { id: 5, label: 'F', x: 1050, y: 850, visible: true },
-      ],
-      edges: [
-        {
-          id: 'e0',
-          from: 0,
-          to: 1,
-          directed: false,
-          label: '1',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e1',
-          from: 1,
-          to: 3,
-          directed: false,
-          label: '2',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e2',
-          from: 2,
-          to: 4,
-          directed: false,
-          label: '3',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e3',
-          from: 0,
-          to: 2,
-          directed: false,
-          label: '4',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e4',
-          from: 3,
-          to: 4,
-          directed: false,
-          label: '5',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e5',
-          from: 4,
-          to: 5,
-          directed: false,
-          label: '6',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e6',
-          from: 2,
-          to: 3,
-          directed: false,
-          label: '7',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e7',
-          from: 1,
-          to: 2,
-          directed: false,
-          label: '8',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e8',
-          from: 3,
-          to: 5,
-          directed: false,
-          label: '9',
-          color: '#64748b',
-          visible: true,
-        },
-      ],
-    },
-    steps: [
-      {
-        id: 'kruskal-s0',
-        description:
-          'Kruskal MST: sort weighted edges ascending; each node starts in its own DSU component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'queued', color: '#eab308' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'queued', color: '#eab308' },
-          3: { status: 'queued', color: '#eab308' },
-          4: { status: 'queued', color: '#eab308' },
-          5: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {},
-      },
-      {
-        id: 'kruskal-s1',
-        description:
-          'Consider edge A-B (1): find(A) and find(B) differ, so union accepts it',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: { e0: { color: '#22c55e' } },
-      },
-      {
-        id: 'kruskal-s2',
-        description:
-          'Consider edge B-D (2): union connects D to the growing MST component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-          3: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'kruskal-s3',
-        description:
-          'Consider edge C-E (3): union creates a second accepted MST component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'kruskal-s4',
-        description:
-          'Consider edge A-C (4): find differs, so union merges the two MST components',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'kruskal-s5',
-        description:
-          'Consider edge D-E (5): find(D) equals find(E), so this cycle edge is rejected',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'active', color: '#3b82f6' },
-          4: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#dc2626' },
-        },
-      },
-      {
-        id: 'kruskal-s6',
-        description:
-          'Accept edge E-F (6): the final union gives the MST n - 1 edges',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'active', color: '#3b82f6' },
-          5: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#dc2626' },
-          e5: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'kruskal-s7',
-        description:
-          'Final Kruskal MST: accepted edges are green; rejected cycle edges stay red',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#dc2626' },
-          e5: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  'dijkstra-shortest-paths': {
-    legend: DIJKSTRA_SHORTEST_PATHS_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'S', x: 260, y: 520, visible: true },
-        { id: 1, label: 'A', x: 600, y: 340, visible: true },
-        { id: 2, label: 'B', x: 600, y: 700, visible: true },
-        { id: 3, label: 'C', x: 980, y: 340, visible: true },
-        { id: 4, label: 'D', x: 980, y: 700, visible: true },
-        { id: 5, label: 'T', x: 1340, y: 520, visible: true },
-      ],
-      edges: [
-        {
-          id: 'e0',
-          from: 0,
-          to: 1,
-          directed: true,
-          label: '2',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e1',
-          from: 0,
-          to: 2,
-          directed: true,
-          label: '5',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e2',
-          from: 1,
-          to: 2,
-          directed: true,
-          label: '1',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e3',
-          from: 1,
-          to: 3,
-          directed: true,
-          label: '2',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e4',
-          from: 2,
-          to: 4,
-          directed: true,
-          label: '2',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e5',
-          from: 3,
-          to: 4,
-          directed: true,
-          label: '1',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e6',
-          from: 3,
-          to: 5,
-          directed: true,
-          label: '7',
-          color: '#64748b',
-          visible: true,
-        },
-        {
-          id: 'e7',
-          from: 4,
-          to: 5,
-          directed: true,
-          label: '3',
-          color: '#64748b',
-          visible: true,
-        },
-      ],
-    },
-    steps: [
-      {
-        id: 'dijkstra-sp-s0',
-        description:
-          'Dijkstra starts at source S: distance[S]=0 and all other distances are infinity',
-        durationMs: 800,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 'dijkstra-sp-s1',
-        description:
-          'Relax edges from S: A gets distance 2 and B gets distance 5 as queued candidates',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#f59e0b' },
-          e1: { color: '#f59e0b' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s2',
-        description:
-          'Pick A at distance 2: relax A->B to distance 3 and A->C to distance 4',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-          2: { status: 'queued', color: '#eab308' },
-          3: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#64748b' },
-          e2: { color: '#f59e0b' },
-          e3: { color: '#f59e0b' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s3',
-        description:
-          'Finalize A: B is now the closest unvisited node with shortest distance 3',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'queued', color: '#eab308' },
-          3: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s4',
-        description: 'Pick B at distance 3: relax B->D to distance 5',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'queued', color: '#eab308' },
-          4: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#f59e0b' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s5',
-        description:
-          'Pick C at distance 4: relax C->D ties the best distance 5 and C->T gives 11',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'active', color: '#3b82f6' },
-          4: { status: 'queued', color: '#eab308' },
-          5: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e5: { color: '#f59e0b' },
-          e6: { color: '#f59e0b' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s6',
-        description:
-          'Pick D at distance 5: relax D->T to distance 8, improving the target',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'active', color: '#3b82f6' },
-          5: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e7: { color: '#f59e0b' },
-        },
-      },
-      {
-        id: 'dijkstra-sp-s7',
-        description:
-          'Final shortest-path tree from S: S-A, A-B, A-C, B-D, and D-T are highlighted',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e7: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  'topological-sort': {
-    legend: TOPOLOGICAL_SORT_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 160, y: 260, visible: true },
-        { id: 1, label: 'B', x: 160, y: 420, visible: true },
-        { id: 2, label: 'C', x: 380, y: 340, visible: true },
-        { id: 3, label: 'D', x: 600, y: 260, visible: true },
-        { id: 4, label: 'E', x: 820, y: 340, visible: true },
-        { id: 5, label: 'F', x: 1040, y: 340, visible: true },
-      ],
-      edges: [
-        { id: 'e0', from: 0, to: 2, directed: true, visible: true },
-        { id: 'e1', from: 1, to: 2, directed: true, visible: true },
-        { id: 'e2', from: 2, to: 3, directed: true, visible: true },
-        { id: 'e3', from: 2, to: 4, directed: true, visible: true },
-        { id: 'e4', from: 3, to: 5, directed: true, visible: true },
-        { id: 'e5', from: 4, to: 5, directed: true, visible: true },
-      ],
-    },
-    steps: [
-      {
-        id: 'topo-s0',
-        description: 'Zero indegree nodes A and B enter the queue',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'queued', color: '#eab308' },
-          1: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {},
-      },
-      {
-        id: 'topo-s1',
-        description: 'Process A: remove outgoing edge A->C; C still waits on B',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' } },
-      },
-      {
-        id: 'topo-s2',
-        description: 'Process B: C reaches zero indegree and joins the queue',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-          2: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 'topo-s3',
-        description: 'Process C: outgoing edges make D and E zero indegree',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-          3: { status: 'queued', color: '#eab308' },
-          4: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#3b82f6' },
-          e3: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 'topo-s4',
-        description: 'Process D, then E: F becomes the last zero indegree node',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#3b82f6' },
-          e5: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 'topo-s5',
-        description: 'Topological order complete: A, B, C, D, E, F',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-          3: { status: 'visited', color: '#22c55e' },
-          4: { status: 'visited', color: '#22c55e' },
-          5: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e5: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  'disjoint-set-union': {
-    legend: DSU_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: '0', x: 180, y: 260, visible: true },
-        { id: 1, label: '1', x: 380, y: 260, visible: true },
-        { id: 2, label: '2', x: 580, y: 260, visible: true },
-        { id: 3, label: '3', x: 180, y: 500, visible: true },
-        { id: 4, label: '4', x: 380, y: 500, visible: true },
-        { id: 5, label: '5', x: 580, y: 500, visible: true },
-      ],
-      edges: [
-        {
-          id: 'e0',
-          from: 0,
-          to: 1,
-          directed: false,
-          label: '1',
-          visible: true,
-        },
-        {
-          id: 'e1',
-          from: 1,
-          to: 2,
-          directed: false,
-          label: '2',
-          visible: true,
-        },
-        {
-          id: 'e2',
-          from: 3,
-          to: 4,
-          directed: false,
-          label: '3',
-          visible: true,
-        },
-        {
-          id: 'e3',
-          from: 4,
-          to: 5,
-          directed: false,
-          label: '4',
-          visible: true,
-        },
-        {
-          id: 'e4',
-          from: 2,
-          to: 5,
-          directed: false,
-          label: '5',
-          visible: true,
-        },
-        {
-          id: 'e5',
-          from: 0,
-          to: 2,
-          directed: false,
-          label: 'cycle',
-          visible: true,
-        },
-      ],
-    },
-    steps: [
-      {
-        id: 'dsu-s0',
-        description: 'Initialize DSU: each node is its own component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'queued', color: '#e0f2fe' },
-          1: { status: 'queued', color: '#fef3c7' },
-          2: { status: 'queued', color: '#dcfce7' },
-          3: { status: 'queued', color: '#fee2e2' },
-          4: { status: 'queued', color: '#ede9fe' },
-          5: { status: 'queued', color: '#fce7f3' },
-        },
-        edgeOverrides: {},
-      },
-      {
-        id: 'dsu-s1',
-        description: 'find(0) and find(1) differ, so union accepts edge 0-1',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'queued', color: '#dcfce7' },
-          3: { status: 'queued', color: '#fee2e2' },
-          4: { status: 'queued', color: '#ede9fe' },
-          5: { status: 'queued', color: '#fce7f3' },
-        },
-        edgeOverrides: { e0: { color: '#22c55e' } },
-      },
-      {
-        id: 'dsu-s2',
-        description:
-          'find(1) and find(2) differ, so union merges 2 into component {0,1}',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'active', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'queued', color: '#fee2e2' },
-          4: { status: 'queued', color: '#ede9fe' },
-          5: { status: 'queued', color: '#fce7f3' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'dsu-s3',
-        description:
-          'find(3) and find(4) differ, so union starts a second component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'visited', color: '#fed7aa' },
-          5: { status: 'queued', color: '#fce7f3' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'dsu-s4',
-        description:
-          'find(4) and find(5) differ, so union adds 5 to the second component',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'active', color: '#fed7aa' },
-          5: { status: 'visited', color: '#fed7aa' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'dsu-s5',
-        description:
-          'find(2) and find(5) differ, so union merges the two components',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bbf7d0' },
-          1: { status: 'visited', color: '#bbf7d0' },
-          2: { status: 'active', color: '#bbf7d0' },
-          3: { status: 'visited', color: '#bbf7d0' },
-          4: { status: 'visited', color: '#bbf7d0' },
-          5: { status: 'active', color: '#bbf7d0' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'dsu-s6',
-        description:
-          'find(0) equals find(2), so edge 0-2 is rejected as a cycle',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'active', color: '#bbf7d0' },
-          1: { status: 'visited', color: '#bbf7d0' },
-          2: { status: 'active', color: '#bbf7d0' },
-          3: { status: 'visited', color: '#bbf7d0' },
-          4: { status: 'visited', color: '#bbf7d0' },
-          5: { status: 'visited', color: '#bbf7d0' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e5: { color: '#dc2626' },
-        },
-      },
-    ],
-  },
-  'connected-components': {
-    legend: CONNECTED_COMPONENTS_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: '0', x: 180, y: 240, visible: true },
-        { id: 1, label: '1', x: 360, y: 180, visible: true },
-        { id: 2, label: '2', x: 360, y: 320, visible: true },
-        { id: 3, label: '3', x: 660, y: 220, visible: true },
-        { id: 4, label: '4', x: 840, y: 220, visible: true },
-        { id: 5, label: '5', x: 660, y: 500, visible: true },
-        { id: 6, label: '6', x: 840, y: 440, visible: true },
-        { id: 7, label: '7', x: 1020, y: 500, visible: true },
-      ],
-      edges: [
-        { id: 'e0', from: 0, to: 1, directed: false, visible: true },
-        { id: 'e1', from: 0, to: 2, directed: false, visible: true },
-        { id: 'e2', from: 3, to: 4, directed: false, visible: true },
-        { id: 'e3', from: 5, to: 6, directed: false, visible: true },
-        { id: 'e4', from: 6, to: 7, directed: false, visible: true },
-      ],
-    },
-    steps: [
-      {
-        id: 'cc-s0',
-        description: 'Start component 1 at node 0 and mark it active',
-        durationMs: 800,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 'cc-s1',
-        description: 'Traverse from 0: queue neighbors 1 and 2 in component 1',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'queued', color: '#eab308' },
-          2: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: { e0: { color: '#3b82f6' }, e1: { color: '#3b82f6' } },
-      },
-      {
-        id: 'cc-s2',
-        description: 'Finish component 1: nodes 0, 1, and 2 are visited',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-        },
-        edgeOverrides: { e0: { color: '#22c55e' }, e1: { color: '#22c55e' } },
-      },
-      {
-        id: 'cc-s3',
-        description: 'Node 3 is unvisited, so start a new component 2',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'active', color: '#fb923c' },
-        },
-        edgeOverrides: { e0: { color: '#22c55e' }, e1: { color: '#22c55e' } },
-      },
-      {
-        id: 'cc-s4',
-        description: 'Traverse component 2: queue node 4 from node 3',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 'cc-s5',
-        description: 'Finish component 2: nodes 3 and 4 are visited',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'visited', color: '#fed7aa' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'cc-s6',
-        description: 'Node 5 is unvisited, so start a new component 3',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'visited', color: '#fed7aa' },
-          5: { status: 'active', color: '#a78bfa' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-        },
-      },
-      {
-        id: 'cc-s7',
-        description: 'Traverse component 3: queue 6, then queue 7 from 6',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'visited', color: '#fed7aa' },
-          5: { status: 'visited', color: '#ddd6fe' },
-          6: { status: 'active', color: '#a78bfa' },
-          7: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#3b82f6' },
-          e4: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 'cc-s8',
-        description: 'All components found: {0,1,2}, {3,4}, and {5,6,7}',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#bfdbfe' },
-          1: { status: 'visited', color: '#bfdbfe' },
-          2: { status: 'visited', color: '#bfdbfe' },
-          3: { status: 'visited', color: '#fed7aa' },
-          4: { status: 'visited', color: '#fed7aa' },
-          5: { status: 'visited', color: '#ddd6fe' },
-          6: { status: 'visited', color: '#ddd6fe' },
-          7: { status: 'visited', color: '#ddd6fe' },
-        },
-        edgeOverrides: {
-          e0: { color: '#22c55e' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-        },
-      },
-    ],
-  },
-  multigraph: {
-    legend: MULTIGRAPH_LEGEND,
-    graph: {
-      nodes: [
-        { id: 0, label: 'A', x: 200, y: 300, visible: true },
-        { id: 1, label: 'B', x: 500, y: 300, visible: true },
-        { id: 2, label: 'C', x: 350, y: 500, visible: true },
-      ],
-      edges: [
-        {
-          id: 'e0',
-          from: 0,
-          to: 1,
-          directed: true,
-          label: 'Path 1',
-          visible: true,
-        },
-        {
-          id: 'e1',
-          from: 0,
-          to: 1,
-          directed: true,
-          label: 'Path 2',
-          visible: true,
-        },
-        {
-          id: 'e2',
-          from: 0,
-          to: 1,
-          directed: true,
-          label: 'Path 3',
-          visible: true,
-        },
-        {
-          id: 'e3',
-          from: 1,
-          to: 1,
-          directed: true,
-          label: 'Loop',
-          visible: true,
-        },
-        {
-          id: 'e4',
-          from: 1,
-          to: 2,
-          directed: true,
-          label: 'To C',
-          visible: true,
-        },
-        {
-          id: 'e5',
-          from: 2,
-          to: 0,
-          directed: true,
-          label: 'Back to A',
-          visible: true,
-        },
-      ],
-    },
-    steps: [
-      {
-        id: 's0',
-        description: 'Start at A',
-        durationMs: 800,
-        nodeOverrides: { 0: { status: 'active', color: '#3b82f6' } },
-        edgeOverrides: {},
-      },
-      {
-        id: 's1',
-        description: 'Explore multiple paths to B',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'queued', color: '#eab308' },
-        },
-        edgeOverrides: {
-          e0: { color: '#3b82f6' },
-          e1: { color: '#3b82f6' },
-          e2: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's2',
-        description: 'Select Path 2 as optimal',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e0: { color: '#64748b' },
-          e1: { color: '#22c55e' },
-          e2: { color: '#64748b' },
-        },
-      },
-      {
-        id: 's3',
-        description: 'Process self-loop on B',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: { e1: { color: '#22c55e' }, e3: { color: '#3b82f6' } },
-      },
-      {
-        id: 's4',
-        description: 'Move to C',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'visited', color: '#22c55e' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'active', color: '#3b82f6' },
-        },
-        edgeOverrides: {
-          e1: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#3b82f6' },
-        },
-      },
-      {
-        id: 's5',
-        description: 'Return to A (Cycle complete)',
-        durationMs: 800,
-        nodeOverrides: {
-          0: { status: 'active', color: '#3b82f6' },
-          1: { status: 'visited', color: '#22c55e' },
-          2: { status: 'visited', color: '#22c55e' },
-        },
-        edgeOverrides: {
-          e1: { color: '#22c55e' },
-          e3: { color: '#22c55e' },
-          e4: { color: '#22c55e' },
-          e5: { color: '#3b82f6' },
-        },
-      },
-    ],
-  },
+  bfs: bfs(),
+  dfs: dfs(),
+  dijkstra: dijkstra(false),
+  'kruskal-mst': kruskal(),
+  'dijkstra-shortest-paths': dijkstra(true),
+  'topological-sort': topological(),
+  'disjoint-set-union': dsu(),
+  'connected-components': components(),
+  multigraph: multigraph(),
 };

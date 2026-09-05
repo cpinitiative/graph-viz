@@ -80,8 +80,9 @@ const ScriptModal = ({
       }
     >
       <div className="border border-[#FDBA74] bg-[#FFF7ED] px-3 py-2 text-xs leading-relaxed text-[#7C2D12] dark:border-[#C2410C] dark:bg-[#431407] dark:text-[#FED7AA]">
-        Script Mode executes local JavaScript. Only run code you trust; trace
-        output is validated before timeline generation.
+        Script Mode executes local JavaScript with access to network and browser
+        storage. Only run code you trust; trace output is validated before
+        timeline generation.
       </div>
       <p className={modalBodyTextClass}>
         Write JS using <code>api.active(id)</code>, <code>api.visited(id)</code>
@@ -128,7 +129,11 @@ const ScriptModal = ({
           {error || 'No script errors'}
         </div>
       </div>
+      <label htmlFor="script-source" className={modalFieldLabelClass}>
+        JavaScript trace
+      </label>
       <textarea
+        id="script-source"
         value={text}
         onChange={event => onTextChange(event.target.value)}
         placeholder={defaultScript}

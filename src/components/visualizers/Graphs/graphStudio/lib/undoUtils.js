@@ -16,9 +16,10 @@ const NON_TEXT_INPUT_TYPES = new Set([
 export const cloneJson = value => JSON.parse(JSON.stringify(value));
 
 export const snapshotTimelineState = ({ baseGraph, steps, settings }) => ({
-  baseGraph: cloneJson(baseGraph ?? { nodes: [], edges: [] }),
-  steps: cloneJson(steps ?? []),
-  settings: cloneJson(settings ?? {}),
+  // React state updates are immutable; retain unchanged branches across history.
+  baseGraph: baseGraph ?? { nodes: [], edges: [] },
+  steps: steps ?? [],
+  settings: settings ?? {},
 });
 
 export const isTextEditingUndoTarget = target => {

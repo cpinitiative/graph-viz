@@ -13,7 +13,11 @@ https://graph-viz.usaco.guide
 
 - Interactive graph editing with draggable nodes, edges, labels, weights, and
   directed-edge styling.
+- Keyboard graph editing, visible focus, accessible dialogs, and a mobile canvas
+  focus view.
+- Readable node labels with shared status colors and non-color state cues.
 - Timeline/frame animation for step-by-step algorithm explanations.
+- Automatic local draft recovery and gesture-based undo.
 - USACO-aligned graph presets for common teaching examples.
 - Full project JSON import/export with editor state, timeline, viewport, and
   settings.
@@ -38,7 +42,14 @@ such as:
 - shortest paths with non-negative weights
 - minimum spanning trees
 
-These presets are starting points. Authors can load a preset, adjust the graph
+Presets include compact legends, larger labels, captions, and 1.8–3 second holds
+for video. BFS and DFS expose queue/stack progress; Dijkstra shows
+`node:distance`; topological sort shows `node:indegree`; DSU and components show
+`node:root` or `node:group`. The inspector's **Frame text** field edits these
+annotations independently of the project-wide node name.
+
+Loading a preset applies its presentation sizes, enables its legend and caption,
+and hides the grid. These settings remain editable. Authors can adjust the graph
 and timeline, then export the result for guide modules, slides, classroom
 material, or video explanations.
 
@@ -70,6 +81,26 @@ or existing explanation.
 Edge-list import/export is separate and simpler. It is meant for basic graph
 structure exchange, not full timeline or editor-state persistence.
 
+## Editing and recovery
+
+Tab into the graph, use arrow keys to explore nodes and edges, and press Enter
+or Space to select. Alt + arrows moves a node. In Draw Edge mode, select each
+endpoint with Enter; in Add Node mode, Enter on the canvas creates a node at the
+center. On narrow screens, use `Focus canvas` to hide the timeline.
+
+The editor saves one draft in this browser after a short pause and restores it
+on reload. The status bar reports save failures, including unavailable storage
+or quota limits. Export Project for a portable backup; browser storage can be
+cleared and is not synchronized between devices or tabs.
+
+Project imports are limited to 16 MiB, 1,000 nodes, 5,000 edges, 1,001 frames,
+and 500,000 override entries. Colors accept `#RGB`, `#RRGGBB`, or an empty value
+for the default. Invalid imports leave the current project intact. Edge-list
+exports remap IDs to consecutive integers and require numeric weights; use
+project JSON to preserve directions, labels, and animation settings.
+
+Force layout runs in a cancellable worker. Each drag is a single undo action.
+
 ## Script Mode
 
 Script Mode lets advanced authors write small JavaScript traces that generate
@@ -78,7 +109,9 @@ edges; or push structured timeline patches.
 
 Scripts run in a Web Worker and include timeout protection, so accidental
 infinite loops do not lock the editor. Script output is validated before it is
-used to replace the timeline.
+used to replace the timeline. Closing Script Mode cancels a running script. Only
+run code you trust: a Web Worker can access network and browser storage; it is
+not a security sandbox.
 
 Basic editing does not require Script Mode. It is a power-user workflow for
 authors who want to produce many consistent frames from code.
@@ -95,6 +128,16 @@ Graph Viz supports several export paths:
   structure only.
 
 PPTX exports can be opened in PowerPoint or uploaded to Google Slides.
+
+**Editor view** is the default PNG/SVG framing: it preserves graph scale,
+labels, and overlay placement from the reviewed canvas. PNG scale changes
+resolution only. Video and slides preserve that same composition inside 16:9;
+use **Preview video / slides · 16:9** to review it. Extra space is padded rather
+than stretching or refitting each frame. **Fit graph** and **Slide 16:9** are
+explicit alternatives that resize the graph while reserving overlay space.
+Timeline exports show progress and support cancellation between capture steps.
+MP4 exports are limited to 10 minutes. Final PPTX serialization and a pending
+video encoder flush may delay cancellation.
 
 ## Demo Media
 

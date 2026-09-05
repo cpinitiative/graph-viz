@@ -1,10 +1,15 @@
 import { motion } from 'framer-motion';
 import { useTheme } from '../../../../context/useTheme';
-import { NODE_RADIUS, NODE_STATUS_COLORS } from './constants';
+import { NODE_RADIUS } from './constants';
 import {
   getDefaultNodeLabelFontSize,
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
+import {
+  getContrastText,
+  isGraphColor,
+  NODE_STATES,
+} from './lib/visualProperties';
 
 const EDITOR_RING_COLORS = {
   light: {
@@ -20,28 +25,15 @@ const EDITOR_RING_COLORS = {
 };
 
 const getNodePalette = (node, theme) => {
-  if (theme === 'dark') {
-    if (node?.color) {
-      return { fill: node.color, stroke: '#E2E8F0', text: '#0F172A' };
-    }
-    const status = String(node?.status ?? 'default').toLowerCase();
-    const darkPalettes = {
-      default: { fill: '#FFFFFF', stroke: '#CBD5E1', text: '#0F172A' },
-      active: { fill: '#000000', stroke: '#E2E8F0', text: '#FFFFFF' },
-      queued: { fill: '#EEEEEE', stroke: '#CBD5E1', text: '#0F172A' },
-      visited: { fill: '#E2E8F0', stroke: '#CBD5E1', text: '#0F172A' },
-      discarded: { fill: '#FFFFFF', stroke: '#94A3B8', text: '#64748B' },
-    };
-    return darkPalettes[status] ?? darkPalettes.default;
-  }
-
-  if (node?.color) {
-    return { fill: node.color, stroke: '#1b1b1b', text: '#1b1b1b' };
-  }
-  return (
-    NODE_STATUS_COLORS[String(node?.status ?? 'default').toLowerCase()] ??
-    NODE_STATUS_COLORS.default
-  );
+  const state = NODE_STATES[node?.status] ?? NODE_STATES.default;
+  const fill =
+    isGraphColor(node?.color) && node.color ? node.color : state.color;
+  return {
+    fill,
+    stroke: theme === 'dark' ? '#E2E8F0' : '#334155',
+    text: getContrastText(fill),
+    dash: state.dash,
+  };
 };
 
 const GraphNode = ({
@@ -53,6 +45,8 @@ const GraphNode = ({
   layoutIdPrefix = '',
   onPointerDown,
   onClick,
+  onKeyDown,
+  tabIndex = 0,
   mode,
   isExporting = false,
   themeOverride,
@@ -72,6 +66,17 @@ const GraphNode = ({
 
   return (
     <g
+      data-node-id={node.id}
+      data-graph-object="node"
+      data-node-status={node.status ?? 'default'}
+      className={isExporting ? undefined : 'graphstudio-object'}
+      role={isExporting ? 'img' : 'button'}
+      tabIndex={isExporting ? undefined : tabIndex}
+      aria-label={`Node ${node.annotation || node.label}${node.annotation ? `. ${node.annotation}` : ''}. ${NODE_STATES[node.status]?.label ?? 'Default'}${drawAnchor ? '. Edge source' : ''}`}
+      aria-pressed={
+        isExporting ? undefined : Boolean(selected || multiSelected)
+      }
+      onKeyDown={isExporting ? undefined : onKeyDown}
       style={
         isExporting
           ? undefined
@@ -93,7 +98,8 @@ const GraphNode = ({
         r={nodeRadius}
         fill={palette.fill}
         stroke={palette.stroke}
-        strokeWidth="2"
+        strokeWidth={node.status === 'active' ? 3.5 : 2}
+        strokeDasharray={palette.dash}
         layoutId={`${layoutIdPrefix}node-${node.id}`}
         animate={{ cx: node.x, cy: node.y }}
         transition={
@@ -154,7 +160,7 @@ const GraphNode = ({
           fontFamily: 'sans-serif',
         }}
       >
-        {node.label}
+        {node.annotation || node.label}
       </text>
     </g>
   );

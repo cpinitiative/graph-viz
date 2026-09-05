@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { useModalFocus } from '../hooks/useModalFocus';
 import ModalCloseButton from './ModalCloseButton';
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
@@ -48,10 +50,12 @@ const ModalFrame = ({
   onClose,
   closeOnBackdrop = false,
 }) => {
+  const focusRef = useModalFocus(open, onClose);
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
+      data-modal-portal="true"
       className={joinClasses(
         'fixed inset-0 z-50 flex items-center justify-center bg-[#0F172ABF] p-4',
         overlayClassName
@@ -65,6 +69,8 @@ const ModalFrame = ({
       }}
     >
       <div
+        ref={focusRef}
+        tabIndex={-1}
         className={joinClasses(
           'mx-4 flex min-h-0 w-full flex-col overflow-hidden rounded-sm border border-[#94A3B8] bg-[#F8F9FA] shadow-[0_24px_64px_#0F172A33] dark:border-[#475569] dark:bg-[#0F172A]',
           maxWidthClass,
@@ -119,7 +125,8 @@ const ModalFrame = ({
           </footer>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

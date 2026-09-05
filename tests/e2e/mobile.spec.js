@@ -48,3 +48,24 @@ test.describe('Graph Studio mobile smoke', () => {
     await expect(page.getByText('Frame 2', { exact: true })).toBeVisible();
   });
 });
+
+test('canvas focus refits a teaching preset at a readable size', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open tools panel' }).click();
+  await page.getByLabel('Load graph preset').selectOption('bfs');
+  await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
+  await page.getByRole('button', { name: 'Focus canvas', exact: true }).click();
+  await expect
+    .poll(async () => {
+      const box = await graphCanvas(page)
+        .locator('[data-node-id] circle')
+        .first()
+        .boundingBox();
+      return box?.width ?? 0;
+    })
+    .toBeGreaterThan(25);
+  await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
+  await expect(page.getByTestId('custom-export-legend')).toBeVisible();
+});

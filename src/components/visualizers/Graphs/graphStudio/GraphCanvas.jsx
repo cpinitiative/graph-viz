@@ -27,6 +27,8 @@ import {
   normalizeEdgeLabelFontSize,
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
+import { getGraphContentViewport } from './lib/graphFraming';
+import { NODE_STATES } from './lib/visualProperties';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 const DEFAULT_EDGE_COLOR = '#64748B';
@@ -175,8 +177,8 @@ const CAPTION_SIZE_PRESETS = {
     horizontalPadding: 16,
     verticalPadding: 11,
     minWidth: 144,
-    maxWidth: 500,
-    maxWidthRatio: 0.45,
+    maxWidth: 640,
+    maxWidthRatio: 0.8,
     characterWidth: 7.4,
   },
 };
@@ -249,6 +251,7 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
         stroke={entry.color}
         strokeWidth="3"
         strokeLinecap="square"
+        strokeDasharray={entry.status === 'rejected' ? '6 4' : undefined}
       />
     );
   }
@@ -260,7 +263,8 @@ const LegendSwatch = ({ entry, nodeStroke }) => {
       r="6"
       fill={entry.color}
       stroke={nodeStroke}
-      strokeWidth="1"
+      strokeDasharray={NODE_STATES[entry.status]?.dash}
+      strokeWidth={entry.status === 'active' ? 2 : 1}
     />
   );
 };
@@ -288,6 +292,7 @@ const Legend = ({
     ...entry,
     label: truncateLegendText(entry.label, 34),
   }));
+  const compact = legend.layout === 'compact';
   const initialRows = buildLegendRows(entries);
   const maxTextLength = Math.max(
     title.length,
@@ -305,31 +310,52 @@ const Legend = ({
   const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
   const boxWidth = Math.min(
     maxBoxWidth,
-    300,
-    Math.max(176, 56 + maxTextLength * 7)
+    compact ? 650 : 300,
+    compact ? maxBoxWidth : Math.max(176, 56 + maxTextLength * 7)
   );
+  const columns = compact ? Math.max(1, Math.floor((boxWidth - 24) / 145)) : 1;
+  const cellWidth = (boxWidth - 24) / columns;
   const titleMaxLength = Math.max(4, Math.floor((boxWidth - 24) / 7));
-  const rowMaxLength = Math.max(4, Math.floor((boxWidth - 44) / 7));
+  const rowMaxLength = Math.max(
+    4,
+    Math.floor(((compact ? cellWidth : boxWidth) - 44) / 7)
+  );
   const fittedTitle = truncateLegendText(title, titleMaxLength);
   const fittedEntries = legend.entries.map(entry => ({
     ...entry,
     label: truncateLegendText(entry.label, rowMaxLength),
   }));
-  const rows = buildLegendRows(fittedEntries, {
-    groupMaxLength: rowMaxLength,
-    entryMaxLength: rowMaxLength,
-  });
+  const rows = compact
+    ? fittedEntries.map((entry, index) => ({
+        type: 'entry',
+        key: `compact-${index}`,
+        entry,
+        label: entry.label,
+      }))
+    : buildLegendRows(fittedEntries, {
+        groupMaxLength: rowMaxLength,
+        entryMaxLength: rowMaxLength,
+      });
   const rowsHeight = rows.reduce(
     (height, row) => height + getLegendRowHeight(row),
     0
   );
-  const boxHeight = Math.min(maxBoxHeight, 42 + rowsHeight);
+  const boxHeight = Math.min(
+    maxBoxHeight,
+    42 + (compact ? Math.ceil(rows.length / columns) * 24 : rowsHeight)
+  );
   const availableRowsHeight = Math.max(0, boxHeight - 42);
   const visibleRows = [];
   let usedRowsHeight = 0;
   for (const row of rows) {
     const rowHeight = getLegendRowHeight(row);
-    if (usedRowsHeight + rowHeight > availableRowsHeight) break;
+    if (
+      compact
+        ? Math.floor(visibleRows.length / columns) * 24 + 24 >
+          availableRowsHeight
+        : usedRowsHeight + rowHeight > availableRowsHeight
+    )
+      break;
     visibleRows.push(row);
     usedRowsHeight += rowHeight;
   }
@@ -457,14 +483,15 @@ const Legend = ({
         strokeWidth="1"
       />
       {visibleRows.map((row, index) => {
-        const rowY =
-          42 +
-          visibleRows
-            .slice(0, index)
-            .reduce(
-              (height, previous) => height + getLegendRowHeight(previous),
-              0
-            );
+        const rowY = compact
+          ? 42 + Math.floor(index / columns) * 24
+          : 42 +
+            visibleRows
+              .slice(0, index)
+              .reduce(
+                (height, previous) => height + getLegendRowHeight(previous),
+                0
+              );
         if (row.type === 'group') {
           return (
             <g key={row.key}>
@@ -494,14 +521,17 @@ const Legend = ({
         }
 
         return (
-          <g key={row.key} transform={`translate(12 ${rowY + 3})`}>
+          <g
+            key={row.key}
+            transform={`translate(${12 + (compact ? (index % columns) * cellWidth : 0)} ${rowY + 3})`}
+          >
             <LegendSwatch entry={row.entry} nodeStroke={palette.nodeStroke} />
             <text
               x="32"
               y="4"
               fill={palette.text}
               fontFamily="Arial, sans-serif"
-              fontSize="11"
+              fontSize={compact ? 14 : 11}
               fontWeight="500"
               letterSpacing="0"
             >
@@ -844,6 +874,7 @@ const GraphCanvas = ({
   onBackgroundClear,
   onNodePointerDown,
   onNodeMove,
+  onKeyboardMoveNode,
   onNodePointerUp,
   onNodeClickForDraw,
   onCanvasAddNode,
@@ -941,7 +972,8 @@ const GraphCanvas = ({
     const el = svgRef.current;
     if (!el) return undefined;
     const updateCanvasSize = () => {
-      const bounds = el.getBoundingClientRect();
+      // Layout animation transforms can temporarily report the old visual size.
+      const bounds = { width: el.clientWidth, height: el.clientHeight };
       onViewportSizeChange?.({
         width: Math.max(0, bounds.width),
         height: Math.max(0, bounds.height),
@@ -973,8 +1005,8 @@ const GraphCanvas = ({
     const el = svgRef.current;
     if (!el) return undefined;
     const doInit = () => {
-      const bounds = el.getBoundingClientRect();
-      if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
+      const bounds = { width: el.clientWidth, height: el.clientHeight };
+      if (bounds.width <= 0 || bounds.height <= 0) return false;
       const viewportWidth = bounds.width;
       const viewportHeight = bounds.height;
       const visibleNodes = graph.nodes.filter(node => node.visible !== false);
@@ -1002,15 +1034,28 @@ const GraphCanvas = ({
           Math.min(...visibleNodes.map(node => node.y)) +
           nodeRadius * 2,
       };
+      const safeViewport = getGraphContentViewport(el, {
+        x: 0,
+        y: 0,
+        width: viewportWidth,
+        height: viewportHeight,
+      });
       const nextView = createFitViewState({
         bounds: mergeSvgBounds(renderedBounds, fallbackBounds),
-        viewportWidth,
-        viewportHeight,
+        viewportWidth: safeViewport.width,
+        viewportHeight: safeViewport.height,
         maxZoom: 1,
-        padding: Math.max(24, nodeRadius),
+        padding: Math.min(
+          Math.max(24, nodeRadius),
+          Math.min(safeViewport.width, safeViewport.height) * 0.1
+        ),
       });
       if (!nextView) return false;
-      setViewState(nextView);
+      setViewState({
+        ...nextView,
+        x: nextView.x + safeViewport.x,
+        y: nextView.y + safeViewport.y,
+      });
       hasInitializedViewRef.current = true;
       return true;
     };
@@ -1234,6 +1279,83 @@ const GraphCanvas = ({
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
+  const handleGraphKeyDown = event => {
+    const object = event.target.closest?.('[data-graph-object]');
+    if (!object) {
+      if (
+        event.target === svgRef.current &&
+        mode === 'add' &&
+        (event.key === 'Enter' || event.key === ' ')
+      ) {
+        event.preventDefault();
+        const bounds = svgRef.current.getBoundingClientRect();
+        onCanvasAddNode(
+          toWorld({ x: bounds.width / 2, y: bounds.height / 2 }, viewState)
+        );
+      }
+      return;
+    }
+    const nodeId = object.getAttribute('data-node-id');
+    const edgeId = object.getAttribute('data-edge-id');
+    if (event.altKey && /^Arrow/.test(event.key) && nodeId !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      const distance = snapEnabled ? 28 : 10;
+      onKeyboardMoveNode?.(nodeId, {
+        x:
+          event.key === 'ArrowLeft'
+            ? -distance
+            : event.key === 'ArrowRight'
+              ? distance
+              : 0,
+        y:
+          event.key === 'ArrowUp'
+            ? -distance
+            : event.key === 'ArrowDown'
+              ? distance
+              : 0,
+      });
+      return;
+    }
+    if (
+      [
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End',
+      ].includes(event.key)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      const objects = [
+        ...svgRef.current.querySelectorAll('[data-graph-object]'),
+      ];
+      const index = objects.indexOf(object);
+      const next =
+        event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? objects.length - 1
+            : (index +
+                (['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 1) +
+                objects.length) %
+              objects.length;
+      objects.forEach(el =>
+        el.setAttribute('tabindex', el === objects[next] ? '0' : '-1')
+      );
+      objects[next]?.focus();
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (nodeId !== null) {
+        if (mode === 'draw') onNodeClickForDraw(nodeId);
+        else onSelectNode(nodeId, event.shiftKey);
+      } else if (edgeId !== null) onSelectEdge(edgeId);
+    }
+  };
   return (
     <div className="relative h-full bg-white font-inter text-on-surface dark:bg-gray-900 dark:text-dark-on-surface">
       <svg
@@ -1243,6 +1365,11 @@ const GraphCanvas = ({
         ref={svgRef}
         className="h-full w-full"
         aria-label="Graph canvas"
+        role="group"
+        aria-describedby={
+          isExporting ? undefined : `${svgElementId}-keyboard-help`
+        }
+        onKeyDown={isExporting ? undefined : handleGraphKeyDown}
         data-frame-navigation-surface={isExporting ? undefined : 'true'}
         data-mode={isExporting ? undefined : mode}
         data-view-x={isExporting ? undefined : viewState.x}
@@ -1258,6 +1385,7 @@ const GraphCanvas = ({
         onPointerDown={isExporting ? undefined : onPointerDownBackground}
         onPointerMove={isExporting ? undefined : onPointerMove}
         onPointerUp={isExporting ? undefined : onPointerUp}
+        onPointerCancel={isExporting ? undefined : onPointerUp}
         onPointerLeave={isExporting ? undefined : onPointerUp}
         style={
           isExporting
@@ -1273,6 +1401,9 @@ const GraphCanvas = ({
               }
         }
       >
+        <desc id={`${svgElementId}-keyboard-help`}>
+          {`${graph.nodes.filter(node => node.visible !== false).length} visible nodes, ${edgeVisualData.length} visible edges. ${captionText ?? ''} Arrow keys explore objects. Enter or Space selects, or chooses an edge endpoint in Draw Edge mode. Alt plus arrow keys moves a focused node. In Add Node mode, focus the canvas and press Enter to add at its center.`}
+        </desc>
         <defs>
           <pattern
             id={gridPatternId}
@@ -1357,8 +1488,10 @@ const GraphCanvas = ({
                   diff.changedNodes.has(String(edge.to));
                 return (
                   <GraphEdge
-                    key={edge.id}
+                    key={`${resetViewTrigger}:${edge.id}`}
                     edge={edge}
+                    tabIndex={selected ? 0 : -1}
+                    accessibleLabel={`Edge ${nodeMap.get(String(edge.from))?.label ?? edge.from} ${edge.directed ? 'to' : 'and'} ${nodeMap.get(String(edge.to))?.label ?? edge.to}${edge.label ? `. Weight ${edge.label}` : ''}${edge.status ? `. ${edge.status}` : ''}`}
                     pathD={pathD}
                     pathType={pathType}
                     pathPoints={pathPoints}
@@ -1368,7 +1501,7 @@ const GraphCanvas = ({
                     labelPosition={labelPosition}
                     labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}
-                    layoutIdPrefix={layoutIdPrefix}
+                    layoutIdPrefix={`${layoutIdPrefix}${resetViewTrigger}-`}
                     shouldAnimate={
                       !isExporting &&
                       (endpointMoved || diff.changedEdges.has(String(edge.id)))
@@ -1398,8 +1531,16 @@ const GraphCanvas = ({
                 );
                 return (
                   <GraphNode
-                    key={node.id}
+                    key={`${resetViewTrigger}:${node.id}`}
                     node={node}
+                    tabIndex={
+                      selected ||
+                      (!effectiveSelectedObject &&
+                        node ===
+                          graph.nodes.find(item => item.visible !== false))
+                        ? 0
+                        : -1
+                    }
                     nodeRadius={nodeRadius}
                     labelFontSize={nodeLabelSize}
                     selected={selected}
@@ -1410,7 +1551,7 @@ const GraphCanvas = ({
                     }
                     isExporting={isExporting}
                     themeOverride={themeOverride}
-                    layoutIdPrefix={layoutIdPrefix}
+                    layoutIdPrefix={`${layoutIdPrefix}${resetViewTrigger}-`}
                     mode={mode}
                     onPointerDown={event =>
                       handleNodePointerDown(event, node.id)

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Panel,
   Group as PanelGroup,
@@ -13,6 +14,7 @@ import LeftSidebar from './LeftSidebar';
 import PropertyPanel from './PropertyPanel';
 import TimelinePanel from './TimelinePanel';
 import { DEFAULT_SCRIPT } from './data/defaultScript';
+import { useModalFocus } from './hooks/useModalFocus';
 import ExportModal from './modals/ExportModal';
 import ExportVideoModal from './modals/ExportVideoModal';
 import ImportModal from './modals/ImportModal';
@@ -64,11 +66,11 @@ const getStatusClassName = status => {
       : tone === 'success'
         ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46] dark:border-[#34D399] dark:bg-[#052E16] dark:text-[#D1FAE5]'
         : 'border-[#D7DEE8] bg-[#F8F9FA] text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]';
-  return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
+  return `pointer-events-none select-none border px-2 py-1 text-[11px] leading-snug break-words ${toneClass}`;
 };
 
 const canvasHudStackClass =
-  'pointer-events-none absolute right-3 top-3 z-30 flex w-80 max-w-[90%] flex-col items-end gap-2';
+  'pointer-events-none relative order-first z-30 flex shrink-0 flex-wrap items-start justify-end gap-2 p-2';
 const canvasModeIndicatorClass =
   'pointer-events-none w-[220px] max-w-full border border-[#CBD5E1] border-l-2 border-l-[#A66A00] bg-[#FFFFFF] px-3 py-2 text-left text-[#0F172A] shadow-[0_2px_4px_#0F172A0D] dark:border-[#475569] dark:border-l-[#F59E0B] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryShellClass =
@@ -279,10 +281,20 @@ const CloseIcon = () => (
 
 const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   const sideClass = side === 'left' ? 'left-0' : 'right-0';
+  const focusRef = useModalFocus(true, onClose);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}>
+  return createPortal(
+    <div
+      data-modal-portal="true"
+      className="fixed inset-0 z-50 bg-black/50"
+      onClick={onClose}
+    >
       <div
+        ref={focusRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={side === 'left' ? 'Tools' : 'Inspector'}
+        tabIndex={-1}
         className={`graphstudio-side-panel absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-[#F8F9FA] dark:bg-[#111827] ${sideClass}`}
         onClick={event => event.stopPropagation()}
       >
@@ -296,14 +308,31 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 const CanvasStage = ({ canvas, currentFrame, status, presenceRecovery }) => (
-  <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
-    <GraphCanvas {...canvas} />
+  <motion.div
+    className="relative flex h-full min-h-0 flex-col"
+    layoutId="graphstudio-main-canvas"
+  >
+    <div className="min-h-0 flex-1">
+      <GraphCanvas {...canvas} />
+    </div>
     <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
+      <details className="pointer-events-auto w-[220px] max-w-full border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 max-[768px]:flex-1">
+        <summary className="cursor-pointer font-semibold">
+          Keyboard controls
+        </summary>
+        <p className="mt-2 leading-relaxed">
+          Tab to the graph. Arrow keys explore nodes and edges; Enter selects.
+          Alt + arrows moves a node. In Draw Edge mode, Enter chooses each
+          endpoint. In Add Node mode, Enter on the canvas adds a node at the
+          center.
+        </p>
+      </details>
       <CanvasModeIndicator
         mode={canvas.mode}
         currentFrame={currentFrame}
@@ -312,23 +341,25 @@ const CanvasStage = ({ canvas, currentFrame, status, presenceRecovery }) => (
       />
       <PresenceRecoveryAffordance recovery={presenceRecovery} />
     </div>
-    {status && (
-      <div
-        className={getStatusClassName(status)}
-        data-testid="graph-studio-status"
-        data-status-tone={
-          STATUS_ERROR_PATTERN.test(status)
-            ? 'error'
-            : STATUS_SUCCESS_PATTERN.test(status)
-              ? 'success'
-              : 'neutral'
-        }
-        role="status"
-        aria-live="polite"
-      >
-        {status}
-      </div>
-    )}
+    <div className="h-8 shrink-0 overflow-y-auto px-2 pb-1">
+      {status && (
+        <div
+          className={getStatusClassName(status)}
+          data-testid="graph-studio-status"
+          data-status-tone={
+            STATUS_ERROR_PATTERN.test(status)
+              ? 'error'
+              : STATUS_SUCCESS_PATTERN.test(status)
+                ? 'success'
+                : 'neutral'
+          }
+          role="status"
+          aria-live="polite"
+        >
+          {status}
+        </div>
+      )}
+    </div>
   </motion.div>
 );
 
@@ -378,6 +409,8 @@ const ModalStack = ({
       onPreviewFrameChange={sidebar.onExportFrameChange}
       previewCaptureToken={exportCapture?.captureToken}
       isExporting={sidebar.isVisualExporting}
+      onCancelExport={sidebar.onCancelExport}
+      exportProgress={sidebar.exportProgress}
       steps={sidebar.steps}
     />
     <ParserModal
@@ -429,8 +462,10 @@ const GraphStudioLayout = ({
   presenceRecovery,
   exportCapture,
   status,
+  draftStatus,
 }) => {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [canvasFocused, setCanvasFocused] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
@@ -470,7 +505,22 @@ const GraphStudioLayout = ({
 
   if (isMobile) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface">
+      <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+        <div
+          role="status"
+          className="px-3 py-1 text-xs text-slate-600 dark:text-slate-300"
+        >
+          {draftStatus}
+          {sidebar.isVisualExporting && (
+            <button
+              type="button"
+              onClick={sidebar.onCancelExport}
+              className="ml-3 rounded border border-slate-400 px-2 py-1"
+            >
+              Cancel export ({Math.round(sidebar.exportProgress * 100)}%)
+            </button>
+          )}
+        </div>
         {/* Mobile Header with Toggle Buttons */}
         <div className="flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-low p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface-container-low">
           <MobileHeaderButton
@@ -480,9 +530,19 @@ const GraphStudioLayout = ({
           >
             <MenuIcon />
           </MobileHeaderButton>
-          <span className="text-sm font-semibold text-on-surface dark:text-dark-on-surface">
-            Graph Studio
-          </span>
+          <button
+            type="button"
+            className="rounded border border-slate-400 px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2"
+            aria-pressed={canvasFocused}
+            onClick={() => {
+              setCanvasFocused(value => !value);
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => sidebar.onCenterView?.())
+              );
+            }}
+          >
+            {canvasFocused ? 'Show timeline' : 'Focus canvas'}
+          </button>
           <MobileHeaderButton
             label={
               showPropertyPanel
@@ -525,7 +585,13 @@ const GraphStudioLayout = ({
           />
         </div>
 
-        <div className="min-h-[260px] flex-none border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
+        <div
+          className={
+            canvasFocused
+              ? 'hidden'
+              : 'max-h-[50dvh] min-h-0 flex-none overflow-auto border-t border-outline-variant/20 dark:border-dark-outline-variant/20'
+          }
+        >
           <TimelinePanel {...timeline} />
         </div>
 
@@ -535,8 +601,23 @@ const GraphStudioLayout = ({
   }
 
   return (
-    <div className="h-full min-h-0 bg-surface font-inter text-on-surface">
-      <PanelGroup orientation="vertical" className="h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+      <div
+        role="status"
+        className="shrink-0 border-b border-slate-200 px-4 py-1 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
+      >
+        {draftStatus}
+        {sidebar.isVisualExporting && (
+          <button
+            type="button"
+            onClick={sidebar.onCancelExport}
+            className="ml-3 rounded border border-slate-400 px-2 py-1"
+          >
+            Cancel export ({Math.round(sidebar.exportProgress * 100)}%)
+          </button>
+        )}
+      </div>
+      <PanelGroup orientation="vertical" className="min-h-0 flex-1">
         <Panel minSize="360px" className="min-h-0">
           <PanelGroup orientation="horizontal" className="h-full min-h-0">
             <Panel defaultSize="18%" minSize="14%" className={SIDE_PANEL_CLASS}>

@@ -1,205 +1,123 @@
-# Graph Studio production/main diagnostic
+# Graph Studio audit and implementation report
 
-Date: 2026-07-15
+Updated September 4, 2026. Reviewed local source based on commit
+`7418661eee9f240e22a5b2ad1a8f5249347ec66d`, then implemented the changes below
+in the working tree. This report supersedes the July deployment diagnostic. It
+describes the local application; production deployment and HTTP headers were not
+verified.
 
-## Bottom line
+The audit reproduced an import crash, missing keyboard graph operations,
+inconsistent status colors, dialog focus escape, fragmented drag undo, and loss
+of work on reload. The application now rejects malformed visual data, provides
+keyboard graph editing and dialog focus management, uses consistent node state
+cues, saves a local draft, and groups drag undo by gesture.
 
-The original mismatch was real but the local branch information was stale by the
-time this work started.
+## Preset and export follow-up — September 5, 2026
 
-- The deployed bundle had been identified as the tree built from `8741844`.
-- Local `main` was still `e95edf3`, five commits behind that tree.
-- A fresh fetch found upstream merge commit `f771186` (PR #72). Its parents are
-  `e95edf3` and `8741844`, and its tree is byte-for-byte identical to the
-  `8741844` tree.
-- Local `main` was fast-forwarded to `f771186`. This PR is based on `f771186`.
+All nine presets now include deliberate layouts, compact legends, 18 px node and
+edge text, enabled captions, and 1.8–3 second frame holds. The animations show
+intermediate traversal/selection steps and correct final results. Dijkstra
+distances, topological indegrees, and component/root IDs use validated per-frame
+annotations; project-wide node labels retain their existing meaning. The DSU
+cycle edge clears the intermediate node, and the multigraph example no longer
+claims an unweighted edge is optimal.
 
-Do not cherry-pick the five commits again. They are already in upstream `main`.
-The remaining deployment gap is provenance: the currently deployed bundle has no
-marker that identifies its source without downloading and comparing assets.
+Fitting now reserves caption/legend space. Replacing a preset resets node motion
+identity before measuring, preventing stale geometry from shrinking or shifting
+the new graph. Status messages occupy their own row outside the canvas.
 
-## Reconciliation audit
+Image export defaults to the reviewed editor view. Capture retains the source
+canvas dimensions and scales the whole composition once, preserving relative
+graph, legend, and caption size. Video/slides use the same reviewed composition
+inside 16:9 with a dedicated preview option and clipping at the original canvas
+boundary. Timeline exports no longer refit each frame independently. Explicit
+Fit graph and Slide 16:9 modes remain available for image reframing.
 
-The five commits that were absent from stale `main` were, oldest first:
+Validation: 86 unit tests pass. The 51-test browser run passed 50 tests and
+identified a mobile resize defect; after correcting it, all five focused sizing,
+preset visibility, and export-fidelity checks passed, including that mobile
+test. Formatting, lint, and production build pass. Coverage includes preset
+algorithm invariants, annotation round trips, all-preset visibility, and
+editor/preview/SVG fidelity. Canvas measurements now use layout dimensions, so
+temporary layout animation transforms cannot leave captions or fitting at the
+old viewport size. Local screenshot artifacts are in
+`qa-screenshots/presets-2026-09-04` (the review began September 4). The
+remaining dependency and broader accessibility limitations below still apply.
 
-1. `14080a5` — Improve Graph Studio control trust
-2. `b81ec78` — Fix Graph Studio e2e regressions
-3. `639e9d6` — Refine Graph Studio mode indicators
-4. `134abc3` — Calm Graph Studio tool mode styling
-5. `8741844` — Move Graph Studio mode indicator into canvas
+## Findings and implemented changes
 
-The range is linear: `e95edf3...8741844` reports `0 5`. Net change was 10 files,
-334 insertions, and 99 deletions.
+| Finding                                                              | Current behavior                                                                                                                                                                                                        | Status                                                                 |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Malformed imported colors could blank the application                | Shared validation checks base properties and temporal patches before replacement. Invalid imports preserve the current graph. Inspector color entry handles partial hex input, and an error boundary provides recovery. | Fixed for reproduced inputs                                            |
+| Graph objects were pointer-only                                      | Nodes and edges expose names, state, selection, and keyboard focus. Arrows explore objects; Enter/Space selects; Alt + arrows moves nodes. Keyboard creation and connection are supported.                              | Implemented; real screen-reader verification remains                   |
+| Default legend disagreed with rendered node states                   | Nodes and default legend share one palette. Active thickness and queued/visited/discarded dash patterns provide additional state cues.                                                                                  | Fixed                                                                  |
+| Custom node fills could hide labels                                  | Node labels choose black or white from fill luminance, including exported SVG content. Supported colors are hex or default.                                                                                             | Fixed for node label contrast                                          |
+| Dialogs let focus escape and controls lacked names                   | Shared portal dialogs trap focus, make background content inert, and restore focus. Script and inspector controls have labels.                                                                                          | Fixed in tested Chromium flows                                         |
+| Imports and script output had insufficient bounds                    | Limits apply to text size, graph counts, frames, overrides, IDs, coordinates, descriptions, and visual values. Script output has event and serialized-size budgets.                                                     | Bounded; maximum-size memory profiling remains                         |
+| Dragging produced many undo entries and cloned history repeatedly    | Pointer and range gestures become transactions. History shares immutable snapshots and uses reference signatures.                                                                                                       | Fixed in tested drag flow                                              |
+| Reload discarded the current project                                 | Debounced device-local draft saving restores project, timeline, settings, and view. Storage failures are shown with an export recovery instruction.                                                                     | Implemented; browser quota still applies                               |
+| Edge-list exports used incompatible raw IDs                          | IDs remap to consecutive integers; unsupported weights produce an error. Full project JSON preserves richer graph semantics.                                                                                            | Fixed for supported edge-list format                                   |
+| Force layout blocked the UI thread                                   | A dedicated worker supports cancellation, timeout, and stale-result cleanup.                                                                                                                                            | UI blocking addressed; algorithm remains quadratic                     |
+| Small screens left little canvas space                               | Mobile users can hide the timeline with Focus canvas. Canvas help occupies its own space on narrow screens. The application uses dynamic viewport height.                                                               | Improved                                                               |
+| Script Mode was described as sandboxed                               | UI and docs explicitly describe trusted JavaScript with network/storage access. Closing the dialog terminates execution.                                                                                                | Trust boundary clarified, not isolated                                 |
+| Export work eagerly resolved all frames and queued too much encoding | Frames resolve on demand from an immutable session. Video encoding periodically flushes and yields; video duration is bounded. Progress and cancellation controls are available. MP4 muxer loads lazily.                | Improved; final serialization and pending flush can delay cancellation |
+| Dependency advisories and startup bundle size                        | Compatible dependency updates removed the development-tool advisories. Two high npm entries remain through PPTX image parsing. Optional MP4 code is split out.                                                          | Partially resolved                                                     |
 
-No production-only change was discarded. In particular:
+Reduced-motion preferences are now honored by the animation provider and CSS.
+Timeline frame buttons use a roving tab stop. Dark/light themes and mobile
+layout received visual review, with final fixes for draft-status contrast and
+canvas-help overlap.
 
-- The force-layout recalibration in `14080a5` is a material behavior change and
-  has deterministic unit coverage. It stays.
-- The grid SVG rewrite in `b81ec78` is renderer/test robustness work. It stays.
-- `639e9d6` and `134abc3` contain intermediate mode-indicator decisions. The
-  final intended state is the compact canvas indicator in `8741844`, not either
-  intermediate presentation.
-- `8741844` intentionally removes the Add Node/Draw Edge helper paragraphs from
-  the sidebar. Restoring tests for that copy would reintroduce the mismatch.
+## Validation
 
-Verified merge facts:
+- 74 unit tests passed, including malformed visual-property and project-limit
+  regressions; existing project JSON metadata round trips remain covered.
+- 48 Playwright tests passed across desktop, mobile, and local build smoke
+  projects. New regressions cover atomic import rejection, dialog focus
+  containment/restoration, keyboard graph operations, drag undo, draft reload,
+  status/contrast consistency, and cancelling a 1,000-node force layout.
+- After the final visual layout adjustments, all 11 focused mobile, export, and
+  audit regression browser tests passed again.
+- Formatting, ESLint, and production build passed using Node 20.19.0.
+- Local Chromium screenshots reviewed at 1440 × 1000 in both themes, at 390 ×
+  844, and at 720 × 500. Export preview was also inspected. No browser
+  exceptions were recorded in the visual probe.
+- `npm audit --json` now reports 2 high affected-package entries, down from 11
+  entries (7 high, 1 moderate, 3 low) before compatible updates.
 
-```text
-f771186 parents: e95edf3 8741844
-8741844 tree:    f4b6f5d453ed424cefa215067193e8d1609c3212
-f771186 tree:    f4b6f5d453ed424cefa215067193e8d1609c3212
-```
+Local visual artifacts are in
+[`qa-screenshots/implementation-2026-09-04`](../qa-screenshots/implementation-2026-09-04/).
+The initial diagnostic captures remain in
+[`qa-screenshots/audit-2026-09-04`](../qa-screenshots/audit-2026-09-04/). These
+directories are ignored by Git and are local review evidence.
 
-## Test mismatch
+## Remaining limitations and follow-up
 
-Stale-main E2E tests expected exact sidebar instructions such as “Click canvas
-to add a node…” and “Connect nodes to add an edge…”. Production removed those
-paragraphs and moved mode feedback onto the canvas.
+**PPTX dependency advisories.** `pptxgenjs` 4.0.1 depends on `image-size` 1.2.1.
+The registry reports denial-of-service issues in malformed
+[ICNS](https://github.com/advisories/GHSA-w3rx-r6r6-pgpr) and
+[JXL/HEIF](https://github.com/advisories/GHSA-5p2g-fcmc-qvqq) parsing. Current
+slideshow export supplies internally generated PNGs; this review found no
+untrusted-image route to those parsers. That reachability assessment does not
+remove the advisories. npm proposes a breaking downgrade to PptxGenJS 1.1.5;
+that downgrade was not applied. A supported dependency resolution remains open.
 
-The tests merged by PR #72 now assert stable behavior instead:
+**Large-project performance.** The minified entry is approximately 550 kB (165
+kB gzip), with separate PPTX and MP4 muxer chunks. Vite still reports its 500 kB
+chunk warning. Force computation still has quadratic complexity inside the
+worker; SVG rendering, autosave serialization, and large exports need measured
+memory/latency budgets. The editor does not virtualize graph objects. Limits
+constrain input size but do not guarantee smooth operation at all maxima.
 
-- active tool state through `aria-pressed`
-- canvas state through `data-mode`
-- the visible `canvas-mode-indicator`
-- draw-source ring behavior
+**Storage and execution.** A local draft is a recovery aid with browser quota
+limits, not a synchronized backup. Multiple tabs can overwrite the single draft.
+Script Mode runs trusted code with worker capabilities; it is not a hostile-code
+sandbox. Export cancellation is cooperative; PptxGenJS final serialization and
+pending codec flushes can delay cancellation.
 
-This PR does not weaken those assertions or restore stale copy checks. The new
-deployed smoke also uses stable roles/test IDs rather than the marketing tagline
-or CSS color values.
-
-## Build provenance
-
-Vite now injects three values at build time and `graph-studio-root` exposes them
-as invisible `data-build-*` attributes:
-
-- `data-build-commit`
-- `data-build-timestamp`
-- `data-build-environment`
-
-Commit detection prefers explicit Graph Studio/provider environment values and
-falls back to `git rev-parse HEAD`. Timestamp falls back to the build time.
-Environment falls back to the Vite mode. Deploy systems can set:
-
-```text
-GRAPH_STUDIO_COMMIT_SHA
-GRAPH_STUDIO_BUILD_TIMESTAMP
-GRAPH_STUDIO_DEPLOYMENT
-```
-
-Git-less source builds report commit `unknown` unless the build system injects
-the SHA. The optional expected-SHA smoke check rejects `unknown`. This is
-deliberately not a visible UI badge.
-
-## Deployed smoke path
-
-Run locally:
-
-```bash
-npm run test:e2e:smoke
-```
-
-Run against production:
-
-```bash
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e:smoke
-```
-
-Require a specific deployed commit:
-
-```bash
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide EXPECTED_GRAPH_STUDIO_COMMIT_SHA=$(git rev-parse HEAD) npm run test:e2e:smoke
-```
-
-The public deployment requires no secret. The smoke verifies HTTP 200 for the
-document and same-origin core assets, nonblank shell layout, Graph Studio shell,
-provenance fields, a rendered graph canvas with nodes and edges, theme toggling,
-same-origin request failures, console errors, and page errors.
-
-Current production result before this PR is deployed: the document, shell,
-canvas, theme toggle, core assets, and browser-error checks pass. The test fails
-only the four provenance assertions because the old bundle has no marker. That
-failure is expected and should remain red until a build containing this PR is
-deployed.
-
-## Node decision
-
-`.nvmrc` remains the canonical recommendation at Node `20.19.0`; both GitHub
-workflows already consume it. The package engine range also admits Node 25, so
-leaving a known-broken unit command would be dishonest.
-
-`test:unit` now names the current unit files explicitly instead of passing the
-directory:
-
-```text
-node --test tests/unit/effectiveVisibility.test.mjs tests/unit/graphLayouts.test.mjs tests/unit/temporalGraphState.test.mjs
-```
-
-The command passes all 21 tests on Node `20.19.0` and Node `25.2.1`. This is a
-small compatibility correction, not a toolchain migration.
-
-## Commands run and results
-
-```text
-git fetch origin --prune
-  PASS — origin/main advanced from e95edf3 to f771186
-
-git rev-list --left-right --count e95edf3...8741844
-  PASS — 0 5
-
-git rev-parse 8741844^{tree} f771186^{tree}
-  PASS — identical tree IDs
-
-git diff --quiet 8741844 f771186
-  PASS — no tree diff
-
-npm install
-  PASS — dependencies already up to date
-
-npm run test:unit                         # Node 20.19.0
-  PASS — 21/21
-
-PATH=/opt/homebrew/bin:/usr/bin:/bin /opt/homebrew/bin/npm run test:unit
-  PASS — 21/21 on Node 25.2.1
-
-npm run lint
-  PASS
-
-npm run build
-  PASS — 384 modules transformed
-  NOTE — existing >500 kB chunk warning remains
-
-SOURCE_DATE_EPOCH=100000000000000 npm run build
-  PASS — invalid out-of-range source dates fall back instead of crashing Vite
-
-npm run test:e2e:smoke
-  PASS — 1/1 against a local production build served by Vite preview
-
-npm run test:e2e
-  PASS — 31/31 across desktop, mobile, and focused smoke projects
-
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e:smoke
-  EXPECTED FAIL — production lacks all four provenance fields; subsequent
-  shell/canvas/theme/core-asset/browser-error checks complete without failure
-```
-
-All project commands above were run with Node `20.19.0` unless explicitly marked
-as the Node 25 compatibility check.
-
-## Remaining follow-ups
-
-### P1
-
-- Merge and deploy this PR, then run the production smoke with
-  `EXPECTED_GRAPH_STUDIO_COMMIT_SHA` set to the deployed revision. Until that
-  happens, production is healthy but cannot prove its source revision.
-
-### P2
-
-- Trigger the focused smoke from the deployment-complete event or a scheduled
-  workflow. Do not gate an earlier push job on production; it can race the
-  deployment and test the previous bundle.
-- Replace remaining broad-suite assertions that couple to computed colors or HUD
-  pixel ordering when those tests are next touched. They are more brittle than
-  the new smoke but are outside this focused PR.
-- Address the existing production chunk-size warning in a separate performance
-  change. Export architecture/code splitting is explicitly out of scope here.
+**Accessibility acceptance.** Keyboard and visual improvements do not constitute
+full WCAG or assistive-technology certification. Real screen readers, Firefox,
+Safari, grayscale comprehension, arbitrary custom edge/legend colors, long-label
+layouts, and maximum-scale projects still require dedicated review. Relevant
+acceptance references are [WCAG 2.2](https://www.w3.org/TR/WCAG22/) and the
+[WAI modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).

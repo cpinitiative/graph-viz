@@ -1,3 +1,4 @@
+import { requireLimit } from './projectLimits.js';
 import { GRAPH_STATE_COLORS } from './stateColors';
 
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
@@ -25,13 +26,18 @@ self.onmessage = event => {
     const source = String(code ?? '');
     const safeGraph = deepFreeze(cloneSerializable(graph, 'api.graph'));
     const trace = [];
+    let traceBytes = 0;
     const pushTrace = entry => {
       if (trace.length >= SCRIPT_MAX_TRACE_ENTRIES) {
         throw new Error(
           `Script generated too many events; limit is ${SCRIPT_MAX_TRACE_ENTRIES}`
         );
       }
-      trace.push(entry);
+      const serialized = JSON.stringify(entry);
+      requireLimit(serialized.length, 65536, 'Trace event size');
+      traceBytes += new TextEncoder().encode(serialized).byteLength;
+      requireLimit(traceBytes, 1024 * 1024, 'Trace size in bytes');
+      trace.push(JSON.parse(serialized));
     };
     const api = {
       graph: safeGraph,

@@ -2,11 +2,17 @@ import {
   DEFAULT_FRAME_DURATION_MS,
   normalizeFrameDuration,
 } from './frameDuration.js';
+import {
+  PROJECT_LIMITS,
+  requireLimit,
+  requireTextBudget,
+} from './projectLimits.js';
 import { GRAPH_STATE_COLORS } from './stateColors.js';
 import {
   sanitizeTemporalOverrideMap,
   sanitizeTemporalOverridePatch,
 } from './temporalOverrideSchema.js';
+import { validateVisualProperties } from './visualProperties.js';
 
 const SCRIPT_MAX_LENGTH = 20000;
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
@@ -87,6 +93,7 @@ const validateOverrideMap = ({ label, overrides, knownIds, objectType }) => {
       if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
         throw new Error(`${label}.${id} must be an object`);
       }
+      validateVisualProperties(objectType, patch, `${label}.${id}`);
       const sanitizedPatch = sanitizeTemporalOverridePatch(
         objectType,
         cloneSerializable(patch, `${label}.${id}`)
@@ -107,6 +114,13 @@ const validateScriptTraceEntry = (entry, context) => {
   }
 
   const type = String(entry.type ?? '');
+  if (type === 'node' || type === 'edge')
+    validateVisualProperties(type, entry, 'Trace event');
+  requireLimit(
+    String(entry.description ?? '').length,
+    PROJECT_LIMITS.description,
+    'Frame description'
+  );
   const description =
     entry.description === undefined ? undefined : String(entry.description);
   const durationMs = normalizeScriptDuration(entry.durationMs);
@@ -185,10 +199,11 @@ const validateWorkerTrace = ({ trace, context }) => {
     );
   }
 
+  requireLimit(JSON.stringify(trace).length, 1024 * 1024, 'Trace size');
   return trace.map(entry => validateScriptTraceEntry(entry, context));
 };
 
-const runScriptTraceWorker = ({ source, graph, timeoutMs }) =>
+const runScriptTraceWorker = ({ source, graph, timeoutMs, signal }) =>
   new Promise((resolve, reject) => {
     const worker = new Worker(
       new URL('./scriptTraceWorker.js', import.meta.url),
@@ -202,6 +217,7 @@ const runScriptTraceWorker = ({ source, graph, timeoutMs }) =>
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', cancel);
       worker.terminate();
       callback();
     };
@@ -210,6 +226,13 @@ const runScriptTraceWorker = ({ source, graph, timeoutMs }) =>
       finish(() => reject(new Error(SCRIPT_TIMEOUT_ERROR)));
     }, timeoutMs);
 
+    const cancel = () =>
+      finish(() => reject(new DOMException('Script cancelled', 'AbortError')));
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) {
+      cancel();
+      return;
+    }
     worker.onmessage = event => {
       finish(() => {
         const payload = event.data;
@@ -244,6 +267,7 @@ export const buildTimelineSteps = trace => {
       edgeOverrides: {},
     },
   ];
+  let totalOverrides = 0;
   trace.forEach((entry, index) => {
     const previous = steps[steps.length - 1];
     const next = {
@@ -278,12 +302,21 @@ export const buildTimelineSteps = trace => {
         ...sanitizeTemporalOverrideMap('edge', entry.edgeOverrides),
       };
     }
+    totalOverrides +=
+      Object.keys(next.nodeOverrides).length +
+      Object.keys(next.edgeOverrides).length;
+    requireLimit(
+      totalOverrides,
+      PROJECT_LIMITS.overrides,
+      'Total frame overrides'
+    );
     steps.push(next);
   });
+  requireTextBudget(JSON.stringify(steps), 'Generated timeline');
   return steps;
 };
 
-export const runScriptTrace = async ({ code, graph, timeoutMs }) => {
+export const runScriptTrace = async ({ code, graph, timeoutMs, signal }) => {
   const source = validateScriptSource(code);
   const normalizedTimeoutMs = normalizeScriptTimeout(timeoutMs);
   const safeGraph = deepFreeze(cloneSerializable(graph, 'api.graph'));
@@ -292,6 +325,7 @@ export const runScriptTrace = async ({ code, graph, timeoutMs }) => {
     source,
     graph: safeGraph,
     timeoutMs: normalizedTimeoutMs,
+    signal,
   });
   const trace = validateWorkerTrace({ trace: rawTrace, context });
   return buildTimelineSteps(trace);

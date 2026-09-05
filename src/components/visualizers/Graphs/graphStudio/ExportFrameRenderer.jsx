@@ -1,5 +1,4 @@
 import GraphCanvas from './GraphCanvas';
-import { getContainedViewState } from './graphCanvasUtils';
 import { resolveStepCaptionEnabled } from './lib/captionOverlay';
 import {
   EXPORT_CAPTURE_SVG_ELEMENT_ID,
@@ -29,16 +28,13 @@ const ExportFrameRenderer = ({
     ...(baseCaptionOverlay ?? {}),
     enabled: resolveStepCaptionEnabled(step, baseCaptionOverlay),
   };
-  const canonicalViewport = {
-    width: SLIDE_EXPORT_WIDTH,
-    height: SLIDE_EXPORT_HEIGHT,
+  // Preserve the reviewed editor's complete coordinate system, including
+  // screen-space overlays. Output sizing happens once, during serialization.
+  const sourceViewport = {
+    width: Math.max(2, canvas?.viewportSize?.width || SLIDE_EXPORT_WIDTH),
+    height: Math.max(2, canvas?.viewportSize?.height || SLIDE_EXPORT_HEIGHT),
   };
-  const exportViewState = getContainedViewState({
-    viewState: canvas?.viewState,
-    sourceViewport: canvas?.viewportSize,
-    targetViewport: canonicalViewport,
-  }) ??
-    canvas?.viewState ?? { x: 0, y: 0, zoom: 1 };
+  const exportViewState = canvas?.viewState ?? { x: 0, y: 0, zoom: 1 };
 
   return (
     <div
@@ -49,8 +45,8 @@ const ExportFrameRenderer = ({
       data-testid="export-capture-surface"
       inert=""
       style={{
-        width: SLIDE_EXPORT_WIDTH,
-        height: SLIDE_EXPORT_HEIGHT,
+        width: sourceViewport.width,
+        height: sourceViewport.height,
       }}
     >
       <GraphCanvas
@@ -83,7 +79,7 @@ const ExportFrameRenderer = ({
         layoutIdPrefix="export-capture-"
         exportFrameIndex={frameIndex}
         exportCaptureToken={captureToken}
-        canvasSizeOverride={canonicalViewport}
+        canvasSizeOverride={sourceViewport}
         onSelectNode={noop}
         onSelectEdge={noop}
         onSelectNodes={noop}

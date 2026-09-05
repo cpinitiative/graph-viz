@@ -1,4 +1,7 @@
-'use client';
+import { useProjectDraft } from './graphStudio/hooks/useProjectDraft';
+import { readProjectDraft } from './graphStudio/lib/projectDraft';
+import { PROJECT_LIMITS } from './graphStudio/lib/projectLimits';
+('use client');
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../../context/useTheme';
@@ -78,12 +81,19 @@ const isAutoFontSize = (value, autoValue) =>
 
 const GraphStudioVisualizer = ({ snapshot }) => {
   const { theme } = useTheme();
+  const [initialDraft] = useState(() =>
+    snapshot?.initialAnimation || snapshot?.initialGraph
+      ? null
+      : readProjectDraft()
+  );
   const seedTimeline = useMemo(
     () =>
-      normalizeTimelinePayload(
-        snapshot?.initialAnimation ?? snapshot?.initialGraph
-      ),
-    [snapshot]
+      initialDraft
+        ? { baseGraph: initialDraft.graph, steps: initialDraft.timeline.steps }
+        : normalizeTimelinePayload(
+            snapshot?.initialAnimation ?? snapshot?.initialGraph
+          ),
+    [initialDraft, snapshot]
   );
   const playbackStopRef = useRef(null);
   const stopPlaybackBeforeTimelineMutation = useCallback(() => {
@@ -108,10 +118,18 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     onBeforeTimelineMutation: stopPlaybackBeforeTimelineMutation,
   });
   const [mode, setMode] = useState('select');
-  const [edgeRouting, setEdgeRouting] = useState(EDGE_ROUTING.straight);
-  const [snapEnabled, setSnapEnabled] = useState(true);
-  const [showGrid, setShowGrid] = useState(true);
-  const [captionOverlay, setCaptionOverlay] = useState(DEFAULT_CAPTION_OVERLAY);
+  const [edgeRouting, setEdgeRouting] = useState(
+    initialDraft?.settings.edgeRouting ?? EDGE_ROUTING.straight
+  );
+  const [snapEnabled, setSnapEnabled] = useState(
+    initialDraft?.settings.snapEnabled ?? true
+  );
+  const [showGrid, setShowGrid] = useState(
+    initialDraft?.settings.showGrid ?? true
+  );
+  const [captionOverlay, setCaptionOverlay] = useState(
+    initialDraft?.settings.captionOverlay ?? DEFAULT_CAPTION_OVERLAY
+  );
   const normalizedCaptionOverlay = normalizeCaptionOverlay(captionOverlay);
   const currentCaptionOverlay = {
     ...normalizedCaptionOverlay,
@@ -120,7 +138,9 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       normalizedCaptionOverlay
     ),
   };
-  const [customLegend, setCustomLegend] = useState(DEFAULT_CUSTOM_LEGEND);
+  const [customLegend, setCustomLegend] = useState(
+    initialDraft?.settings.customLegend ?? DEFAULT_CUSTOM_LEGEND
+  );
   const [isLegendEditorOpen, setIsLegendEditorOpen] = useState(false);
   const {
     viewState,
@@ -173,14 +193,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       didFit ? 'View fit to graph' : 'Unlock view to change the viewport'
     );
   }, [centerViewOnContent, lockCanvas, setStatus]);
-  const [globalSettings, setGlobalSettings] = useState({
-    forceStrength: 1,
-    edgeCurvature: 46,
-    nodeSize: DEFAULT_NODE_SIZE,
-    nodeLabelFontSize: getDefaultNodeLabelFontSize(DEFAULT_NODE_SIZE),
-    edgeWidth: DEFAULT_EDGE_WIDTH,
-    edgeLabelFontSize: getDefaultEdgeLabelFontSize(DEFAULT_EDGE_WIDTH),
-  });
+  const [globalSettings, setGlobalSettings] = useState(
+    initialDraft?.settings.globalSettings ?? {
+      forceStrength: 1,
+      edgeCurvature: 46,
+      nodeSize: DEFAULT_NODE_SIZE,
+      nodeLabelFontSize: getDefaultNodeLabelFontSize(DEFAULT_NODE_SIZE),
+      edgeWidth: DEFAULT_EDGE_WIDTH,
+      edgeLabelFontSize: getDefaultEdgeLabelFontSize(DEFAULT_EDGE_WIDTH),
+    }
+  );
   const updateGlobalSettings = useCallback(patch => {
     setGlobalSettings(prev => {
       const previousNodeSize = Number.isFinite(Number(prev.nodeSize))
@@ -246,6 +268,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       snapEnabled,
     ]
   );
+  const draftProject = useMemo(
+    () => ({
+      baseGraph,
+      steps,
+      currentFrame,
+      settings: { ...undoSettings, viewState },
+    }),
+    [baseGraph, steps, currentFrame, undoSettings, viewState]
+  );
+  const draftStatus = useProjectDraft(draftProject);
   const restoreUndoSettings = useCallback(
     settings => {
       if (!isRecord(settings)) return;
@@ -259,15 +291,16 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     },
     [updateLockCanvas]
   );
-  const { resetUndoHistory } = useGraphStudioUndo({
-    baseGraph,
-    steps,
-    settings: undoSettings,
-    currentFrame,
-    replaceTimeline,
-    restoreSettings: restoreUndoSettings,
-    setStatus,
-  });
+  const { resetUndoHistory, beginTransaction, endTransaction } =
+    useGraphStudioUndo({
+      baseGraph,
+      steps,
+      settings: undoSettings,
+      currentFrame,
+      replaceTimeline,
+      restoreSettings: restoreUndoSettings,
+      setStatus,
+    });
   const { isPlaying, stopTimeline, setPlaybackLocked, togglePlayback } =
     useGraphStudioPlayback({
       steps,
@@ -315,6 +348,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     addEdge,
     deleteSelection,
     applyLayout,
+    isLayoutRunning,
+    cancelLayout,
   } = useGraphStudioGraphModel({
     baseGraph,
     setBaseGraph,
@@ -380,6 +415,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     computedGraph,
     addEdge,
     updateBaseNodesBulk,
+    beginTransaction,
+    endTransaction,
     selectedObject,
     selectedNodeIds,
     selectedNodeIdSet,
@@ -430,6 +467,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     exportFrameIndex,
     setExportFrameIndex,
     isVisualExporting,
+    cancelExport,
+    exportProgress,
     beginExportReview,
     endExportReview,
     importProjectFile,
@@ -471,13 +510,28 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setPlaybackLocked,
   });
   useEffect(() => {
-    replaceTimeline(seedTimeline.baseGraph, seedTimeline.steps);
+    replaceTimeline(
+      seedTimeline.baseGraph,
+      seedTimeline.steps,
+      initialDraft?.timeline.currentFrame ?? 0
+    );
+    if (initialDraft) setLockCanvas(initialDraft.settings.lockCanvas);
     setViewFromNodes(seedTimeline.baseGraph.nodes);
     clearSelection();
     clearDrawState();
     resetUndoHistory();
     bumpViewReset();
+    if (initialDraft?.settings.viewState) {
+      const timer = setTimeout(
+        () => setViewState(initialDraft.settings.viewState),
+        0
+      );
+      return () => clearTimeout(timer);
+    }
   }, [
+    initialDraft,
+    setLockCanvas,
+    setViewState,
     seedTimeline,
     replaceTimeline,
     resetUndoHistory,
@@ -673,6 +727,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () =>
       selectedNode
         ? getFrameOverrideState(currentStep, 'node', selectedNode.id, [
+            'annotation',
             'color',
             'status',
             'visible',
@@ -708,6 +763,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextGraph = cloneJson(preset.graph);
     const nextSteps = cloneJson(preset.steps);
     replaceTimeline(nextGraph, nextSteps);
+    setGlobalSettings(previous => ({ ...previous, ...preset.settings }));
+    setCaptionOverlay(normalizeCaptionOverlay(preset.captionOverlay));
+    setShowGrid(false);
+    setSnapEnabled(false);
+    setEdgeRouting(EDGE_ROUTING.straight);
     if (!lockCanvas) {
       setViewFromNodes(nextGraph.nodes);
       bumpViewReset();
@@ -715,11 +775,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setMode('select');
     clearSelection();
     clearDrawState();
-    setCustomLegend(prev =>
+    setCustomLegend(
       normalizeCustomLegend({
         ...DEFAULT_CUSTOM_LEGEND,
         ...(preset.legend ?? {}),
-        enabled: Boolean(prev?.enabled),
+        enabled: true,
       })
     );
     setStatus(
@@ -727,8 +787,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     );
   };
   const handleAutoLayout = useCallback(
-    type => {
-      const nextGraph = applyLayout(type);
+    async type => {
+      const nextGraph = await applyLayout(type);
       if (!lockCanvas && nextGraph?.nodes) {
         setViewFromNodes(nextGraph.nodes);
         bumpViewReset();
@@ -738,6 +798,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   );
 
   const layoutProps = {
+    draftStatus,
     exportCapture,
     presenceRecovery: {
       entries: compactPresenceRecoveryEntries,
@@ -758,6 +819,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       lockCanvas,
       setLockCanvas: updateLockCanvas,
       onAutoLayout: handleAutoLayout,
+      isLayoutRunning,
+      onCancelLayout: cancelLayout,
       forceStrength: globalSettings.forceStrength,
       onForceStrengthChange: updateForceStrength,
       onOpenParser: () => setIsParserOpen(true),
@@ -774,6 +837,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       exportFrameIndex,
       onExportFrameChange: setExportFrameIndex,
       isVisualExporting,
+      onCancelExport: cancelExport,
+      exportProgress,
       onBeginExportReview: beginExportReview,
       onEndExportReview: endExportReview,
       onImportProjectFile: importProjectFile,
@@ -821,6 +886,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onBackgroundClear,
       onNodePointerDown,
       onNodeMove,
+      onKeyboardMoveNode: (id, delta) => {
+        const node = baseGraph.nodes.find(
+          item => String(item.id) === String(id)
+        );
+        if (node)
+          updateBaseNode(id, { x: node.x + delta.x, y: node.y + delta.y });
+      },
       onNodePointerUp,
       onNodeClickForDraw,
       onCanvasAddNode: addNodeAt,
@@ -903,6 +975,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
           fontSize,
         })),
       onAddStep: () => {
+        if (frameCount >= PROJECT_LIMITS.frames) {
+          setStatus(`Frame limit reached (${PROJECT_LIMITS.frames})`);
+          return;
+        }
         addStep(currentFrame);
         setCurrentFrame(currentFrame + 1, frameCount + 1);
         setStatus(
@@ -910,6 +986,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         );
       },
       onDuplicateStep: () => {
+        if (frameCount >= PROJECT_LIMITS.frames) {
+          setStatus(`Frame limit reached (${PROJECT_LIMITS.frames})`);
+          return;
+        }
         duplicateStep(currentFrame);
         setCurrentFrame(currentFrame + 1, frameCount + 1);
         setStatus(`Frame ${currentFrame + 2} duplicated exactly`);

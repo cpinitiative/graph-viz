@@ -377,6 +377,8 @@ const LeftSidebar = ({
   setLockCanvas,
   onDrawEdge,
   onAutoLayout,
+  isLayoutRunning,
+  onCancelLayout,
   forceStrength = 1,
   onForceStrengthChange,
   onOpenImportMenu,
@@ -471,6 +473,15 @@ const LeftSidebar = ({
             </ActionButton>
           ))}
         </div>
+        {isLayoutRunning && (
+          <button
+            type="button"
+            onClick={onCancelLayout}
+            className="mt-2 w-full rounded border border-slate-400 px-3 py-2 text-xs font-semibold"
+          >
+            Cancel layout
+          </button>
+        )}
         <SidebarRangeControl
           label="Force strength"
           value={forceStrength}

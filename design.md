@@ -87,7 +87,7 @@ Utility and IO operations binding the app features to real-world datasets.
   securely via dispatch diffing.
 - **Programmatic Importers:** Exposes Edge List parsers to rapidly load unstyled
   topologies into the engine.
-- **Script Tracing (`runScriptTrace`):** An embedded scripting sandbox executing
+- **Script Tracing (`runScriptTrace`):** A trusted-code Web Worker executing
   context-aware JavaScript (via `api.active()`, `api.queued()`, etc.). This acts
   as a macro layer converting algorithmic logic directly into generated timeline
   Steps (simulating real graph traversals).
