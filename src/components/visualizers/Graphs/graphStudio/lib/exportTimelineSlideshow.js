@@ -51,6 +51,8 @@ export async function exportTimelineSlideshow({
   steps,
   frameIndexes,
   renderFrame,
+  signal,
+  onProgress,
   svgElementId = EXPORT_CAPTURE_SVG_ELEMENT_ID,
 }) {
   if (!steps?.length) {
@@ -82,10 +84,12 @@ export async function exportTimelineSlideshow({
     lang: 'en-US',
   };
 
-  const slideshowFramingMode = IMAGE_FRAMING.slide;
+  const slideshowFramingMode = IMAGE_FRAMING.presentation;
   let captureSurface = null;
 
-  for (const i of selectedFrameIndexes) {
+  for (const [index, i] of selectedFrameIndexes.entries()) {
+    signal?.throwIfAborted();
+    onProgress?.(index / selectedFrameIndexes.length);
     const renderedSvg = await renderFrame(i);
     const svgEl = renderedSvg ?? getGraphSvgElement(svgElementId);
     if (!captureSurface) {
@@ -122,5 +126,6 @@ export async function exportTimelineSlideshow({
     });
   }
 
+  signal?.throwIfAborted();
   await pptx.writeFile({ fileName: getDatedFilename() });
 }

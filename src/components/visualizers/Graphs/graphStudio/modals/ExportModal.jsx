@@ -15,7 +15,8 @@ import ModalFrame from './ModalFrame';
 
 const PREVIEW_UPDATE_DELAY_MS = 400;
 const IMAGE_FRAMING_LABELS = {
-  [IMAGE_FRAMING.viewport]: 'Viewport',
+  [IMAGE_FRAMING.viewport]: 'Editor view',
+  [IMAGE_FRAMING.presentation]: 'Editor view · 16:9',
   [IMAGE_FRAMING.fit]: 'Fit graph',
   [IMAGE_FRAMING.slide]: 'Slide 16:9',
 };
@@ -38,7 +39,7 @@ const ExportModal = ({
   onExportPng,
   pngScale = 2,
   onPngScaleChange,
-  imageFraming = IMAGE_FRAMING.fit,
+  imageFraming = IMAGE_FRAMING.viewport,
   onImageFramingChange,
   onExportVideo,
   onExportSlideshow,
@@ -50,6 +51,8 @@ const ExportModal = ({
   onPreviewFrameChange,
   previewCaptureToken,
   isExporting = false,
+  onCancelExport,
+  exportProgress = 0,
   steps = [],
 }) => {
   const [previewUrl, setPreviewUrl] = useState('');
@@ -268,6 +271,21 @@ const ExportModal = ({
       onClose={onClose}
       closeOnBackdrop
     >
+      {isExporting && (
+        <div
+          role="status"
+          className="flex items-center justify-between border-b border-slate-400 p-3 text-sm lg:col-span-2"
+        >
+          <span>Exporting… {Math.round(exportProgress * 100)}%</span>
+          <button
+            type="button"
+            className={actionClass}
+            onClick={onCancelExport}
+          >
+            Cancel export
+          </button>
+        </div>
+      )}
       <section
         className="flex min-h-[440px] min-w-0 flex-col border-b border-[#CBD5E1] bg-[#E9EDF2] p-4 dark:border-[#334155] dark:bg-[#0B1220] sm:p-6 lg:min-h-0 lg:border-b-0 lg:border-r"
         data-testid="export-preview-section"
@@ -331,8 +349,8 @@ const ExportModal = ({
           )}
         </div>
         <p className="mt-3 text-xs leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-          PNG/SVG use the selected image framing. Slideshow exports render into
-          a 16:9 slide frame.
+          PNG/SVG match this preview. Video and slides preserve the editor view
+          inside a 16:9 frame; graph, text, and overlays scale together.
         </p>
 
         <div className="mt-4 flex-none border-t border-[#CBD5E1] pt-4 dark:border-[#334155]">
@@ -478,6 +496,14 @@ const ExportModal = ({
             )}
           </div>
 
+          <button
+            type="button"
+            className={`${actionClass} w-full`}
+            disabled={isExporting}
+            onClick={() => onImageFramingChange?.(IMAGE_FRAMING.presentation)}
+          >
+            Preview video / slides · 16:9
+          </button>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -544,13 +570,18 @@ const ExportModal = ({
                 size="regular"
               >
                 <option value={IMAGE_FRAMING.fit}>Fit graph</option>
-                <option value={IMAGE_FRAMING.viewport}>Viewport</option>
+                <option value={IMAGE_FRAMING.viewport}>
+                  Editor view (default)
+                </option>
+                <option value={IMAGE_FRAMING.presentation}>
+                  Editor view · 16:9
+                </option>
                 <option value={IMAGE_FRAMING.slide}>Slide 16:9</option>
               </NativeSelect>
               <span className="block text-[11px] leading-relaxed text-[#64748B] dark:text-[#94A3B8]">
-                Fit graph is the default. Viewport contains the complete editor
-                region captured when review opened; Slide 16:9 composes a
-                presentation frame.
+                Editor view preserves your composition, including text and
+                overlays. Fit graph deliberately resizes the graph. PNG scale
+                changes resolution only.
               </span>
             </label>
           </div>

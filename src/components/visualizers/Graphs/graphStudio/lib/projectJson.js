@@ -20,9 +20,15 @@ import {
   normalizeFrameDuration,
 } from './frameDuration.js';
 import {
+  PROJECT_LIMITS,
+  requireLimit,
+  requireTextBudget,
+} from './projectLimits.js';
+import {
   sanitizeTemporalOverrideMap,
   sanitizeTemporalOverridePatch,
 } from './temporalOverrideSchema.js';
+import { validateVisualProperties } from './visualProperties.js';
 import {
   migrateLegacyVisualStates,
   normalizeVisualStates,
@@ -63,8 +69,13 @@ const isRecord = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const isUsableId = value => {
-  if (value === null || value === undefined) return false;
-  return String(value).trim() !== '';
+  if (typeof value !== 'string' && typeof value !== 'number') return false;
+  if (typeof value === 'number' && !Number.isSafeInteger(value)) return false;
+  return (
+    String(value).trim() !== '' &&
+    String(value).length <= 100 &&
+    !['__proto__', 'constructor', 'prototype'].includes(String(value))
+  );
 };
 
 const requireArray = (value, label) => {
@@ -75,11 +86,27 @@ const requireArray = (value, label) => {
 const sanitizeNode = (node, index) => {
   if (!isRecord(node)) throw new Error(`Node ${index + 1} must be an object`);
   if (!isUsableId(node.id)) throw new Error(`Node ${index + 1} has no id`);
-  if (!Number.isFinite(Number(node.x)) || !Number.isFinite(Number(node.y))) {
+  if (
+    ![node.x, node.y].every(
+      value =>
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        Math.abs(value) <= 10000000
+    )
+  ) {
     throw new Error(`Node "${node.id}" must have numeric x and y`);
   }
+  validateVisualProperties('node', node, `Node ${node.id}`);
+  requireLimit(
+    String(node.label ?? node.id).length,
+    PROJECT_LIMITS.label,
+    'Node label'
+  );
   return {
     ...cloneJson(node),
+    id: node.id,
+    ...(node.color !== undefined ? { color: node.color } : {}),
+    ...(node.status !== undefined ? { status: node.status } : {}),
     x: Number(node.x),
     y: Number(node.y),
     label: String(node.label ?? node.id),
@@ -96,8 +123,28 @@ const sanitizeEdge = (edge, index, nodeIds) => {
   if (!nodeIds.has(String(edge.from)) || !nodeIds.has(String(edge.to))) {
     throw new Error(`Edge "${edge.id}" references a missing node`);
   }
+  validateVisualProperties('edge', edge, `Edge ${edge.id}`);
+  requireLimit(
+    String(edge.label ?? '').length,
+    PROJECT_LIMITS.label,
+    'Edge label'
+  );
+  if (
+    edge.duration !== undefined &&
+    (typeof edge.duration !== 'number' || !Number.isFinite(edge.duration))
+  )
+    throw new Error(`Edge ${edge.id}: invalid duration`);
+  if (edge.directed !== undefined && typeof edge.directed !== 'boolean')
+    throw new Error(`Edge ${edge.id}: directed must be a boolean`);
   return {
     ...cloneJson(edge),
+    from: edge.from,
+    to: edge.to,
+    ...(edge.color !== undefined ? { color: edge.color } : {}),
+    ...(edge.status !== undefined ? { status: edge.status } : {}),
+    ...(edge.duration !== undefined
+      ? { duration: Math.max(80, Math.min(3000, edge.duration)) }
+      : {}),
     id: String(edge.id),
     directed: Boolean(edge.directed),
     label: String(edge.label ?? ''),
@@ -116,6 +163,7 @@ const sanitizeOverrideMap = (value, validIds, label, objectType) => {
       if (!isRecord(patch)) {
         throw new Error(`${label} entry "${id}" must be an object`);
       }
+      validateVisualProperties(objectType, patch, `${label} entry ${id}`);
       const sanitizedPatch = sanitizeTemporalOverridePatch(
         objectType,
         cloneJson(patch)
@@ -133,12 +181,16 @@ const sanitizeOverrideMap = (value, validIds, label, objectType) => {
 const sanitizeStep = (step, index, nodeIds, edgeIds) => {
   if (!isRecord(step))
     throw new Error(`Timeline step ${index + 1} must be an object`);
+  requireLimit(
+    String(step.description ?? '').length,
+    PROJECT_LIMITS.description,
+    'Frame description'
+  );
   const captionVisible =
     typeof step.captionVisible === 'boolean'
       ? step.captionVisible
       : step.showCaption;
   const sanitized = {
-    ...cloneJson(step),
     id: String(step.id ?? `step-${index}`),
     description: String(step.description ?? `Step ${index + 1}`),
     durationMs: normalizeFrameDuration(step.durationMs),
@@ -332,6 +384,35 @@ export const validateProjectPayload = payload => {
   if (!isRecord(payload.timeline))
     throw new Error('Project timeline is missing');
 
+  requireLimit(
+    requireArray(payload.graph.nodes, 'Graph nodes').length,
+    PROJECT_LIMITS.nodes,
+    'Node count'
+  );
+  requireLimit(
+    requireArray(payload.graph.edges, 'Graph edges').length,
+    PROJECT_LIMITS.edges,
+    'Edge count'
+  );
+  requireLimit(
+    requireArray(payload.timeline.steps, 'Timeline steps').length,
+    PROJECT_LIMITS.frames,
+    'Frame count'
+  );
+  let overrideCount = 0;
+  for (const step of payload.timeline.steps) {
+    overrideCount +=
+      Object.keys(step?.nodeOverrides ?? {}).length +
+      Object.keys(step?.edgeOverrides ?? {}).length;
+    requireLimit(
+      overrideCount,
+      PROJECT_LIMITS.overrides,
+      'Total frame overrides'
+    );
+  }
+  const legend = payload.settings?.customLegend;
+  if (legend?.entries)
+    requireLimit(legend.entries.length, 64, 'Legend entries');
   const nodes = requireArray(payload.graph.nodes, 'Graph nodes').map(
     sanitizeNode
   );
@@ -376,9 +457,11 @@ export const validateProjectPayload = payload => {
 };
 
 export const parseProjectJson = text => {
+  const source = String(text ?? '');
+  requireTextBudget(source);
   let payload;
   try {
-    payload = JSON.parse(String(text ?? ''));
+    payload = JSON.parse(source);
   } catch {
     throw new Error('Invalid JSON');
   }

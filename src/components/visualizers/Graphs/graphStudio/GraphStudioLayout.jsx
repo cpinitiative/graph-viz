@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Panel,
   Group as PanelGroup,
@@ -13,6 +14,7 @@ import LeftSidebar from './LeftSidebar';
 import PropertyPanel from './PropertyPanel';
 import TimelinePanel from './TimelinePanel';
 import { DEFAULT_SCRIPT } from './data/defaultScript';
+import { useModalFocus } from './hooks/useModalFocus';
 import ExportModal from './modals/ExportModal';
 import ExportVideoModal from './modals/ExportVideoModal';
 import ImportModal from './modals/ImportModal';
@@ -225,10 +227,20 @@ const CloseIcon = () => (
 
 const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   const sideClass = side === 'left' ? 'left-0' : 'right-0';
+  const focusRef = useModalFocus(true, onClose);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose}>
+  return createPortal(
+    <div
+      data-modal-portal="true"
+      className="fixed inset-0 z-50 bg-black/50"
+      onClick={onClose}
+    >
       <div
+        ref={focusRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={side === 'left' ? 'Tools' : 'Inspector'}
+        tabIndex={-1}
         className={`graphstudio-side-panel absolute bottom-0 top-0 w-80 max-w-[85vw] overflow-auto bg-[#F8F9FA] dark:bg-[#111827] ${sideClass}`}
         onClick={event => event.stopPropagation()}
       >
@@ -242,7 +254,8 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -320,6 +333,8 @@ const ModalStack = ({
       onPreviewFrameChange={sidebar.onExportFrameChange}
       previewCaptureToken={exportCapture?.captureToken}
       isExporting={sidebar.isVisualExporting}
+      onCancelExport={sidebar.onCancelExport}
+      exportProgress={sidebar.exportProgress}
       steps={sidebar.steps}
     />
     <ParserModal
@@ -378,7 +393,8 @@ const GraphStudioLayout = ({
   exportCapture,
   status,
 }) => {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [canvasFocused, setCanvasFocused] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
@@ -430,7 +446,7 @@ const GraphStudioLayout = ({
 
   if (isMobile) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface">
+      <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
         {/* Mobile Header with Toggle Buttons */}
         <div className="flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-low p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface-container-low">
           <MobileHeaderButton
@@ -440,11 +456,24 @@ const GraphStudioLayout = ({
           >
             <MenuIcon />
           </MobileHeaderButton>
-          <span className="min-w-0 text-center text-on-surface dark:text-dark-on-surface">
-            <span className="block text-sm font-semibold">Graph Studio</span>
+          <button
+            type="button"
+            className="min-w-0 rounded border border-slate-400 px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2"
+            aria-label={canvasFocused ? 'Show timeline' : 'Focus canvas'}
+            aria-pressed={canvasFocused}
+            onClick={() => {
+              setCanvasFocused(value => !value);
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => sidebar.onCenterView?.())
+              );
+            }}
+          >
+            <span className="block">
+              {canvasFocused ? 'Show timeline' : 'Focus canvas'}
+            </span>
             {(canvas.lockCanvas || modeGuidance) && (
               <span
-                className="block max-w-[220px] truncate text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]"
+                className="block max-w-[210px] truncate text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]"
                 data-testid="mobile-mode-guidance"
               >
                 {canvas.lockCanvas
@@ -452,7 +481,7 @@ const GraphStudioLayout = ({
                   : `${modeGuidance.modeLabel} · ${modeGuidance.action}`}
               </span>
             )}
-          </span>
+          </button>
           <MobileHeaderButton
             label={
               showPropertyPanel
@@ -494,7 +523,13 @@ const GraphStudioLayout = ({
           />
         </div>
 
-        <div className="min-h-[260px] flex-none border-t border-outline-variant/20 dark:border-dark-outline-variant/20">
+        <div
+          className={
+            canvasFocused
+              ? 'hidden'
+              : 'max-h-[50dvh] min-h-0 flex-none overflow-auto border-t border-outline-variant/20 dark:border-dark-outline-variant/20'
+          }
+        >
           <TimelinePanel {...timelineProps} />
         </div>
 
@@ -504,8 +539,8 @@ const GraphStudioLayout = ({
   }
 
   return (
-    <div className="h-full min-h-0 bg-surface font-inter text-on-surface">
-      <PanelGroup orientation="vertical" className="h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
+      <PanelGroup orientation="vertical" className="min-h-0 flex-1">
         <Panel minSize="360px" className="min-h-0">
           <PanelGroup orientation="horizontal" className="h-full min-h-0">
             <Panel defaultSize="18%" minSize="14%" className={SIDE_PANEL_CLASS}>

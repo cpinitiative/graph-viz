@@ -1,15 +1,19 @@
+import { NODE_STATES, getContrastText } from './lib/visualProperties.js';
 export const VIEWBOX_WIDTH = 2200;
 export const VIEWBOX_HEIGHT = 1400;
 export const NODE_RADIUS = 22;
 export const GRID_SIZE = 28;
 
-export const NODE_STATUS_COLORS = {
-  default: { fill: '#ffffff', stroke: '#1b1b1b', text: '#1b1b1b' },
-  active: { fill: '#000000', stroke: '#000000', text: '#ffffff' },
-  queued: { fill: '#eeeeee', stroke: '#c6c6c6', text: '#1b1b1b' },
-  visited: { fill: '#e2e2e2', stroke: '#c6c6c6', text: '#1b1b1b' },
-  discarded: { fill: '#ffffff', stroke: '#c6c6c6', text: '#c6c6c6' },
-};
+export const NODE_STATUS_COLORS = Object.fromEntries(
+  Object.entries(NODE_STATES).map(([key, state]) => [
+    key,
+    {
+      fill: state.color,
+      stroke: '#334155',
+      text: getContrastText(state.color),
+    },
+  ])
+);
 
 export const EDGE_ROUTING = {
   straight: 'straight',

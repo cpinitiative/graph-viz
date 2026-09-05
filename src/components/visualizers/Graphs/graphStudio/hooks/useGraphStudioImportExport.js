@@ -21,6 +21,7 @@ import {
   exportProjectJson,
   parseProjectJson,
 } from '../lib/projectJson';
+import { PROJECT_LIMITS, requireLimit } from '../lib/projectLimits.js';
 import {
   DEFAULT_PNG_SCALE,
   EXPORT_CAPTURE_SVG_ELEMENT_ID,
@@ -79,7 +80,6 @@ export const useGraphStudioImportExport = ({
   setMode,
   clearSelection,
   clearDrawState,
-  resetUndoHistory,
   stopTimeline,
   setPlaybackLocked,
   onProjectGenerated,
@@ -122,12 +122,18 @@ export const useGraphStudioImportExport = ({
   const [scriptText, setScriptText] = useState(DEFAULT_SCRIPT);
   const [scriptError, setScriptError] = useState('');
   const isScriptRunningRef = useRef(false);
+  const scriptAbortRef = useRef(null);
+  useEffect(() => () => scriptAbortRef.current?.abort(), []);
   const [isScriptRunning, setIsScriptRunning] = useState(false);
   const [isExportVideoOpen, setIsExportVideoOpen] = useState(false);
   const [pngScale, setPngScale] = useState(DEFAULT_PNG_SCALE);
-  const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.fit);
+  const [imageFraming, setImageFraming] = useState(IMAGE_FRAMING.viewport);
   const captureTokenRef = useRef(0);
   const exportInFlightRef = useRef(false);
+  const exportAbortRef = useRef(null);
+  const [exportProgress, setExportProgress] = useState(0);
+  const cancelExport = useCallback(() => exportAbortRef.current?.abort(), []);
+  useEffect(() => () => exportAbortRef.current?.abort(), []);
   const exportReviewActiveRef = useRef(false);
   const [isExportCaptureActive, setIsExportCaptureActive] = useState(false);
   const [isVisualExporting, setIsVisualExporting] = useState(false);
@@ -278,6 +284,8 @@ export const useGraphStudioImportExport = ({
       return false;
     }
     exportInFlightRef.current = true;
+    exportAbortRef.current = new AbortController();
+    setExportProgress(0);
     setPlaybackLocked?.(true);
     setIsExportCaptureActive(true);
     setIsVisualExporting(true);
@@ -289,6 +297,7 @@ export const useGraphStudioImportExport = ({
     stopTimeline?.();
     setPlaybackLocked?.(false);
     exportInFlightRef.current = false;
+    exportAbortRef.current = null;
     setIsVisualExporting(false);
     if (!exportReviewActiveRef.current) setIsExportCaptureActive(false);
   }, [setPlaybackLocked, stopTimeline]);
@@ -364,15 +373,21 @@ export const useGraphStudioImportExport = ({
   }, []);
 
   const exportText = useCallback(async () => {
-    const output = exportEdgeListText(baseGraph);
     try {
-      await navigator.clipboard.writeText(output);
-      setStatus('Edge list copied to clipboard');
-      onExportCompleted?.('edge-list');
-    } catch {
-      setStatus('Clipboard unavailable; open parser and paste manually');
-      setIsParserOpen(true);
-      setParserText(output);
+      const output = exportEdgeListText(baseGraph);
+      try {
+        await navigator.clipboard.writeText(output);
+        setStatus(
+          'Edge list copied. IDs renumbered from 0; use Project export to preserve direction and styling.'
+        );
+        onExportCompleted?.('edge-list');
+      } catch {
+        setStatus('Clipboard unavailable; edge list opened for manual copying');
+        setIsParserOpen(true);
+        setParserText(output);
+      }
+    } catch (error) {
+      setStatus(`Edge list export error: ${error.message}`);
     }
   }, [baseGraph, onExportCompleted, setStatus]);
 
@@ -519,7 +534,7 @@ export const useGraphStudioImportExport = ({
       setMode('select');
       clearSelection?.();
       clearDrawState?.();
-      resetUndoHistory?.();
+      // Keep the previous project recoverable with Undo.
       setStatus('Project imported');
       onProjectImported?.({
         hasTimeline: project.timeline.steps.length > 1,
@@ -533,7 +548,6 @@ export const useGraphStudioImportExport = ({
       getZoomViewportSize,
       onProjectImported,
       replaceTimeline,
-      resetUndoHistory,
       setEdgeRouting,
       setGlobalSettings,
       setLockCanvas,
@@ -560,6 +574,11 @@ export const useGraphStudioImportExport = ({
     async file => {
       if (!file) return;
       try {
+        requireLimit(
+          file.size,
+          PROJECT_LIMITS.bytes,
+          'Project file size in bytes'
+        );
         importProjectJsonText(await file.text());
       } catch (error) {
         setStatus(`Project import error: ${error.message}`);
@@ -603,21 +622,29 @@ export const useGraphStudioImportExport = ({
 
   const createExportSession = useCallback(
     frameIndexes => {
-      const snapshotSteps = cloneJson(steps);
-      const canvas = cloneJson(getExportCanvasSnapshot());
-      const frameSnapshots = new Map(
-        frameIndexes.map(frameIndex => [
-          frameIndex,
-          {
-            graph: cloneJson(getFrameGraph?.(frameIndex)),
-            step: cloneJson(snapshotSteps[frameIndex] ?? {}),
-            canvas,
-          },
-        ])
+      // Capture immutable state once, resolving only the frame being rendered.
+      const snapshotSteps = steps;
+      const canvas = cloneJson(
+        exportReviewActiveRef.current
+          ? exportCapture.canvas
+          : getExportCanvasSnapshot()
       );
+      const allowedFrames = new Set(frameIndexes);
+      const frameSnapshots = {
+        get: frameIndex => {
+          if (!allowedFrames.has(frameIndex))
+            throw new Error('Frame is outside the export session');
+          exportAbortRef.current?.signal.throwIfAborted();
+          return {
+            graph: getFrameGraph(frameIndex),
+            step: snapshotSteps[frameIndex],
+            canvas,
+          };
+        },
+      };
       return { steps: snapshotSteps, frameSnapshots };
     },
-    [getExportCanvasSnapshot, getFrameGraph, steps]
+    [exportCapture.canvas, getExportCanvasSnapshot, getFrameGraph, steps]
   );
 
   const exportVideo = useCallback(async () => {
@@ -633,6 +660,8 @@ export const useGraphStudioImportExport = ({
       await exportTimelineVideo({
         steps: session.steps,
         frameIndexes,
+        signal: exportAbortRef.current?.signal,
+        onProgress: setExportProgress,
         renderFrame: async frameIndex =>
           (
             await prepareExportFrame(
@@ -644,8 +673,12 @@ export const useGraphStudioImportExport = ({
       setStatus('Video exported successfully');
       onExportCompleted?.('mp4');
     } catch (error) {
-      console.error(error);
-      setStatus(`Export failed: ${error.message}`);
+      if (error.name !== 'AbortError') console.error(error);
+      setStatus(
+        error.name === 'AbortError'
+          ? 'Export cancelled'
+          : `Export failed: ${error.message}`
+      );
     } finally {
       try {
         await prepareExportFrame(originalCapture.frameIndex, originalCapture);
@@ -678,6 +711,8 @@ export const useGraphStudioImportExport = ({
       await exportTimelineSlideshow({
         steps: session.steps,
         frameIndexes,
+        signal: exportAbortRef.current?.signal,
+        onProgress: setExportProgress,
         renderFrame: async frameIndex =>
           (
             await prepareExportFrame(
@@ -689,8 +724,12 @@ export const useGraphStudioImportExport = ({
       setStatus('Slideshow exported');
       onExportCompleted?.('pptx');
     } catch (error) {
-      console.error(error);
-      setStatus(`Slideshow export error: ${error.message}`);
+      if (error.name !== 'AbortError') console.error(error);
+      setStatus(
+        error.name === 'AbortError'
+          ? 'Export cancelled'
+          : `Slideshow export error: ${error.message}`
+      );
     } finally {
       try {
         await prepareExportFrame(originalCapture.frameIndex, originalCapture);
@@ -712,6 +751,7 @@ export const useGraphStudioImportExport = ({
 
   const setScriptModalOpen = useCallback(open => {
     setIsScriptOpen(open);
+    if (!open) scriptAbortRef.current?.abort();
     if (open) setScriptError('');
   }, []);
 
@@ -723,6 +763,7 @@ export const useGraphStudioImportExport = ({
   const runScript = useCallback(async () => {
     if (isScriptRunningRef.current) return;
     isScriptRunningRef.current = true;
+    scriptAbortRef.current = new AbortController();
     setIsScriptRunning(true);
     setScriptError('');
     setStatus('Running script...');
@@ -730,6 +771,7 @@ export const useGraphStudioImportExport = ({
       const traceSteps = await runScriptTrace({
         code: scriptText,
         graph: baseGraph,
+        signal: scriptAbortRef.current.signal,
       });
       replaceTimeline(baseGraph, traceSteps);
       setMode('select');
@@ -740,7 +782,10 @@ export const useGraphStudioImportExport = ({
       setStatus(`Script generated ${traceSteps.length} frames`);
       onTimelineGenerated?.('script');
     } catch (error) {
-      const message = `Script error: ${error.message}`;
+      const message =
+        error.name === 'AbortError'
+          ? 'Script cancelled'
+          : `Script error: ${error.message}`;
       setScriptError(previous => (previous === message ? previous : message));
       setStatus(message);
     } finally {
@@ -772,6 +817,8 @@ export const useGraphStudioImportExport = ({
   }, [exportVideo]);
 
   return {
+    cancelExport,
+    exportProgress,
     isParserOpen,
     setIsParserOpen: setParserModalOpen,
     parserText,

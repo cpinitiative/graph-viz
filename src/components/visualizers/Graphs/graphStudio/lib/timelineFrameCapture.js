@@ -1,3 +1,4 @@
+import { getGraphContentViewport } from './graphFraming.js';
 export const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
 export const EXPORT_CAPTURE_SVG_ELEMENT_ID = 'graph-studio-export-capture-svg';
 export const DEFAULT_PNG_SCALE = 2;
@@ -8,6 +9,7 @@ export const IMAGE_FRAMING = {
   viewport: 'viewport',
   fit: 'fit',
   slide: 'slide',
+  presentation: 'presentation',
 };
 export const SLIDE_ASPECT_RATIO = SLIDE_EXPORT_WIDTH / SLIDE_EXPORT_HEIGHT;
 export const CAPTURE_MODE = Object.freeze({
@@ -192,7 +194,7 @@ const getGraphContentTransform = ({ svgEl, viewport }) => {
   try {
     return getFitContentTransform({
       bounds: getUntransformedBounds(graphContent),
-      viewport,
+      viewport: getGraphContentViewport(svgEl, viewport),
       padding: getFitContentPadding(svgEl),
     });
   } catch {
@@ -317,6 +319,23 @@ export const serializeSvgElement = ({
     }
   }
 
+  if (framingMode === IMAGE_FRAMING.presentation) {
+    // Letterboxing must not reveal nodes that were outside the reviewed editor.
+    const ns = 'http://www.w3.org/2000/svg';
+    const clip = document.createElementNS(ns, 'clipPath');
+    clip.id = 'graphstudio-reviewed-viewport';
+    const rect = document.createElementNS(ns, 'rect');
+    rect.setAttribute('width', viewportWidth);
+    rect.setAttribute('height', viewportHeight);
+    clip.appendChild(rect);
+    const scene = document.createElementNS(ns, 'g');
+    scene.setAttribute('clip-path', 'url(#graphstudio-reviewed-viewport)');
+    for (const child of [...exportSvg.children]) {
+      if (child.tagName.toLowerCase() === 'g') scene.appendChild(child);
+    }
+    exportSvg.append(clip, scene);
+  }
+
   exportSvg.setAttribute('width', width);
   exportSvg.setAttribute('height', height);
   exportSvg.setAttribute('version', '1.1');
@@ -364,7 +383,8 @@ export const serializeCurrentFrameSvg = ({
   const svgEl = getGraphSvgElement(svgElementId);
   const viewport = getViewportSize(svgEl);
   const outputSize =
-    framingMode === IMAGE_FRAMING.slide
+    framingMode === IMAGE_FRAMING.slide ||
+    framingMode === IMAGE_FRAMING.presentation
       ? {
           width: SLIDE_EXPORT_WIDTH,
           height: SLIDE_EXPORT_HEIGHT,
@@ -434,7 +454,8 @@ export const createCaptureCanvas = (
   const viewport = getViewportSize(svgEl);
   const canvas = document.createElement('canvas');
   const baseSize =
-    framingMode === IMAGE_FRAMING.slide
+    framingMode === IMAGE_FRAMING.slide ||
+    framingMode === IMAGE_FRAMING.presentation
       ? {
           width: SLIDE_EXPORT_WIDTH,
           height: SLIDE_EXPORT_HEIGHT,

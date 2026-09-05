@@ -69,7 +69,7 @@ export const useGraphStudioUndo = ({
       steps,
       settings,
     });
-    const signature = JSON.stringify(currentSnapshot);
+    const signature = [baseGraph, steps, settings];
     const previous = historyMetaRef.current;
     if (!previous) {
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
@@ -97,7 +97,7 @@ export const useGraphStudioUndo = ({
       syncHistoryAvailability();
       return;
     }
-    if (signature !== previous.signature) {
+    if (signature.some((value, index) => value !== previous.signature[index])) {
       undoHistoryRef.current.push(previous.snapshot);
       if (undoHistoryRef.current.length > HISTORY_LIMIT) {
         undoHistoryRef.current.shift();

@@ -3,3 +3,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.graphstudio-object:focus-visible {
+  outline: 3px dashed #2563eb;
+  outline-offset: 5px;
+}
+.dark .graphstudio-object:focus-visible {
+  outline-color: #67e8f9;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

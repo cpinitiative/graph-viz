@@ -1,4 +1,5 @@
 import { GRAPH_STATE_COLORS } from './stateColors.js';
+import { NODE_STATES } from './visualProperties.js';
 import { deriveSmartLegendEntries } from './visualStates.js';
 
 export const LEGEND_MODES = Object.freeze(['smart', 'custom']);
@@ -30,24 +31,28 @@ export const DEFAULT_CUSTOM_LEGEND_ENTRIES = [
     group: 'Nodes',
     kind: 'node',
     label: 'Default node',
+    status: 'default',
     color: GRAPH_STATE_COLORS.nodeDefault,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Active node',
+    status: 'active',
     color: GRAPH_STATE_COLORS.nodeActive,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Queued node',
+    status: 'queued',
     color: GRAPH_STATE_COLORS.nodeQueued,
   },
   {
     group: 'Nodes',
     kind: 'node',
     label: 'Visited node',
+    status: 'visited',
     color: GRAPH_STATE_COLORS.nodeVisited,
   },
   {
@@ -114,6 +119,10 @@ const normalizeLegendEntry = entry => {
     ...(group ? { group } : {}),
     kind,
     label,
+    ...(Object.hasOwn(NODE_STATES, entry.status) ||
+    (kind === 'edge' && ['completed', 'rejected'].includes(entry.status))
+      ? { status: entry.status }
+      : {}),
     color: isValidLegendColor(entry.color)
       ? entry.color
       : CUSTOM_LEGEND_FALLBACK_COLOR,
@@ -140,6 +149,7 @@ export const normalizeCustomLegend = value => {
   const y = clampNormalizedCoordinate(customPositionValue.y);
 
   return {
+    ...(value.layout === 'compact' ? { layout: 'compact' } : {}),
     enabled:
       typeof value.enabled === 'boolean'
         ? value.enabled

@@ -220,6 +220,8 @@ const GraphEdge = ({
   labelFontSize = 12,
   onPointerDown,
   onClick,
+  tabIndex = -1,
+  accessibleLabel,
   strokeWidth,
   isExporting = false,
   themeOverride,
@@ -255,6 +257,15 @@ const GraphEdge = ({
   return (
     <g
       data-edge-id={edge.id}
+      data-graph-object="edge"
+      className={isExporting ? undefined : 'graphstudio-object'}
+      role={isExporting ? 'img' : 'button'}
+      aria-label={
+        accessibleLabel ??
+        `Edge ${edge.from} ${edge.directed ? 'to' : 'and'} ${edge.to}${edge.label ? `. Weight ${edge.label}` : ''}`
+      }
+      aria-pressed={isExporting ? undefined : Boolean(selected)}
+      tabIndex={isExporting ? undefined : tabIndex}
       style={isExporting ? undefined : { cursor: 'pointer' }}
     >
       {!isExporting && (
@@ -274,6 +285,7 @@ const GraphEdge = ({
         d={bodyPathD}
         fill="none"
         stroke={strokeColor}
+        strokeDasharray={edge.status === 'rejected' ? '6 4' : undefined}
         strokeWidth={strokeWidth}
         strokeLinecap={edge.directed ? 'butt' : 'round'}
         layoutId={`${layoutIdPrefix}edge-${edge.id}`}
@@ -308,6 +320,7 @@ const GraphEdge = ({
           points={arrow.points}
           fill={strokeColor}
           stroke={strokeColor}
+          strokeDasharray={edge.status === 'rejected' ? '6 4' : undefined}
           strokeWidth="0"
           strokeLinejoin="miter"
           pointerEvents="none"
@@ -325,7 +338,6 @@ const GraphEdge = ({
           pointerEvents="none"
           data-edge-label-id={edge.id}
           data-edge-label-theme={theme}
-          aria-hidden="true"
           style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         >
           <text

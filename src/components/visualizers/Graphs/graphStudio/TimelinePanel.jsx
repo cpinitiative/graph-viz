@@ -466,7 +466,7 @@ const TimelinePanel = ({
                 }
               }}
               role="option"
-              tabIndex="0"
+              tabIndex={index === currentFrame ? 0 : -1}
             >
               {index === currentFrame && (
                 <span
@@ -513,6 +513,7 @@ const TimelinePanel = ({
             <span className={detailLabelClass}>Description</span>
             <input
               aria-label="Frame Description"
+              maxLength={10000}
               value={steps[currentFrame]?.description ?? ''}
               onChange={event =>
                 onDescriptionChange(currentFrame, event.target.value)

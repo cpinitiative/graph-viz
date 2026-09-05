@@ -6,6 +6,11 @@ import {
 } from './constants.js';
 import { normalizeFrameDuration } from './lib/frameDuration.js';
 import { clamp, clampNodePosition } from './lib/graphGeometry.js';
+import {
+  PROJECT_LIMITS,
+  requireLimit,
+  requireTextBudget,
+} from './lib/projectLimits.js';
 
 const EDGE_LIST_WEIGHT_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
 
@@ -25,6 +30,7 @@ export const normalizeNodeId = (rawId, fallback) => {
 export const normalizeBaseGraph = (payload = DEFAULT_GRAPH) => {
   const nodesInput = Array.isArray(payload?.nodes) ? payload.nodes : [];
   const edgesInput = Array.isArray(payload?.edges) ? payload.edges : [];
+  const seenIds = new Set();
   const nodes = nodesInput
     .map((node, index) => {
       const id = normalizeNodeId(node.id, index);
@@ -40,10 +46,12 @@ export const normalizeBaseGraph = (payload = DEFAULT_GRAPH) => {
         visible: node.visible !== false,
       };
     })
-    .filter(
-      (node, idx, all) =>
-        all.findIndex(item => String(item.id) === String(node.id)) === idx
-    );
+    .filter(node => {
+      const id = String(node.id);
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
   const nodeIds = new Set(nodes.map(node => String(node.id)));
   const edges = edgesInput
     .map((edge, index) => {
@@ -153,6 +161,7 @@ export const computeStepDiff = (previousGraph, nextGraph) => {
   return { changedNodes, changedEdges };
 };
 export const parseEdgeListText = text => {
+  requireTextBudget(String(text ?? ''), 'Edge list');
   const source = String(text ?? '').trim();
   if (!source) {
     throw new Error('Paste an edge list with header "n m" before importing.');
@@ -206,6 +215,8 @@ export const parseEdgeListText = text => {
     throw new Error('Header m must be at least 0.');
   }
 
+  requireLimit(n, PROJECT_LIMITS.nodes, 'Node count');
+  requireLimit(m, PROJECT_LIMITS.edges, 'Edge count');
   const edgeLines = lines.slice(1);
   if (edgeLines.length !== m) {
     throw new Error(
@@ -272,7 +283,7 @@ export const exportEdgeListText = graph => {
 
     const label = String(edge.label ?? '').trim();
     const weight =
-      EDGE_LIST_WEIGHT_PATTERN.test(label) && Number.isFinite(Number(label))
+      /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(label) && Number.isFinite(Number(label))
         ? ` ${label}`
         : '';
     return [`${from} ${to}${weight}`];

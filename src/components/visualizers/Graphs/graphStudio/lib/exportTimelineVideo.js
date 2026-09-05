@@ -1,4 +1,3 @@
-import * as Mp4Muxer from 'mp4-muxer';
 import { normalizeFrameDuration } from './frameDuration.js';
 import {
   CAPTURE_MODE,
@@ -67,6 +66,8 @@ export async function exportTimelineVideo({
   steps,
   frameIndexes,
   renderFrame,
+  signal,
+  onProgress,
   svgElementId = EXPORT_CAPTURE_SVG_ELEMENT_ID,
 }) {
   if (typeof VideoEncoder === 'undefined') {
@@ -83,6 +84,16 @@ export async function exportTimelineVideo({
     throw new Error('Video export renderer is unavailable');
   }
 
+  const outputFrames = framePlan.reduce(
+    (sum, frame) => sum + frame.outputFrameCount,
+    0
+  );
+  if (outputFrames > VIDEO_EXPORT_FPS * 600)
+    throw new Error(
+      'Video exports are limited to 10 minutes. Select a shorter frame range.'
+    );
+  signal?.throwIfAborted();
+  const Mp4Muxer = await import('mp4-muxer');
   const firstSvg =
     (await renderFrame(framePlan[0].frameIndex)) ??
     getGraphSvgElement(svgElementId);
@@ -134,10 +145,12 @@ export async function exportTimelineVideo({
         height: canvas.height,
         viewportWidth: viewport.width,
         viewportHeight: viewport.height,
-        framingMode: IMAGE_FRAMING.slide,
+        framingMode: IMAGE_FRAMING.presentation,
       });
 
       for (let f = 0; f < descriptor.outputFrameCount; f += 1) {
+        signal?.throwIfAborted();
+        if (encoderError) throw encoderError;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -150,6 +163,11 @@ export async function exportTimelineVideo({
           frame.close();
         }
         frameIndex += 1;
+        if (videoEncoder.encodeQueueSize >= 8 || frameIndex % 8 === 0) {
+          await videoEncoder.flush();
+          onProgress?.(frameIndex / outputFrames);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
     }
 
@@ -160,6 +178,7 @@ export async function exportTimelineVideo({
         'Video encoder did not provide AVC decoder configuration'
       );
     }
+    signal?.throwIfAborted();
     muxer.finalize();
     downloadBlob({
       blob: new Blob([muxer.target.buffer], { type: 'video/mp4' }),

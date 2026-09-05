@@ -230,3 +230,27 @@ test('project export strips unsupported override keys without mutating state', (
   });
   assert.deepEqual(steps, original);
 });
+
+test('import rejects invalid visual values in base objects and temporal overrides', () => {
+  const project = {
+    format: 'graph-viz-project',
+    version: 1,
+    graph: { nodes: [{ id: 0, x: 10, y: 20, color: 42 }], edges: [] },
+    timeline: { steps: [] },
+  };
+  assert.throws(() => validateProjectPayload(project), /invalid color/);
+  delete project.graph.nodes[0].color;
+  project.timeline.steps = [{ nodeOverrides: { 0: { visible: 'false' } } }];
+  assert.throws(() => validateProjectPayload(project), /invalid visible/);
+  project.timeline.steps = [
+    { nodeOverrides: { 0: { color: 'url(https:\/\/example.com)' } } },
+  ];
+  assert.throws(() => validateProjectPayload(project), /invalid color/);
+  project.timeline.steps = [];
+  project.graph.nodes = Array.from({ length: 1001 }, (_, id) => ({
+    id,
+    x: 10,
+    y: 20,
+  }));
+  assert.throws(() => validateProjectPayload(project), /Node count exceeds/);
+});

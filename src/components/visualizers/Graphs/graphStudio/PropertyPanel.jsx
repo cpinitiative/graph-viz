@@ -7,6 +7,7 @@ import {
   getDefaultNodeLabelFontSize,
   NODE_LABEL_FONT_SIZE_RANGE,
 } from './lib/fontSizing';
+import { isGraphColor } from './lib/visualProperties';
 import { getVisualStatesForKind } from './lib/visualStates';
 
 const panelClass =
@@ -160,11 +161,13 @@ const Field = ({
   </div>
 );
 
-const TextInput = ({ value, onChange, placeholder, ariaLabel }) => (
+const TextInput = ({ value, onChange, placeholder, ariaLabel, onBlur }) => (
   <input
-    aria-label={ariaLabel}
+    aria-label={ariaLabel ?? placeholder}
+    onBlur={onBlur}
+    maxLength={200}
     className={inputClass}
-    value={value}
+    value={typeof value === 'string' ? value : ''}
     onChange={event => onChange(event.target.value)}
     placeholder={placeholder}
   />
@@ -179,29 +182,56 @@ const ColorField = ({
   onResetOverride,
   onApplyToAll,
   onChange,
-}) => (
-  <Field
-    label={label}
-    hasOverride={hasOverride}
-    onResetOverride={onResetOverride}
-    onApplyToAll={onApplyToAll}
-  >
-    <div className="flex items-center gap-2">
-      <input
-        type="color"
-        value={value.startsWith('#') ? value : fallback}
-        onChange={event => onChange(event.target.value)}
-        className="h-10 w-10 cursor-pointer rounded bg-transparent p-0 md:h-8 md:w-8"
-      />
-      <TextInput
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        ariaLabel={label}
-      />
-    </div>
-  </Field>
-);
+}) => {
+  const [edit, setEdit] = useState({
+    value,
+    text: typeof value === 'string' ? value : '',
+  });
+  const draft =
+    edit.value === value ? edit.text : typeof value === 'string' ? value : '';
+  const update = next => {
+    const valid = isGraphColor(next);
+    setEdit({ value: valid ? next : value, text: next });
+    if (valid) onChange(next);
+  };
+  return (
+    <Field
+      label={label}
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
+    >
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${label} picker`}
+          value={
+            typeof value === 'string' && /^#[\da-f]{6}$/i.test(value)
+              ? value
+              : fallback
+          }
+          onChange={event => update(event.target.value)}
+          className="h-10 w-10 cursor-pointer rounded bg-transparent p-0 md:h-8 md:w-8"
+        />
+        <TextInput
+          value={draft}
+          onChange={update}
+          onBlur={() => {
+            if (!isGraphColor(draft))
+              setEdit({ value, text: typeof value === 'string' ? value : '' });
+          }}
+          placeholder={placeholder}
+          ariaLabel={label}
+        />
+      </div>
+      {!isGraphColor(draft) && (
+        <p className="text-xs text-red-700 dark:text-red-300">
+          Use a hex color such as #3B82F6.
+        </p>
+      )}
+    </Field>
+  );
+};
 
 const VisualStateField = ({
   kind,
@@ -744,6 +774,21 @@ const NodeInspector = ({
             value={selectedNode.label ?? ''}
             onChange={value => onUpdateNode({ label: value })}
             ariaLabel="Label"
+          />
+        </Field>
+        <Field
+          label="Frame text"
+          hasOverride={frameOverrides.annotation}
+          onResetOverride={() => onResetOverride?.('annotation')}
+          onApplyToAll={() =>
+            onApplyToAllFrames?.({ annotation: selectedNode.annotation ?? '' })
+          }
+        >
+          <TextInput
+            value={selectedNode.annotation ?? ''}
+            onChange={value => onUpdateNode({ annotation: value })}
+            ariaLabel="Frame text"
+            placeholder="Use node label"
           />
         </Field>
         <Field label="Position">

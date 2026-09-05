@@ -1,4 +1,5 @@
-'use client';
+import { PROJECT_LIMITS } from './graphStudio/lib/projectLimits';
+('use client');
 
 import {
   useCallback,
@@ -445,6 +446,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     addEdge,
     deleteSelection,
     applyLayout,
+    isLayoutRunning,
+    cancelLayout,
   } = useGraphStudioGraphModel({
     baseGraph,
     setBaseGraph,
@@ -592,6 +595,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     exportFrameIndex,
     setExportFrameIndex,
     isVisualExporting,
+    cancelExport,
+    exportProgress,
     beginExportReview,
     endExportReview,
     importProjectFile,
@@ -889,6 +894,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     () =>
       selectedNode
         ? getFrameOverrideState(currentStep, 'node', selectedNode.id, [
+            'annotation',
             'stateId',
             'color',
             'status',
@@ -942,6 +948,11 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     const nextGraph = cloneJson(semanticPreset.graph);
     const nextSteps = cloneJson(semanticPreset.steps);
     replaceTimeline(nextGraph, nextSteps);
+    setGlobalSettings(previous => ({ ...previous, ...preset.settings }));
+    setCaptionOverlay(normalizeCaptionOverlay(preset.captionOverlay));
+    setShowGrid(false);
+    setSnapEnabled(false);
+    setEdgeRouting(EDGE_ROUTING.straight);
     bumpContentEpoch();
     if (!lockCanvas) {
       bumpViewReset();
@@ -956,13 +967,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       normalizeCustomLegend({
         ...DEFAULT_CUSTOM_LEGEND,
         ...(semanticPreset.legend ?? {}),
-        enabled: presetName === 'blank' ? false : Boolean(prev?.enabled),
+        enabled:
+          presetName === 'blank'
+            ? false
+            : Boolean(semanticPreset.legend?.enabled ?? prev?.enabled),
       })
     );
-    setCaptionOverlay(prev => ({
-      ...normalizeCaptionOverlay(prev),
-      enabled: false,
-    }));
     usageTracker.recordPresetLoaded(presetName, {
       hasTimeline: nextSteps.length > 1,
     });
@@ -1005,8 +1015,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     [baseGraph, currentFrame, replaceTimeline, setStatus, steps]
   );
   const handleAutoLayout = useCallback(
-    type => {
-      const nextGraph = applyLayout(type);
+    async type => {
+      const nextGraph = await applyLayout(type);
       if (!lockCanvas && nextGraph?.nodes) {
         bumpViewReset();
       }
@@ -1015,6 +1025,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
   );
 
   const layoutProps = {
+    draftStatus,
     exportCapture,
     presenceRecovery: {
       entries: compactPresenceRecoveryEntries,
@@ -1036,6 +1047,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       lockCanvas,
       setLockCanvas: updateLockCanvas,
       onAutoLayout: handleAutoLayout,
+      isLayoutRunning,
+      onCancelLayout: cancelLayout,
       forceStrength: globalSettings.forceStrength,
       onForceStrengthChange: updateForceStrength,
       onOpenParser: () => setIsParserOpen(true),
@@ -1052,6 +1065,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       exportFrameIndex,
       onExportFrameChange: setExportFrameIndex,
       isVisualExporting,
+      onCancelExport: cancelExport,
+      exportProgress,
       onBeginExportReview: beginExportReview,
       onEndExportReview: endExportReview,
       onImportProjectFile: importProjectFile,
@@ -1105,6 +1120,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onBackgroundClear,
       onNodePointerDown,
       onNodeMove,
+      onKeyboardMoveNode: (id, delta) => {
+        const node = baseGraph.nodes.find(
+          item => String(item.id) === String(id)
+        );
+        if (node)
+          updateBaseNode(id, { x: node.x + delta.x, y: node.y + delta.y });
+      },
       onNodePointerUp,
       onNodeClickForDraw,
       onCanvasAddNode: addTrackedNodeAt,
@@ -1190,6 +1212,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
           fontSize,
         })),
       onAddStep: () => {
+        if (frameCount >= PROJECT_LIMITS.frames) {
+          setStatus(`Frame limit reached (${PROJECT_LIMITS.frames})`);
+          return;
+        }
         addStep(currentFrame);
         usageTracker.markTimelineCreated('manual');
         setCurrentFrame(currentFrame + 1, frameCount + 1);
@@ -1198,6 +1224,10 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         );
       },
       onDuplicateStep: () => {
+        if (frameCount >= PROJECT_LIMITS.frames) {
+          setStatus(`Frame limit reached (${PROJECT_LIMITS.frames})`);
+          return;
+        }
         duplicateStep(currentFrame);
         usageTracker.markTimelineCreated('manual');
         setCurrentFrame(currentFrame + 1, frameCount + 1);

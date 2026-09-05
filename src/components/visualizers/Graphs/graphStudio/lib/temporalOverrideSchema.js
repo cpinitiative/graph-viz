@@ -1,4 +1,7 @@
+import { isVisualPropertyValid } from './visualProperties.js';
+
 export const TEMPORAL_NODE_OVERRIDE_KEYS = Object.freeze([
+  'annotation',
   'stateId',
   'status',
   'color',
@@ -28,8 +31,10 @@ export const sanitizeTemporalOverridePatch = (objectType, patch) => {
   if (!isRecord(patch)) return {};
 
   return Object.fromEntries(
-    Object.entries(patch).filter(([key]) =>
-      isTemporalOverrideKey(objectType, key)
+    Object.entries(patch).filter(
+      ([key, value]) =>
+        isTemporalOverrideKey(objectType, key) &&
+        isVisualPropertyValid(objectType, key, value)
     )
   );
 };

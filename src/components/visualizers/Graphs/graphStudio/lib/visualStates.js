@@ -312,9 +312,50 @@ export const createSemanticPresetModel = (presetName, preset) => {
   const visualStates = createVisualStatesFromLegend(preset?.legend, {
     namespace: presetName,
   });
+  const stateIdByLegacyStatus = new Map();
+  (preset?.legend?.entries ?? []).forEach((entry, index) => {
+    const status = String(entry?.status ?? '').trim();
+    const stateId = visualStates[index]?.id;
+    if (!status || !stateId) return;
+    const kind = entry.kind === 'edge' ? 'edge' : 'node';
+    stateIdByLegacyStatus.set(`${kind}:${status}`, stateId);
+  });
+  const assignLegacyStatus = (object, kind) => {
+    const nextObject = cloneJson(object);
+    if (String(nextObject?.stateId ?? '').trim()) return nextObject;
+    const stateId = stateIdByLegacyStatus.get(
+      `${kind}:${String(nextObject?.status ?? '').trim()}`
+    );
+    return stateId ? { ...nextObject, stateId } : nextObject;
+  };
+  const statusMappedPreset = {
+    graph: {
+      nodes: (preset?.graph?.nodes ?? []).map(node =>
+        assignLegacyStatus(node, 'node')
+      ),
+      edges: (preset?.graph?.edges ?? []).map(edge =>
+        assignLegacyStatus(edge, 'edge')
+      ),
+    },
+    steps: (preset?.steps ?? []).map(step => ({
+      ...cloneJson(step),
+      nodeOverrides: Object.fromEntries(
+        Object.entries(step?.nodeOverrides ?? {}).map(([id, patch]) => [
+          id,
+          assignLegacyStatus(patch, 'node'),
+        ])
+      ),
+      edgeOverrides: Object.fromEntries(
+        Object.entries(step?.edgeOverrides ?? {}).map(([id, patch]) => [
+          id,
+          assignLegacyStatus(patch, 'edge'),
+        ])
+      ),
+    })),
+  };
   const migrated = applyVisualStatesByColor({
-    graph: preset?.graph,
-    steps: preset?.steps,
+    graph: statusMappedPreset.graph,
+    steps: statusMappedPreset.steps,
     visualStates,
   });
   return {

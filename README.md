@@ -14,6 +14,50 @@ Use the editor at [graph-viz.usaco.guide](https://graph-viz.usaco.guide/).
 - MP4 videos for lessons and presentations
 - Editable `.graphviz.json` project files
 
+## Feature Overview
+
+- Interactive graph editing with draggable nodes, edges, labels, weights, and
+  directed-edge styling.
+- Keyboard graph editing, visible focus, accessible dialogs, and a mobile canvas
+  focus view.
+- Readable node labels with shared status colors and non-color state cues.
+- Timeline/frame animation for step-by-step algorithm explanations.
+- Automatic local draft recovery and gesture-based undo.
+- USACO-aligned graph presets for common teaching examples.
+- Full project JSON import/export with editor state, timeline, viewport, and
+  settings.
+- PPTX slideshow export for slide-based lessons.
+- MP4 export for embedding animations in written or video material.
+- Edge-list import/export for simple graph structure exchange.
+- Script Mode for generating timeline frames from small JavaScript traces.
+- Visual state legend for active, queued, visited, highlighted, and selected
+  elements.
+- Playwright E2E coverage for key editor, import/export, preset, and export
+  workflows.
+
+## USACO Guide Alignment
+
+Graph Viz is designed for USACO Guide authors and students who need clear,
+repeatable graph algorithm visuals. The current preset set covers graph topics
+such as:
+
+- graph traversal and connected components
+- disjoint set union
+- topological sort
+- shortest paths with non-negative weights
+- minimum spanning trees
+
+Presets include compact legends, larger labels, captions, and 1.8–3 second holds
+for video. BFS and DFS expose queue/stack progress; Dijkstra shows
+`node:distance`; topological sort shows `node:indegree`; DSU and components show
+`node:root` or `node:group`. The inspector's **Frame text** field edits these
+annotations independently of the project-wide node name.
+
+Loading a preset applies its presentation sizes, enables its legend and caption,
+and hides the grid. These settings remain editable. Authors can adjust the graph
+and timeline, then export the result for guide modules, slides, classroom
+material, or video explanations.
+
 Graph Viz is intended for authoring—not for running algorithms or analyzing an
 input graph. The editor is designed around a mouse, keyboard, and desktop-sized
 screen. Mobile layouts may be useful for review, but mobile editing is not a
@@ -96,6 +140,26 @@ code or AI assistance before being imported for visual review. Edge-list import
 and export is intentionally simpler: it transfers graph structure, not the
 timeline or editor settings.
 
+## Editing and recovery
+
+Tab into the graph, use arrow keys to explore nodes and edges, and press Enter
+or Space to select. Alt + arrows moves a node. In Draw Edge mode, select each
+endpoint with Enter; in Add Node mode, Enter on the canvas creates a node at the
+center. On narrow screens, use `Focus canvas` to hide the timeline.
+
+The editor saves one draft in this browser after a short pause and restores it
+on reload. The status bar reports save failures, including unavailable storage
+or quota limits. Export Project for a portable backup; browser storage can be
+cleared and is not synchronized between devices or tabs.
+
+Project imports are limited to 16 MiB, 1,000 nodes, 5,000 edges, 1,001 frames,
+and 500,000 override entries. Colors accept `#RGB`, `#RRGGBB`, or an empty value
+for the default. Invalid imports leave the current project intact. Edge-list
+exports remap IDs to consecutive integers and require numeric weights; use
+project JSON to preserve directions, labels, and animation settings.
+
+Force layout runs in a cancellable worker. Each drag is a single undo action.
+
 ## Script Mode
 
 Script Mode is an optional power-user workflow for building timeline frames from
@@ -106,7 +170,9 @@ timeline.
 
 Basic editing does not require code. Start with the visual editor or a preset;
 use Script Mode when a longer animation would be clearer and faster to generate
-from an algorithm trace.
+from an algorithm trace. Closing Script Mode cancels a running script. Only run
+code you trust: a Web Worker can access network and browser storage; it is not a
+security sandbox.
 
 ## Export Guide
 
@@ -116,6 +182,18 @@ from an algorithm trace.
 - **Export MP4:** selected animation frames as a video
 - **Export Project:** the complete editable project as `.graphviz.json`
 - **Export Edge List:** graph structure only
+
+PPTX exports can be opened in PowerPoint or uploaded to Google Slides.
+
+**Editor view** is the default PNG/SVG framing: it preserves graph scale,
+labels, and overlay placement from the reviewed canvas. PNG scale changes
+resolution only. Video and slides preserve that same composition inside 16:9;
+use **Preview video / slides · 16:9** to review it. Extra space is padded rather
+than stretching or refitting each frame. **Fit graph** and **Slide 16:9** are
+explicit alternatives that resize the graph while reserving overlay space.
+Timeline exports show progress and support cancellation between capture steps.
+MP4 exports are limited to 10 minutes. Final PPTX serialization and a pending
+video encoder flush may delay cancellation.
 
 Review the selected frames and export settings before rendering. Keep the
 project JSON alongside published media so the visualization can be revised

@@ -4,7 +4,12 @@ import { ThemeContext } from './themeContextValue';
 const getInitialTheme = () => {
   if (typeof window === 'undefined') return 'light';
 
-  const savedTheme = localStorage.getItem('theme');
+  let savedTheme;
+  try {
+    savedTheme = localStorage.getItem('theme');
+  } catch {
+    /* Storage may be disabled. */
+  }
   if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
 
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -20,7 +25,11 @@ export const ThemeProvider = ({ children }) => {
 
     root.classList.add('transitioning');
     root.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch {
+      /* Theme remains usable without storage. */
+    }
 
     const timeout = setTimeout(() => {
       root.classList.remove('transitioning');

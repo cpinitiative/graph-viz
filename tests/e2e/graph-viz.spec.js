@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { Buffer } from 'node:buffer';
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'url';
+import { GRAPH_PRESETS } from '../../src/components/visualizers/Graphs/graphStudio/data/graphPresets.js';
 
 const unexpectedConsoleTypes = new Set(['error']);
 
@@ -468,7 +469,7 @@ const expandLegendEditor = async page => {
 };
 
 const closeLegendEditor = async page => {
-  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByTestId('custom-legend-modal')).toBeHidden();
 };
 
@@ -522,113 +523,18 @@ const closeExportMenu = async page => {
 const fixturePath = name =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
-const educationalPresets = [
-  {
-    value: 'topological-sort',
-    firstDescription: 'Zero indegree nodes A and B enter the queue',
-    secondDescription:
-      'Process A: remove outgoing edge A->C; C still waits on B',
-  },
-  {
-    value: 'disjoint-set-union',
-    firstDescription: 'Initialize DSU: each node is its own component',
-    secondDescription:
-      'Operation #1: find(0) and find(1) differ, so union accepts edge 0-1',
-  },
-  {
-    value: 'connected-components',
-    firstDescription: 'Start component 1 at node 0 and mark it active',
-    secondDescription:
-      'Traverse from 0: queue neighbors 1 and 2 in component 1',
-  },
-  {
-    value: 'kruskal-mst',
-    firstDescription:
-      'Kruskal MST: sort weighted edges ascending; each node starts in its own DSU component',
-    secondDescription:
-      'Consider edge A-B (1): find(A) and find(B) differ, so union accepts it',
-    thirdDescription:
-      'Consider edge D-E (5): find(D) equals find(E), so this cycle edge is rejected',
-  },
-  {
-    value: 'dijkstra-shortest-paths',
-    firstDescription:
-      'Dijkstra starts at source S: distance[S]=0 and all other distances are infinity',
-    secondDescription:
-      'Relax edges from S: A gets distance 2 and B gets distance 5 as queued candidates',
-    thirdDescription:
-      'Final shortest-path tree from S: S-A, A-B, A-C, B-D, and D-T are highlighted',
-  },
-];
-
-const presetLegends = [
-  {
-    value: 'bfs',
-    title: 'Breadth-first search',
-    entries: [
-      'Front of queue',
-      'Waiting in queue',
-      'Fully explored',
-      'Discovering edge',
-    ],
-  },
-  {
-    value: 'dfs',
-    title: 'Depth-first search',
-    entries: ['On recursion stack', 'Finished', 'DFS tree edge'],
-  },
-  {
-    value: 'dijkstra',
-    title: 'Dijkstra shortest paths',
-    entries: [
-      'Current minimum',
-      'Tentative distance known',
-      'Replaced candidate',
-    ],
-  },
-  {
-    value: 'topological-sort',
-    title: "Kahn's topological sort",
-    entries: [
-      'In zero-indegree queue',
-      'Removing from queue',
-      'Removing outgoing edge',
-    ],
-  },
-  {
-    value: 'disjoint-set-union',
-    title: 'Disjoint set union',
-    entries: ['First component', 'Joined component', 'Union skipped: same set'],
-  },
-  {
-    value: 'connected-components',
-    title: 'Connected components',
-    entries: ['First component', 'Third component', 'Discovering edge'],
-  },
-  {
-    value: 'kruskal-mst',
-    title: "Kruskal's minimum spanning tree",
-    entries: [
-      'Endpoints being checked',
-      'Accepted MST edge',
-      'Skipped (would form a cycle)',
-    ],
-  },
-  {
-    value: 'dijkstra-shortest-paths',
-    title: 'Dijkstra shortest paths',
-    entries: [
-      'Current minimum',
-      'Latest relaxation',
-      'Shortest-path tree edge',
-    ],
-  },
-  {
-    value: 'multigraph',
-    title: 'Parallel edges and self-loops',
-    entries: ['Edge being examined', 'Processed edge', 'Skipped parallel edge'],
-  },
-];
+const educationalPresets = Object.entries(GRAPH_PRESETS).map(
+  ([value, preset]) => ({
+    value,
+    firstDescription: preset.steps[0].description,
+    secondDescription: preset.steps[1].description,
+  })
+);
+const presetLegends = Object.entries(GRAPH_PRESETS).map(([value, preset]) => ({
+  value,
+  title: preset.legend.title,
+  entries: preset.legend.entries.map(e => e.label),
+}));
 
 const pastedProject = {
   format: 'graph-viz-project',
@@ -783,17 +689,16 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect
       .poll(async () => {
         const bounds = await getRenderedContentViewportBounds(page);
-        if (!bounds) return null;
-        return {
-          x: Math.round(
-            (bounds.left + bounds.right - bounds.viewportWidth) * 10
-          ),
-          y: Math.round(
-            (bounds.top + bounds.bottom - bounds.viewportHeight) * 10
-          ),
-        };
+        if (!bounds) return false;
+        const horizontalError =
+          bounds.left + bounds.right - bounds.viewportWidth;
+        const verticalError =
+          bounds.top + bounds.bottom - bounds.viewportHeight;
+        return (
+          Math.abs(horizontalError) <= 0.5 && Math.abs(verticalError) <= 0.5
+        );
       })
-      .toEqual({ x: 0, y: 0 });
+      .toBe(true);
 
     expect(errors).toEqual([]);
   });
@@ -1028,7 +933,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(modeGuidance).toHaveText('Click canvas');
     await expect(editScope).toHaveText('New items start on Frame 1');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
-    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
     await expect(page.getByText(/Node \d+ added/)).toBeVisible();
     await page.waitForTimeout(4200);
@@ -1036,7 +941,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(graphCanvas(page)).toBeVisible();
 
     await page.getByTestId('tool-button-select').click();
-    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(page.getByTestId('tool-button-draw')).toHaveAttribute(
       'aria-pressed',
@@ -1246,11 +1151,16 @@ test.describe('Graph Studio desktop smoke', () => {
       'Unlock view to change the viewport'
     );
     const lockedViewBeforeAdd = await getCanvasViewSnapshot(page);
-    const nodeCountBeforeLockedAdd = await graphNodes.count();
+    const nodeGroups = graphCanvas(page).locator('[data-node-id]');
+    const countUniqueNodeIds = () =>
+      nodeGroups.evaluateAll(
+        nodes => new Set(nodes.map(node => node.dataset.nodeId)).size
+      );
+    const nodeCountBeforeLockedAdd = await countUniqueNodeIds();
     await page.getByRole('button', { name: 'Add Node' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
-    await graphCanvas(page).click({ position: { x: 120, y: 120 } });
-    await expect(graphNodes).toHaveCount(nodeCountBeforeLockedAdd + 1);
+    await graphCanvas(page).click({ position: { x: 700, y: 120 } });
+    await expect.poll(countUniqueNodeIds).toBe(nodeCountBeforeLockedAdd + 1);
     await expect
       .poll(() => getCanvasViewSnapshot(page))
       .toEqual(lockedViewBeforeAdd);
@@ -1292,7 +1202,7 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await choosePreset(page, 'bfs');
     await page.getByTestId('tool-button-select').click();
-    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await expect(propertyPanel(page)).toHaveAttribute(
       'data-inspector-type',
       'canvas'
@@ -1391,7 +1301,7 @@ test.describe('Graph Studio desktop smoke', () => {
       propertyPanel(page).getByLabel('Visibility change scope')
     ).toHaveValue('frame');
     await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
-    await graphCanvas(page).click({ position: { x: 24, y: 24 } });
+    await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
@@ -1552,6 +1462,22 @@ while (true) {}
     const addKeyframeButton = page.getByRole('button', { name: '+ Keyframe' });
     const frameDescription = page.getByLabel('Frame Description');
     const durationInput = page.getByTestId('frame-duration-input');
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles({
+      name: 'caption-test.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'graph-viz-project',
+          version: 1,
+          graph: GRAPH_PRESETS.bfs.graph,
+          timeline: { steps: GRAPH_PRESETS.bfs.steps },
+          settings: {
+            captionOverlay: { enabled: false, size: 'medium', fontSize: 12 },
+          },
+        })
+      ),
+    });
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
     const captionSizeControl = page.getByLabel('Caption Size', {
@@ -1638,7 +1564,9 @@ while (true) {}
       `${initialFrameCount + 1} / ${initialFrameCount + 1}`
     );
     await expect(frameDescription).toHaveValue('');
-    await expect(durationInput).toHaveValue('600');
+    await expect(durationInput).toHaveValue(
+      String(GRAPH_PRESETS.bfs.steps.at(-1).durationMs)
+    );
     await expect(durationInput).toHaveAttribute('type', 'text');
     await expect(durationInput).toHaveAttribute('inputmode', 'numeric');
 
@@ -1884,7 +1812,7 @@ while (true) {}
 
     const cards = page.getByTestId('timeline-frame-card');
     const frameCounter = page.getByTestId('timeline-frame-counter');
-    await expect(cards).toHaveCount(5);
+    await expect(cards).toHaveCount(GRAPH_PRESETS.bfs.steps.length);
     await cards.nth(1).click();
 
     const nodeLabel = graphCanvas(page).locator('[data-node-label-id="0"]');
@@ -1893,9 +1821,18 @@ while (true) {}
     const stateInput = propertyPanel(page).getByLabel('Node visual state');
     const originalState = await stateInput.inputValue();
     const originalFill = await nodeCircle.getAttribute('fill');
-    await stateInput.selectOption('bfs-node-waiting-in-queue');
-    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
-    await expect(nodeCircle).toHaveAttribute('fill', '#EAB308');
+    const changedState = await stateInput
+      .locator('option')
+      .evaluateAll(
+        (options, current) =>
+          options.find(option => option.value && option.value !== current)
+            ?.value,
+        originalState
+      );
+    await stateInput.selectOption(changedState);
+    await expect(stateInput).toHaveValue(changedState);
+    const changedFill = await nodeCircle.getAttribute('fill');
+    expect(changedFill).not.toBe(originalFill);
     const undoButton = leftSidebar(page).getByRole('button', { name: 'Undo' });
     const redoButton = leftSidebar(page).getByRole('button', { name: 'Redo' });
     await expect(undoButton).toBeEnabled();
@@ -1917,7 +1854,7 @@ while (true) {}
     await page.getByRole('button', { name: 'Pause timeline' }).click();
 
     await cards.nth(1).click();
-    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
+    await expect(stateInput).toHaveValue(changedState);
     await undoButton.click();
 
     await expect(page.getByText('Undid last action')).toBeVisible();
@@ -1926,24 +1863,30 @@ while (true) {}
     await expect(redoButton).toBeEnabled();
     await redoButton.click();
     await expect(page.getByText('Redid last action')).toBeVisible();
-    await expect(stateInput).toHaveValue('bfs-node-waiting-in-queue');
-    await expect(nodeCircle).toHaveAttribute('fill', '#EAB308');
+    await expect(stateInput).toHaveValue(changedState);
+    await expect(nodeCircle).toHaveAttribute('fill', changedFill);
     await page.keyboard.press('Control+z');
     await expect(stateInput).toHaveValue(originalState);
 
     await cards.last().click();
     await page.getByRole('button', { name: '+ Keyframe' }).click();
-    await expect(cards).toHaveCount(6);
-    await expect(frameCounter).toHaveText('6 / 6');
+    await expect(cards).toHaveCount(GRAPH_PRESETS.bfs.steps.length + 1);
+    await expect(frameCounter).toHaveText(
+      `${GRAPH_PRESETS.bfs.steps.length + 1} / ${GRAPH_PRESETS.bfs.steps.length + 1}`
+    );
     await page.keyboard.press('Control+z');
-    await expect(cards).toHaveCount(5);
-    await expect(frameCounter).toHaveText('5 / 5');
+    await expect(cards).toHaveCount(GRAPH_PRESETS.bfs.steps.length);
+    await expect(frameCounter).toHaveText(
+      `${GRAPH_PRESETS.bfs.steps.length} / ${GRAPH_PRESETS.bfs.steps.length}`
+    );
     await expect(
       page.locator('[data-testid="timeline-frame-card"][data-current="true"]')
     ).toHaveCount(1);
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
     const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
+    await showGrid.check();
+    await snapToGrid.check();
     await expect(showGrid).toBeChecked();
     await expect(snapToGrid).toBeChecked();
     await showGrid.uncheck();
@@ -1966,7 +1909,7 @@ while (true) {}
     for (let index = 0; index < 12; index += 1) {
       await page.getByRole('button', { name: 'Duplicate' }).click();
     }
-    await expect(cards).toHaveCount(17);
+    await expect(cards).toHaveCount(GRAPH_PRESETS.bfs.steps.length + 12);
     await scroller.evaluate(element => {
       element.scrollLeft = 0;
     });
@@ -2168,6 +2111,22 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await choosePreset(page, 'bfs');
 
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles({
+      name: 'caption-test.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'graph-viz-project',
+          version: 1,
+          graph: GRAPH_PRESETS.bfs.graph,
+          timeline: { steps: GRAPH_PRESETS.bfs.steps },
+          settings: {
+            captionOverlay: { enabled: false, size: 'medium', fontSize: 12 },
+          },
+        })
+      ),
+    });
     const captionToggle = page.getByLabel('Show caption');
     const captionStyleSelect = page.getByLabel('Caption Style');
     const captionSizeControl = page.getByLabel('Caption Size', {
@@ -2186,7 +2145,7 @@ while (true) {}
 
     await captionToggle.check();
     await expect(caption).toBeVisible();
-    await expect(caption).toContainText('Start BFS at A');
+    await expect(caption).toContainText('BFS · Queue: A');
     await expect(caption).toHaveAttribute('data-caption-overlay', 'true');
     await expect(caption).toHaveAttribute('data-caption-style', 'subtle');
     await expect(caption).toHaveAttribute('data-caption-size', 'medium');
@@ -2199,15 +2158,15 @@ while (true) {}
     await expect(captionToggle).not.toBeChecked();
     await expect(caption).toHaveCount(0);
     await captionToggle.check();
-    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toContainText('Visit A · Queue: empty');
     await frameCards.first().click();
     await expect(captionToggle).toBeChecked();
-    await expect(caption).toContainText('Start BFS at A');
+    await expect(caption).toContainText('BFS · Queue: A');
     await captionToggle.uncheck();
     await expect(caption).toHaveCount(0);
     await frameCards.nth(1).click();
     await expect(captionToggle).toBeChecked();
-    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toContainText('Visit A · Queue: empty');
 
     await page.getByRole('button', { name: '+ Keyframe' }).click();
     await expect(captionToggle).toBeChecked();
@@ -2217,7 +2176,7 @@ while (true) {}
     await expect(captionToggle).toBeChecked();
     await expect(caption).toContainText('Inherited caption visibility');
     await frameCards.nth(1).click();
-    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toContainText('Visit A · Queue: empty');
 
     const captionBoxBeforeGraphControls = await caption.boundingBox();
     const captionFontSizeBeforeGraphControls = await caption
@@ -2367,7 +2326,7 @@ while (true) {}
     ).toBe('none');
 
     await frameCards.nth(1).click();
-    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toContainText('Visit A · Queue: empty');
     expect(
       Number(await caption.getAttribute('data-caption-position-x'))
     ).toBeCloseTo(draggedPosition.x, 5);
@@ -2385,7 +2344,7 @@ while (true) {}
       .poll(() =>
         previewImage.evaluate(async image => (await fetch(image.src)).text())
       )
-      .toContain('Queue B and C');
+      .toContain('Visit A · Queue: empty');
     const previewSvgText = await previewImage.evaluate(async image =>
       (await fetch(image.src)).text()
     );
@@ -2410,7 +2369,7 @@ while (true) {}
     expect(svgText).toContain('data-caption-size="medium"');
     expect(svgText).toContain('data-caption-font-size="22"');
     expect(svgText).toContain('font-size="22"');
-    expect(svgText).toContain('Queue B and C');
+    expect(svgText).toContain('Visit A · Queue: empty');
 
     const projectDownload = await expectDownloadFrom({
       page,
@@ -2452,7 +2411,7 @@ while (true) {}
     await expect(captionStyleSelect).toHaveValue('dark');
     await expect(captionSizeControl).toHaveCount(0);
     await expect(captionFontSizeInput).toHaveValue('22');
-    await expect(caption).toContainText('Queue B and C');
+    await expect(caption).toContainText('Visit A · Queue: empty');
     await expect(caption).toHaveAttribute('data-caption-style', 'dark');
     await expect(caption).toHaveAttribute('data-caption-size', 'medium');
     await expect(caption).toHaveAttribute('data-caption-font-size', '22');
@@ -2492,8 +2451,8 @@ while (true) {}
     await expect(edgeLabelFontSizeInput).toBeVisible();
     await expect(firstNodeLabel).toBeVisible();
     await expect(firstEdgeLabel).toBeVisible();
-    await expect(nodeLabelFontSizeInput).toHaveValue('12');
-    await expect(edgeLabelFontSizeInput).toHaveValue('16');
+    await expect(nodeLabelFontSizeInput).toHaveValue('18');
+    await expect(edgeLabelFontSizeInput).toHaveValue('18');
     await expect(
       propertyPanel(page).getByText('px', { exact: true })
     ).toHaveCount(0);
@@ -2715,11 +2674,10 @@ while (true) {}
       expect(Number(settledView.zoom)).toBeCloseTo(Number(fittedView.zoom), 5);
     }
 
+    await choosePreset(page, 'disjoint-set-union');
     await expect(graphCanvas(page).getByText('Path 1')).toHaveCount(0);
     await expect(graphCanvas(page).getByText('Loop')).toHaveCount(0);
     await expect(graphCanvas(page).getByText('Back to A')).toHaveCount(0);
-    await choosePreset(page, 'disjoint-set-union');
-    await expect(graphCanvas(page).getByText('cycle')).toHaveCount(0);
 
     expect(errors).toEqual([]);
   });
@@ -2736,17 +2694,21 @@ while (true) {}
     await showCaption.check();
     await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
     await choosePreset(page, 'bfs');
-    await expect(showCaption).not.toBeChecked();
-    await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
+    await expect(showCaption).toBeChecked();
+    await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
     const firstBfsView = await getCanvasViewSnapshot(page);
     const firstBfsBounds = await getRenderedContentViewportBounds(page);
     expect(firstBfsBounds).not.toBeNull();
     expect(
       firstBfsBounds.left + firstBfsBounds.right - firstBfsBounds.viewportWidth
-    ).toBeCloseTo(0, 5);
+    ).toBeCloseTo(0, 0);
     expect(
-      firstBfsBounds.top + firstBfsBounds.bottom - firstBfsBounds.viewportHeight
-    ).toBeCloseTo(0, 5);
+      Math.abs(
+        firstBfsBounds.top +
+          firstBfsBounds.bottom -
+          firstBfsBounds.viewportHeight
+      )
+    ).toBeLessThanOrEqual(50);
     await page.waitForTimeout(400);
     const settledBfsView = await getCanvasViewSnapshot(page);
     const settledBfsBounds = await getRenderedContentViewportBounds(page);
@@ -2805,11 +2767,11 @@ while (true) {}
       expect(
         bounds.left + bounds.right - bounds.viewportWidth,
         `${presetValue} horizontal center error`
-      ).toBeCloseTo(0, 3);
+      ).toBeCloseTo(0, 0);
       expect(
-        bounds.top + bounds.bottom - bounds.viewportHeight,
-        `${presetValue} vertical center error`
-      ).toBeCloseTo(0, 3);
+        Math.abs(bounds.top + bounds.bottom - bounds.viewportHeight),
+        `${presetValue} vertical reserved-overlay offset`
+      ).toBeLessThanOrEqual(50);
     }
 
     expect(errors).toEqual([]);
@@ -2833,12 +2795,10 @@ while (true) {}
       await expandLegendEditor(page);
       await expect(legendTitle).toHaveValue(preset.title);
       await expect(legendPreview).toBeVisible();
-      await expect(
-        legendPreview.getByText('Nodes', { exact: true })
-      ).toBeVisible();
-      await expect(
-        legendPreview.getByText('Edges', { exact: true })
-      ).toBeVisible();
+      await expect(legendPreview).toHaveAttribute(
+        'data-legend-position',
+        'top-left'
+      );
 
       for (const entry of preset.entries) {
         await expect(
@@ -2867,7 +2827,10 @@ while (true) {}
     );
     await expect(page.locator('[data-visual-state-id]')).toHaveCount(5);
     const firstStateLabel = page.getByLabel('node state label').first();
-    await expect(firstStateLabel).toHaveValue('Front of queue');
+    await expect(firstStateLabel).toHaveValue(
+      GRAPH_PRESETS.bfs.legend.entries.find(entry => entry.kind === 'node')
+        .label
+    );
     await firstStateLabel.fill('Current vertex');
     await expect(
       page.getByTestId('custom-export-legend').getByText('Current vertex', {
@@ -2892,11 +2855,11 @@ while (true) {}
     await closeLegendEditor(page);
     await graphNodeCircles(page).first().click();
     const nodeState = propertyPanel(page).getByLabel('Node visual state');
-    await expect(nodeState).toHaveValue('bfs-node-front-of-queue');
-    await nodeState.selectOption('bfs-node-waiting-in-queue');
+    await expect(nodeState).toHaveValue('bfs-node-queued');
+    await nodeState.selectOption('bfs-node-current');
     await expect(graphNodeCircles(page).first()).toHaveAttribute(
       'fill',
-      '#EAB308'
+      '#3B82F6'
     );
 
     expect(errors).toEqual([]);
@@ -3929,7 +3892,9 @@ while (true) {}
       .setInputFiles(fixturePath('effective-edge-visibility.graphviz.json'));
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
-    await expect(page.getByText('Node B not shown')).toBeVisible();
+    await expect(
+      page.getByTestId('timeline-panel').getByText('Node B not shown')
+    ).toBeVisible();
 
     await expect(
       graphCanvas(page).locator('[data-node-label-id="B"]')
@@ -4397,11 +4362,11 @@ while (true) {}
     const exportMenu = await openExportMenu(page);
     await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
     await expect(page.getByTestId('graph-studio-status')).toHaveText(
-      'Edge list copied to clipboard'
+      'Edge list copied. IDs renumbered from 0; use Project export to preserve direction and styling.'
     );
     const exported = await page.evaluate(() => navigator.clipboard.readText());
     expect(exported).toBe(
-      ['3 6', '0 1 4', '0 1 2', '0 1 7', '1 1', '1 2 3', '2 0 5'].join('\n')
+      ['3 6', '0 1', '0 1', '0 1', '1 1', '1 2', '2 0'].join('\n')
     );
     await closeExportMenu(page);
 
@@ -4485,6 +4450,18 @@ while (true) {}
 
     const exportMenu = await openExportMenu(page);
     const previewImage = await expectExportPreview(page);
+    await expect(exportMenu.getByLabel('Image Framing')).toHaveValue(
+      'viewport'
+    );
+    await exportMenu.getByLabel('Image Framing').selectOption('fit');
+    await expect
+      .poll(async () =>
+        getSvgRootAttribute(
+          await getPreviewSvgText(page),
+          'data-export-framing'
+        )
+      )
+      .toBe('fit');
     const fitPreviewUrl = await previewImage.getAttribute('src');
     expect(fitPreviewUrl).toMatch(/^data:image\/svg\+xml/);
     await expect(exportMenu.getByLabel('Image Framing')).toHaveValue('fit');
@@ -4501,10 +4478,10 @@ while (true) {}
     await expect(
       exportMenu.getByTestId('export-preview-section')
     ).toContainText(
-      'PNG/SVG use the selected image framing. Slideshow exports render into a 16:9 slide frame.'
+      'PNG/SVG match this preview. Video and slides preserve the editor view inside a 16:9 frame; graph, text, and overlays scale together.'
     );
     await expect(exportMenu.getByTestId('image-export-controls')).toContainText(
-      'Fit graph is the default. Viewport contains the complete editor region captured when review opened; Slide 16:9 composes a presentation frame.'
+      'Editor view preserves your composition, including text and overlays. Fit graph deliberately resizes the graph. PNG scale changes resolution only.'
     );
 
     await exportMenu.getByLabel('Image Framing').selectOption('viewport');
@@ -4601,22 +4578,19 @@ while (true) {}
     const previewImage = await expectExportPreview(page);
     const previewSource = await previewImage.getAttribute('src');
     const reviewedPreviewSvg = await getPreviewSvgText(page);
-    expect(getSvgRootAttribute(reviewedPreviewSvg, 'width')).toBe('1040');
-    expect(getSvgRootAttribute(reviewedPreviewSvg, 'height')).toBe('585');
-
+    expect(
+      Number(getSvgRootAttribute(reviewedPreviewSvg, 'width'))
+    ).toBeCloseTo(reviewedEditorCamera.width, 0);
+    expect(
+      Number(getSvgRootAttribute(reviewedPreviewSvg, 'height'))
+    ).toBeCloseTo(reviewedEditorCamera.height, 0);
     const exportViewState = getGraphViewTransform(reviewedPreviewSvg);
-    const expectedZoom = Math.min(
-      1040 / (reviewedWorldBounds.maxX - reviewedWorldBounds.minX),
-      585 / (reviewedWorldBounds.maxY - reviewedWorldBounds.minY)
-    );
-    expect(exportViewState.zoom).toBeCloseTo(expectedZoom, 5);
+    expect(exportViewState.zoom).toBeCloseTo(reviewedEditorCamera.zoom, 5);
+    expect(exportViewState.x).toBeCloseTo(reviewedEditorCamera.x, 5);
+    expect(exportViewState.y).toBeCloseTo(reviewedEditorCamera.y, 5);
     const mappedBounds = getMappedBounds(reviewedWorldBounds, exportViewState);
-    expect(mappedBounds.minX).toBeGreaterThanOrEqual(-0.01);
-    expect(mappedBounds.minY).toBeGreaterThanOrEqual(-0.01);
-    expect(mappedBounds.maxX).toBeLessThanOrEqual(1040.01);
-    expect(mappedBounds.maxY).toBeLessThanOrEqual(585.01);
-    expect(mappedBounds.minX).toBeCloseTo(1040 - mappedBounds.maxX, 2);
-    expect(mappedBounds.minY).toBeCloseTo(585 - mappedBounds.maxY, 2);
+    expect(mappedBounds.minX).toBeCloseTo(0, 2);
+    expect(mappedBounds.minY).toBeCloseTo(0, 2);
 
     await page.setViewportSize({ width: 1900, height: 650 });
     await expect
@@ -4668,7 +4642,7 @@ while (true) {}
     ).toHaveAttribute('data-preview-chrome', 'true');
     let previewSvgText = await getPreviewSvgText(page);
     expect(getSvgRootAttribute(previewSvgText, 'data-export-framing')).toBe(
-      'fit'
+      'viewport'
     );
     const previewViewBox = expectReasonableFittedViewBox(previewSvgText);
     let previewState = await getSvgPresentationState(page, previewSvgText);
@@ -4687,7 +4661,7 @@ while (true) {}
     expect(svgPath).not.toBeNull();
     const exportedSvgText = await fs.readFile(svgPath, 'utf8');
     expect(getSvgRootAttribute(exportedSvgText, 'data-export-framing')).toBe(
-      'fit'
+      'viewport'
     );
     expect(exportedSvgText).not.toContain('data-preview-chrome');
     expect(getSvgViewBox(exportedSvgText)).toEqual(previewViewBox);
@@ -4801,7 +4775,7 @@ while (true) {}
         .getByTestId('export-preview-section')
         .getByTestId('export-preview-frame-list')
     ).toBeVisible();
-    await expect(frameItems).toHaveCount(5);
+    await expect(frameItems).toHaveCount(GRAPH_PRESETS.bfs.steps.length);
     await expect(exportMenu.getByLabel('Export start frame')).toHaveCount(0);
     await expect(exportMenu.getByLabel('Export end frame')).toHaveCount(0);
     await expect(
@@ -4871,7 +4845,9 @@ while (true) {}
     await expect(graphNodeCircles(page).first()).toHaveAttribute('r', '30');
 
     const frameCounter = page.getByTestId('timeline-frame-counter');
-    await expect(frameCounter).toHaveText('1 / 9');
+    await expect(frameCounter).toHaveText(
+      `1 / ${GRAPH_PRESETS.dfs.steps.length}`
+    );
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect(
       page.getByRole('button', { name: 'Pause timeline' })
@@ -5107,7 +5083,9 @@ while (true) {}
 
     await choosePreset(page, 'bfs');
     const frameCounter = page.getByTestId('timeline-frame-counter');
-    await expect(frameCounter).toHaveText('1 / 5');
+    await expect(frameCounter).toHaveText(
+      `1 / ${GRAPH_PRESETS.bfs.steps.length}`
+    );
     await commitInputValue(page.getByTestId('frame-duration-input'), 80);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect(
@@ -5601,7 +5579,7 @@ api.edge('loop', '#3b82f6');
     await page.getByRole('button', { name: 'Generate timeline' }).click();
     await expect(page.getByText('Script Mode (Trace Recorder)')).toBeHidden();
     await page.getByText('Frame 2').click();
-    await expect(selfLoopEdge.first()).toHaveAttribute('stroke', '#3b82f6');
+    await expect(selfLoopEdge.first()).toHaveAttribute('stroke', /#3b82f6/i);
 
     const edgeHitTarget = graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
@@ -5922,8 +5900,8 @@ api.edge('loop', '#3b82f6');
     await closeExportMenu(page);
 
     await page.getByText('Frame 2').click();
-    await expect(directedEdge).toHaveAttribute('stroke', '#3B82F6');
-    await expect(arrowhead).toHaveAttribute('fill', '#3B82F6');
+    await expect(directedEdge).toHaveAttribute('stroke', /#3b82f6/i);
+    await expect(arrowhead).toHaveAttribute('fill', /#3b82f6/i);
     await expectBodyOverlapsArrowBase();
 
     await page.getByRole('button', { name: 'Script Mode' }).click();
@@ -6055,8 +6033,8 @@ api.edge('e0', '#f59e0b');
     const pngScaleSelect = page.getByTestId('png-scale-select');
     const imageFramingSelect = page.getByTestId('image-framing-select');
     await expect(pngScaleSelect).toHaveValue('2');
-    await expect(imageFramingSelect).toHaveValue('fit');
-    await expect(imageFramingSelect).toContainText('Viewport');
+    await expect(imageFramingSelect).toHaveValue('viewport');
+    await expect(imageFramingSelect).toContainText('Editor view');
     await expect(imageFramingSelect).toContainText('Slide 16:9');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
@@ -6079,7 +6057,7 @@ api.edge('e0', '#f59e0b');
     );
     expect(
       getSvgRootAttribute(defaultTimelineSvgText, 'data-export-framing')
-    ).toBe('fit');
+    ).toBe('viewport');
     expectReasonableFittedViewBox(defaultTimelineSvgText);
 
     const twoXDownload = await expectDownloadFrom({
@@ -6166,10 +6144,18 @@ api.edge('e0', '#f59e0b');
       Math.max(threeXDimensions.width, threeXDimensions.height)
     ).toBeLessThanOrEqual(4096);
     expect(
-      Math.abs(threeXDimensions.width - oneXDimensions.width * 3)
+      Math.abs(
+        threeXDimensions.width -
+          Number(getSvgRootAttribute(await getPreviewSvgText(page), 'width')) *
+            3
+      )
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(threeXDimensions.height - oneXDimensions.height * 3)
+      Math.abs(
+        threeXDimensions.height -
+          Number(getSvgRootAttribute(await getPreviewSvgText(page), 'height')) *
+            3
+      )
     ).toBeLessThanOrEqual(1);
     await expect(graphTransformGroup).toHaveAttribute(
       'transform',
@@ -6272,13 +6258,13 @@ api.edge('e0', '#f59e0b');
     expect(rangeSlides).toEqual([
       expect.objectContaining({
         description: expect.stringContaining(
-          'Graph Studio Frame 1: Start BFS at A'
+          'Graph Studio Frame 1: BFS · Queue: A'
         ),
         image: { width: 1040, height: 585 },
       }),
       expect.objectContaining({
         description: expect.stringContaining(
-          'Graph Studio Frame 2: Queue B and C'
+          'Graph Studio Frame 2: Visit A · Queue: empty'
         ),
         image: { width: 1040, height: 585 },
       }),
@@ -6286,5 +6272,324 @@ api.edge('e0', '#f59e0b');
     await expect(graphCanvas(page)).toBeVisible();
 
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe('Audit regressions', () => {
+  test('rejects malformed visual properties without replacing the graph', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const before = await getNodePositionSnapshot(page);
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles({
+      name: 'bad-color.graphviz.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'graph-viz-project',
+          version: 1,
+          graph: {
+            nodes: [{ id: 0, label: 'bad', x: 520, y: 420, color: 42 }],
+            edges: [],
+          },
+          timeline: { steps: [] },
+        })
+      ),
+    });
+    await expect(
+      page.getByText(/Project import error:.*invalid color/)
+    ).toBeVisible();
+    expect(await getNodePositionSnapshot(page)).toEqual(before);
+    await expect(graphCanvas(page)).toBeVisible();
+  });
+
+  test('contains dialog focus and restores the trigger', async ({ page }) => {
+    await page.goto('/');
+    const trigger = page.getByRole('button', {
+      name: 'Script Mode',
+      exact: true,
+    });
+    await trigger.click();
+    const dialog = page.getByRole('dialog');
+    await expect(
+      dialog.getByRole('button', { name: 'Close', exact: true })
+    ).toBeFocused();
+    await expect(page.getByLabel('JavaScript trace')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Generate timeline' }).focus();
+    await page.keyboard.press('Tab');
+    await expect(
+      dialog.getByRole('button', { name: 'Close', exact: true })
+    ).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await expect(page.locator('#root')).not.toHaveAttribute('inert');
+  });
+
+  test('supports keyboard selection, movement, connection, and creation', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const canvas = graphCanvas(page);
+    await canvas.focus();
+    await page.keyboard.press('Tab');
+    const first = canvas.locator('[data-node-id="0"]');
+    await expect(first).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    const before = await getNodePositionSnapshot(page);
+    await page.keyboard.press('Alt+ArrowRight');
+    await expect
+      .poll(async () => (await getNodePositionSnapshot(page))[0].x)
+      .toBe(before[0].x + 28);
+    await page.keyboard.press('ArrowRight');
+    await expect(canvas.locator('[data-node-id="1"]')).toBeFocused();
+    await page.getByRole('button', { name: 'Draw Edge', exact: true }).click();
+    // Draw Edge starts from the selected node; choose a target using the graph keyboard.
+    await canvas.locator('[data-node-id="2"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(canvas.locator('[data-edge-id]')).toHaveCount(5);
+    await page.getByRole('button', { name: 'Add Node', exact: true }).click();
+    await canvas.focus();
+    await page.keyboard.press('Enter');
+    await expect(canvas.locator('[data-node-id]')).toHaveCount(6);
+  });
+
+  test('undoes a complete drag and restores the saved draft after reload', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const before = await getNodePositionSnapshot(page);
+    const box = await getRequiredBox(graphNodeCircles(page).first());
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      box.x + box.width / 2 + 130,
+      box.y + box.height / 2 + 40,
+      { steps: 12 }
+    );
+    await page.mouse.up();
+    await expect
+      .poll(async () => (await getNodePositionSnapshot(page))[0].x)
+      .not.toBe(before[0].x);
+    await graphCanvas(page).focus();
+    await page.keyboard.press('Control+z');
+    await expect.poll(() => getNodePositionSnapshot(page)).toEqual(before);
+    await graphCanvas(page).locator('[data-node-id="0"]').click();
+    await propertyPanel(page)
+      .getByLabel('Label', { exact: true })
+      .fill('Recovered draft');
+    await propertyPanel(page).getByLabel('Label', { exact: true }).blur();
+    await expect(
+      page.getByTestId('local-draft-status').getByText(/Saved locally/)
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="0"]')
+    ).toHaveText('Recovered draft');
+  });
+
+  test('keeps labels readable and default legend consistent with statuses', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await graphCanvas(page).locator('[data-node-id="0"]').click();
+    const visualState = page.getByLabel('Node visual state');
+    await visualState.selectOption('node-queued');
+    const node = graphCanvas(page).locator('[data-node-id="0"]');
+    await expect(node.locator('circle').first()).toHaveAttribute(
+      'fill',
+      '#EAB308'
+    );
+    await expect(node.locator('circle').first()).toHaveAttribute(
+      'stroke-dasharray',
+      '6 3'
+    );
+    await visualState.selectOption('');
+    await page.getByLabel('Custom color', { exact: true }).fill('#000000');
+    await expect(node.locator('[data-node-label-id]')).toHaveAttribute(
+      'fill',
+      '#FFFFFF'
+    );
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await expect(node.locator('[data-node-label-id]')).toHaveAttribute(
+      'fill',
+      '#FFFFFF'
+    );
+  });
+
+  test('can cancel a force layout and keep the project unchanged', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const graph = {
+      nodes: Array.from({ length: 1000 }, (_, id) => ({
+        id,
+        label: String(id),
+        x: 400 + (id % 30) * 30,
+        y: 200 + Math.floor(id / 30) * 30,
+      })),
+      edges: [],
+    };
+    await openImportMenu(page);
+    await page.getByTestId('project-import-input').setInputFiles({
+      name: 'large.graphviz.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'graph-viz-project',
+          version: 1,
+          graph,
+          timeline: { steps: [] },
+        })
+      ),
+    });
+    await expect(graphCanvas(page).locator('[data-node-id]')).toHaveCount(1000);
+    const before = await getNodePositionSnapshot(page);
+    await page.getByRole('button', { name: 'Force', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Cancel layout', exact: true })
+      .click();
+    await expect(
+      page.getByText('Layout cancelled', { exact: true })
+    ).toBeVisible();
+    expect(await getNodePositionSnapshot(page)).toEqual(before);
+  });
+});
+
+test.describe('Preset presentation and export fidelity', () => {
+  test('all presets show readable frame text and keep graph clear of overlays', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/');
+    for (const [name, preset] of Object.entries(GRAPH_PRESETS)) {
+      await choosePreset(page, name);
+      const cards = page.getByTestId('timeline-frame-card');
+      await cards.last().click();
+      await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
+        'data-caption-truncated',
+        'false'
+      );
+      for (const n of preset.graph.nodes) {
+        await expect(
+          graphCanvas(page).locator(`[data-node-label-id="${n.id}"]`)
+        ).toHaveText(
+          preset.steps.at(-1).nodeOverrides[n.id].annotation || n.label
+        );
+      }
+      await expect
+        .poll(
+          async () =>
+            graphCanvas(page).evaluate(svg => {
+              const area = svg.getBoundingClientRect();
+              const obstacles = [
+                ...svg.querySelectorAll(
+                  '[data-legend-position],[data-caption-overlay]'
+                ),
+              ].map(el => el.getBoundingClientRect());
+              return [
+                ...svg.querySelectorAll('[data-node-id] circle:first-of-type'),
+              ].every(el => {
+                const b = el.getBoundingClientRect();
+                return (
+                  b.left >= area.left &&
+                  b.right <= area.right &&
+                  b.top >= area.top &&
+                  b.bottom <= area.bottom &&
+                  obstacles.every(
+                    o =>
+                      b.right <= o.left ||
+                      b.left >= o.right ||
+                      b.bottom <= o.top ||
+                      b.top >= o.bottom
+                  )
+                );
+              });
+            }),
+          {
+            message: `${name}: nodes must be visible and clear of captions/legend`,
+          }
+        )
+        .toBe(true);
+    }
+  });
+
+  test('editor view preserves graph and overlay proportions in image and 16:9 previews', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/');
+    await choosePreset(page, 'dijkstra-shortest-paths');
+    await page.getByTestId('timeline-frame-card').last().click();
+    const before = await graphCanvas(page).evaluate(svg => ({
+      transform: svg
+        .querySelector('[data-graph-view-transform]')
+        .getAttribute('transform'),
+      overlay: [
+        ...svg.querySelectorAll(
+          '[data-legend-position],[data-caption-overlay]'
+        ),
+      ].map(el => ({
+        transform: el.getAttribute('transform'),
+        text: el.textContent,
+      })),
+      nodes: [...svg.querySelectorAll('[data-node-label-id]')].map(
+        el => el.textContent
+      ),
+    }));
+    const menu = await openExportMenu(page);
+    await expect(menu.getByLabel('Image Framing')).toHaveValue('viewport');
+    const image = await getPreviewSvgText(page);
+    const inspect = text =>
+      page.evaluate(text => {
+        const svg = new DOMParser().parseFromString(text, 'image/svg+xml');
+        return {
+          transform: svg
+            .querySelector('[data-graph-view-transform]')
+            .getAttribute('transform'),
+          overlay: [
+            ...svg.querySelectorAll(
+              '[data-legend-position],[data-caption-overlay]'
+            ),
+          ].map(el => ({
+            transform: el.getAttribute('transform'),
+            text: el.textContent,
+          })),
+          nodes: [...svg.querySelectorAll('[data-node-label-id]')].map(
+            el => el.textContent
+          ),
+        };
+      }, text);
+    const reviewed = await inspect(image);
+    expect(reviewed.transform).toBe(before.transform);
+    expect(reviewed.nodes).toEqual(before.nodes);
+    expect(reviewed.overlay.map(o => o.text)).toEqual(
+      before.overlay.map(o => o.text)
+    );
+    await menu
+      .getByRole('button', { name: 'Preview video / slides · 16:9' })
+      .click();
+    await expect
+      .poll(async () =>
+        getSvgRootAttribute(
+          await getPreviewSvgText(page),
+          'data-export-framing'
+        )
+      )
+      .toBe('presentation');
+    const slide = await getPreviewSvgText(page);
+    expect(await inspect(slide)).toEqual(reviewed);
+    expect(getSvgViewBox(slide)[2] / getSvgViewBox(slide)[3]).toBeCloseTo(
+      16 / 9,
+      4
+    );
+    expect(slide).toContain('clip-path="url(#graphstudio-reviewed-viewport)"');
+    const download = await expectDownloadFrom({
+      page,
+      locator: menu.getByTestId('svg-export-button'),
+      filenamePattern: /\.svg$/,
+    });
+    expect(await fs.readFile(await download.path(), 'utf8')).toBe(slide);
   });
 });

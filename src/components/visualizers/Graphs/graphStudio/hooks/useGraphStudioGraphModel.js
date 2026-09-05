@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants';
 import {
   circularLayout,
   clampNodePosition,
-  forceDirectedLayout,
   snapToGrid,
   treeLayout,
 } from '../graphStudioUtils';
 import { getForceLayoutOptions } from '../lib/graphLayouts.js';
+import { PROJECT_LIMITS } from '../lib/projectLimits';
+import { runForceLayout } from '../lib/runForceLayout';
 import {
   applyFrameOverride,
   applyPropertyToAllFrames,
@@ -29,7 +30,10 @@ const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
     Math.max(
       -1,
       ...(graph?.nodes ?? []).map(node =>
-        Number.isFinite(Number(node.id)) ? Number(node.id) : -1
+        Number.isSafeInteger(Number(node.id)) &&
+        Number(node.id) < Number.MAX_SAFE_INTEGER - 10000
+          ? Number(node.id)
+          : -1
       )
     ) + 1;
 
@@ -38,7 +42,11 @@ const syncIdCounters = (graph, nextNodeIdRef, nextEdgeIdRef) => {
       -1,
       ...(graph?.edges ?? []).map(edge => {
         const match = String(edge.id).match(/^e(\d+)$/);
-        return match ? Number(match[1]) : -1;
+        return match &&
+          Number.isSafeInteger(Number(match[1])) &&
+          Number(match[1]) < Number.MAX_SAFE_INTEGER - 10000
+          ? Number(match[1])
+          : -1;
       })
     ) + 1;
 };
@@ -59,6 +67,10 @@ export const useGraphStudioGraphModel = ({
   setSelectedNodeIds,
 }) => {
   const nextNodeIdRef = useRef(0);
+  const layoutTaskRef = useRef(null);
+  const [isLayoutRunning, setIsLayoutRunning] = useState(false);
+  const cancelLayout = useCallback(() => layoutTaskRef.current?.abort(), []);
+  useEffect(() => () => layoutTaskRef.current?.abort(), [baseGraph]);
   const nextEdgeIdRef = useRef(0);
 
   useEffect(() => {
@@ -223,8 +235,16 @@ export const useGraphStudioGraphModel = ({
 
   const addNodeAt = useCallback(
     point => {
-      const id = nextNodeIdRef.current;
-      nextNodeIdRef.current += 1;
+      if (baseGraph.nodes.length >= PROJECT_LIMITS.nodes) {
+        setStatus(`Node limit reached (${PROJECT_LIMITS.nodes})`);
+        return;
+      }
+      const existingNodeIds = new Set(
+        baseGraph.nodes.map(node => String(node.id))
+      );
+      let id = nextNodeIdRef.current;
+      while (existingNodeIds.has(String(id))) id += 1;
+      nextNodeIdRef.current = id + 1;
       const position = clampNodePosition({
         x: snapEnabled ? snapToGrid(point.x) : point.x,
         y: snapEnabled ? snapToGrid(point.y) : point.y,
@@ -271,8 +291,17 @@ export const useGraphStudioGraphModel = ({
 
   const addEdge = useCallback(
     (from, to) => {
-      const id = `e${nextEdgeIdRef.current}`;
-      nextEdgeIdRef.current += 1;
+      if (baseGraph.edges.length >= PROJECT_LIMITS.edges) {
+        setStatus(`Edge limit reached (${PROJECT_LIMITS.edges})`);
+        return;
+      }
+      const existingEdgeIds = new Set(
+        baseGraph.edges.map(edge => String(edge.id))
+      );
+      let edgeNumber = nextEdgeIdRef.current;
+      while (existingEdgeIds.has(`e${edgeNumber}`)) edgeNumber += 1;
+      const id = `e${edgeNumber}`;
+      nextEdgeIdRef.current = edgeNumber + 1;
       const nextBaseGraph = {
         ...baseGraph,
         edges: [
@@ -356,20 +385,44 @@ export const useGraphStudioGraphModel = ({
   ]);
 
   const applyLayout = useCallback(
-    type => {
-      let nextGraph = baseGraph;
-      let status = `Applied ${LAYOUT_STATUS_LABELS[type] ?? type} layout`;
-      if (type === 'circle') nextGraph = circularLayout(baseGraph);
-      if (type === 'tree')
-        nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
-      if (type === 'force') {
-        const forceOptions = getForceLayoutOptions(forceStrength);
-        nextGraph = forceDirectedLayout(baseGraph, forceOptions);
-        status = `Applied Force layout at ${forceOptions.strength.toFixed(1)} strength`;
+    async type => {
+      layoutTaskRef.current?.abort();
+      const controller = new AbortController();
+      layoutTaskRef.current = controller;
+      try {
+        let nextGraph = baseGraph;
+        if (type === 'circle') nextGraph = circularLayout(baseGraph);
+        if (type === 'tree')
+          nextGraph = treeLayout(baseGraph, baseGraph.nodes[0]?.id);
+        if (type === 'force') {
+          setIsLayoutRunning(true);
+          setStatus('Arranging graph… You can cancel or keep editing.');
+          nextGraph = await runForceLayout(
+            baseGraph,
+            getForceLayoutOptions(forceStrength),
+            controller.signal
+          );
+        }
+        if (controller.signal.aborted) return null;
+        setBaseGraph(nextGraph);
+        setStatus(
+          `Applied ${LAYOUT_STATUS_LABELS[type] ?? type} layout${type === 'force' ? ` at ${forceStrength.toFixed(1)} strength` : ''}`
+        );
+        return nextGraph;
+      } catch (error) {
+        if (layoutTaskRef.current === controller)
+          setStatus(
+            error.name === 'AbortError'
+              ? 'Layout cancelled'
+              : `Layout error: ${error.message}`
+          );
+        return null;
+      } finally {
+        if (layoutTaskRef.current === controller) {
+          layoutTaskRef.current = null;
+          setIsLayoutRunning(false);
+        }
       }
-      setBaseGraph(nextGraph);
-      setStatus(status);
-      return nextGraph;
     },
     [baseGraph, forceStrength, setBaseGraph, setStatus]
   );
@@ -391,5 +444,7 @@ export const useGraphStudioGraphModel = ({
     addEdge,
     deleteSelection,
     applyLayout,
+    isLayoutRunning,
+    cancelLayout,
   };
 };
