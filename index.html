@@ -4,6 +4,41 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (() => {
+        let theme;
+        try {
+          theme = window.localStorage.getItem('theme');
+        } catch {
+          // Use the operating-system preference when storage is unavailable.
+        }
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+        const root = document.documentElement;
+        root.classList.add('theme-preload');
+        root.classList.toggle('dark', theme === 'dark');
+        root.style.colorScheme = theme;
+        root.dataset.themeReady = theme;
+      })();
+    </script>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: #ffffff;
+      }
+      html.dark,
+      html.dark body,
+      html.dark #root {
+        background: #121212;
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

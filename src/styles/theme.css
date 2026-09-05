@@ -37,6 +37,8 @@ html {
     color 0.3s ease;
 }
 
+html.theme-preload,
+html.theme-preload *,
 html.transitioning,
 html.transitioning * {
   transition: none !important;

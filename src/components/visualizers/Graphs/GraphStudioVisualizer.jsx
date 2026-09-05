@@ -1,14 +1,7 @@
 import { PROJECT_LIMITS } from './graphStudio/lib/projectLimits';
 ('use client');
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createProjectUsageTracker } from '../../../analytics.js';
 import { useTheme } from '../../../context/useTheme';
 import { EDGE_ROUTING } from './graphStudio/constants';
@@ -681,12 +674,6 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     project: localDraftProject,
     startup: localDraftStartup,
   });
-  const initialRecoveryFitRef = useRef(false);
-  useLayoutEffect(() => {
-    if (!recoveredProject || initialRecoveryFitRef.current) return;
-    initialRecoveryFitRef.current = true;
-    bumpViewReset();
-  }, [bumpViewReset, recoveredProject]);
   const previousSeedTimelineRef = useRef(seedTimeline);
   useEffect(() => {
     if (previousSeedTimelineRef.current === seedTimeline) return;

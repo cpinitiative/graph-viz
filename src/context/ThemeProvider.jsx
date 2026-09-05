@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { ThemeContext } from './themeContextValue';
 
 const getInitialTheme = () => {
@@ -20,11 +20,13 @@ const getInitialTheme = () => {
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(getInitialTheme);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = window.document.documentElement;
 
     root.classList.add('transitioning');
     root.classList.toggle('dark', theme === 'dark');
+    root.style.colorScheme = theme;
+    root.dataset.themeReady = theme;
     try {
       localStorage.setItem('theme', theme);
     } catch {
@@ -33,6 +35,7 @@ export const ThemeProvider = ({ children }) => {
 
     const timeout = setTimeout(() => {
       root.classList.remove('transitioning');
+      root.classList.remove('theme-preload');
     }, 50);
 
     return () => clearTimeout(timeout);
