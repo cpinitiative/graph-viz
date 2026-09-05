@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -260,7 +259,7 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
 };
 
 const CanvasStage = ({ canvas, status, presenceRecovery }) => (
-  <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
+  <div className="relative h-full">
     <GraphCanvas {...canvas} />
     {Boolean(presenceRecovery?.entries?.length) && (
       <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
@@ -284,7 +283,7 @@ const CanvasStage = ({ canvas, status, presenceRecovery }) => (
         {status}
       </div>
     )}
-  </motion.div>
+  </div>
 );
 
 const ModalStack = ({

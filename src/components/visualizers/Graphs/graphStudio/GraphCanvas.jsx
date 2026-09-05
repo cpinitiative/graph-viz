@@ -957,6 +957,7 @@ const GraphCanvas = ({
   const contentEpochKey = isExporting ? 'export' : `editor-${contentEpoch}`;
   const contentLayoutIdPrefix = `${layoutIdPrefix}${contentEpochKey}-`;
   const [dragRect, setDragRect] = useState(null);
+  const [isInitialViewReady, setIsInitialViewReady] = useState(isExporting);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
   const fittedViewportSizeRef = useRef({ width: 0, height: 0 });
@@ -1061,12 +1062,13 @@ const GraphCanvas = ({
     if (!hasInitializedViewRef.current || isExporting) return;
     const previousViewport = fittedViewportSizeRef.current;
     const nextViewport = canvasSize;
+    if (nextViewport.width <= 0 || nextViewport.height <= 0) {
+      return;
+    }
     fittedViewportSizeRef.current = nextViewport;
     if (
       previousViewport.width <= 0 ||
       previousViewport.height <= 0 ||
-      nextViewport.width <= 0 ||
-      nextViewport.height <= 0 ||
       (previousViewport.width === nextViewport.width &&
         previousViewport.height === nextViewport.height)
     ) {
@@ -1089,8 +1091,7 @@ const GraphCanvas = ({
 
     const el = svgRef.current;
     if (!el) return undefined;
-    let firstFrame = 0;
-    let secondFrame = 0;
+    let frame = 0;
     let disposed = false;
     const doInit = () => {
       const bounds = { width: el.clientWidth, height: el.clientHeight };
@@ -1110,6 +1111,7 @@ const GraphCanvas = ({
           height: viewportHeight,
         };
         hasInitializedViewRef.current = true;
+        setIsInitialViewReady(true);
         return true;
       }
       const content = el.querySelector('[data-export-content="true"]');
@@ -1153,13 +1155,14 @@ const GraphCanvas = ({
         height: viewportHeight,
       };
       hasInitializedViewRef.current = true;
+      setIsInitialViewReady(true);
       return true;
     };
-    if (resetChanged) {
-      // Presets and explicit Fit View requests already have stable canvas
-      // geometry. Fit synchronously so the replacement graph is never painted
-      // in the previous graph's viewport.
-      doInit();
+
+    // Explicit fit requests run before paint against an already settled panel
+    // layout. On mount, wait one frame for the resizable panels to publish their
+    // final dimensions and keep graph content hidden until that fit is ready.
+    if (resetChanged && doInit()) {
       return undefined;
     }
     const cleanupListeners = () => {
@@ -1167,12 +1170,9 @@ const GraphCanvas = ({
       window.removeEventListener('resize', scheduleInit);
     };
     const scheduleInit = () => {
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
-      firstFrame = window.requestAnimationFrame(() => {
-        secondFrame = window.requestAnimationFrame(() => {
-          if (!disposed && doInit()) cleanupListeners();
-        });
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (!disposed && doInit()) cleanupListeners();
       });
     };
     const ro = new ResizeObserver(scheduleInit);
@@ -1181,8 +1181,7 @@ const GraphCanvas = ({
     scheduleInit();
     return () => {
       disposed = true;
-      window.cancelAnimationFrame(firstFrame);
-      window.cancelAnimationFrame(secondFrame);
+      window.cancelAnimationFrame(frame);
       cleanupListeners();
     };
   }, [graph.nodes, nodeRadius, setViewState, resetViewTrigger]);
@@ -1488,6 +1487,7 @@ const GraphCanvas = ({
         data-view-y={isExporting ? undefined : viewState.y}
         data-view-zoom={isExporting ? undefined : viewState.zoom}
         data-view-locked={isExporting ? undefined : String(lockCanvas)}
+        data-view-ready={isExporting ? undefined : String(isInitialViewReady)}
         data-export-mode={isExporting ? 'true' : 'false'}
         data-export-frame-index={
           Number.isInteger(exportFrameIndex) ? exportFrameIndex : undefined
@@ -1568,6 +1568,7 @@ const GraphCanvas = ({
         <g
           data-graph-view-transform="true"
           transform={`translate(${viewState.x} ${viewState.y}) scale(${viewState.zoom})`}
+          visibility={isInitialViewReady ? 'visible' : 'hidden'}
         >
           {showGrid && !isExporting && (
             <g

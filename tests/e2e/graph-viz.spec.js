@@ -629,6 +629,65 @@ const recoveryDraftEnvelope = {
 test.describe('Graph Studio desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
+  test('paints the saved theme and settled graph viewport on reload', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('theme', 'dark');
+      window.__graphStudioStartupFrames = [];
+      let previousSignature = '';
+      const captureFrame = () => {
+        const svg = document.querySelector('[data-testid="graph-canvas-svg"]');
+        const transform = svg
+          ?.querySelector('[data-graph-view-transform="true"]')
+          ?.getAttribute('transform');
+        const viewReady = svg?.getAttribute('data-view-ready') === 'true';
+        const stageTransform = svg
+          ? getComputedStyle(svg.parentElement?.parentElement).transform
+          : undefined;
+        const frame = {
+          theme: document.documentElement.dataset.themeReady,
+          dark: document.documentElement.classList.contains('dark'),
+          background: getComputedStyle(document.documentElement)
+            .backgroundColor,
+          transform: viewReady ? transform : undefined,
+          stageTransform,
+        };
+        const signature = JSON.stringify(frame);
+        if (signature !== previousSignature) {
+          window.__graphStudioStartupFrames.push(frame);
+          previousSignature = signature;
+        }
+        if (performance.now() < 5000) requestAnimationFrame(captureFrame);
+      };
+      requestAnimationFrame(captureFrame);
+    });
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await page.waitForTimeout(150);
+
+    const startupFrames = await page.evaluate(
+      () => window.__graphStudioStartupFrames
+    );
+    expect(startupFrames.length).toBeGreaterThan(0);
+    expect(startupFrames.every(frame => frame.theme === 'dark')).toBe(true);
+    expect(startupFrames.every(frame => frame.dark)).toBe(true);
+    expect(
+      startupFrames.every(frame => frame.background === 'rgb(18, 18, 18)')
+    ).toBe(true);
+    const paintedTransforms = startupFrames
+      .map(frame => frame.transform)
+      .filter(Boolean);
+    expect(paintedTransforms.length).toBeGreaterThan(0);
+    expect(new Set(paintedTransforms).size).toBe(1);
+    expect(
+      startupFrames
+        .filter(frame => frame.stageTransform)
+        .every(frame => frame.stageTransform === 'none')
+    ).toBe(true);
+  });
+
   test('loads the app shell without unexpected browser errors', async ({
     page,
   }) => {
