@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clampNodePosition, snapToGrid } from '../graphStudioUtils';
+import { clamp, clampNodePosition, snapToGrid } from '../graphStudioUtils';
 import { isNodeVisible } from '../lib/effectiveVisibility';
 import { resolveNodeSelection } from '../lib/selectionState';
+
+const MIN_NODE_POSITION = clampNodePosition({
+  x: Number.NEGATIVE_INFINITY,
+  y: Number.NEGATIVE_INFINITY,
+});
+const MAX_NODE_POSITION = clampNodePosition({
+  x: Number.POSITIVE_INFINITY,
+  y: Number.POSITIVE_INFINITY,
+});
 
 export const useGraphStudioCanvasHandlers = ({
   setMode,
@@ -10,14 +19,14 @@ export const useGraphStudioCanvasHandlers = ({
   computedGraph,
   addEdge,
   updateBaseNodesBulk,
-  beginTransaction,
-  endTransaction,
   selectedObject,
   selectedNodeIds,
   selectedNodeIdSet,
   setSelectedObject,
   setSelectedNodeIds,
   clearSelection,
+  beginHistoryTransaction,
+  endHistoryTransaction,
 }) => {
   const [drawFrom, setDrawFrom] = useState(null);
   const dragStateRef = useRef(null);
@@ -135,35 +144,63 @@ export const useGraphStudioCanvasHandlers = ({
       );
       const anchor = nodeMap.get(String(nodeId));
       if (!anchor) return;
-      beginTransaction?.();
       const offsets = {};
+      const positions = {};
       dragNodeIds.forEach(id => {
         const node = nodeMap.get(String(id));
         if (!node) return;
         offsets[id] = { dx: worldX - node.x, dy: worldY - node.y };
+        positions[id] = { x: node.x, y: node.y };
       });
       dragStateRef.current = {
         anchorId: String(nodeId),
         nodeIds: dragNodeIds,
         offsets,
+        positions,
       };
+      beginHistoryTransaction?.();
     },
-    [baseGraph.nodes, selectedNodeIdSet, beginTransaction]
+    [baseGraph.nodes, beginHistoryTransaction, selectedNodeIdSet]
   );
 
   const onNodeMove = useCallback(
     ({ worldX, worldY, snapEnabled: snap }) => {
       const drag = dragStateRef.current;
       if (!drag) return;
+      const anchorOffset = drag.offsets[drag.anchorId];
+      const anchorPosition = drag.positions[drag.anchorId];
+      if (!anchorOffset || !anchorPosition) return;
+      const rawAnchorX = worldX - anchorOffset.dx;
+      const rawAnchorY = worldY - anchorOffset.dy;
+      const targetAnchorX = snap ? snapToGrid(rawAnchorX) : rawAnchorX;
+      const targetAnchorY = snap ? snapToGrid(rawAnchorY) : rawAnchorY;
+      const requestedDeltaX = targetAnchorX - anchorPosition.x;
+      const requestedDeltaY = targetAnchorY - anchorPosition.y;
+      const positions = drag.nodeIds
+        .map(id => drag.positions[id])
+        .filter(Boolean);
+      const deltaX = clamp(
+        requestedDeltaX,
+        Math.max(
+          ...positions.map(position => MIN_NODE_POSITION.x - position.x)
+        ),
+        Math.min(...positions.map(position => MAX_NODE_POSITION.x - position.x))
+      );
+      const deltaY = clamp(
+        requestedDeltaY,
+        Math.max(
+          ...positions.map(position => MIN_NODE_POSITION.y - position.y)
+        ),
+        Math.min(...positions.map(position => MAX_NODE_POSITION.y - position.y))
+      );
       const patchById = {};
       drag.nodeIds.forEach(id => {
-        const offset = drag.offsets[id];
-        if (!offset) return;
-        const rawX = worldX - offset.dx;
-        const rawY = worldY - offset.dy;
-        const snappedX = snap ? snapToGrid(rawX) : rawX;
-        const snappedY = snap ? snapToGrid(rawY) : rawY;
-        patchById[id] = clampNodePosition({ x: snappedX, y: snappedY });
+        const position = drag.positions[id];
+        if (!position) return;
+        patchById[id] = {
+          x: position.x + deltaX,
+          y: position.y + deltaY,
+        };
       });
       updateBaseNodesBulk(patchById);
     },
@@ -172,8 +209,8 @@ export const useGraphStudioCanvasHandlers = ({
 
   const onNodePointerUp = useCallback(() => {
     dragStateRef.current = null;
-    endTransaction?.();
-  }, [endTransaction]);
+    endHistoryTransaction?.();
+  }, [endHistoryTransaction]);
 
   return {
     drawFrom,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_SCRIPT } from '../data/defaultScript';
+import { recenterViewStateForViewportResize } from '../graphCanvasUtils';
 import {
   exportEdgeListText,
   parseEdgeListText,
@@ -30,6 +31,7 @@ import {
   IMAGE_FRAMING,
   waitForExportReady,
 } from '../lib/timelineFrameCapture';
+import { normalizeVisualStates } from '../lib/visualStates';
 
 const cloneJson = value => JSON.parse(JSON.stringify(value ?? null));
 
@@ -61,14 +63,17 @@ export const useGraphStudioImportExport = ({
   captionOverlay,
   setCaptionOverlay,
   customLegend,
+  renderLegend,
   setCustomLegend,
+  visualStates,
+  setVisualStates,
   lockCanvas,
   setLockCanvas,
   viewState,
   getZoomViewportSize,
   setViewState,
-  setViewFromNodes,
   bumpViewReset,
+  bumpContentEpoch,
   globalSettings,
   theme,
   setGlobalSettings,
@@ -77,6 +82,10 @@ export const useGraphStudioImportExport = ({
   clearDrawState,
   stopTimeline,
   setPlaybackLocked,
+  onProjectGenerated,
+  onProjectImported,
+  onTimelineGenerated,
+  onExportCompleted,
 }) => {
   const getExportCanvasSnapshot = useCallback(
     () => ({
@@ -90,7 +99,7 @@ export const useGraphStudioImportExport = ({
       edgeLabelFontSize: globalSettings?.edgeLabelFontSize,
       theme,
       baseCaptionOverlay: normalizeCaptionOverlay(captionOverlay),
-      customLegend: normalizeCustomLegend(customLegend),
+      customLegend: normalizeCustomLegend(renderLegend ?? customLegend),
     }),
     [
       captionOverlay,
@@ -98,6 +107,7 @@ export const useGraphStudioImportExport = ({
       edgeRouting,
       getZoomViewportSize,
       globalSettings,
+      renderLegend,
       theme,
       viewState,
     ]
@@ -322,8 +332,8 @@ export const useGraphStudioImportExport = ({
           edgeOverrides: {},
         },
       ]);
+      bumpContentEpoch?.();
       if (!lockCanvas) {
-        setViewFromNodes?.(graph.nodes);
         bumpViewReset?.();
       }
       setMode('select');
@@ -333,6 +343,7 @@ export const useGraphStudioImportExport = ({
       setStatus(
         `Graph parsed: ${meta}${lockCanvas ? ' · view preserved' : ''}`
       );
+      onProjectGenerated?.('parser', { hasTimeline: false });
     } catch (error) {
       const message = `Parse failed: ${error.message}`;
       setParserError(message);
@@ -342,10 +353,11 @@ export const useGraphStudioImportExport = ({
     clearDrawState,
     clearSelection,
     bumpViewReset,
+    bumpContentEpoch,
     lockCanvas,
+    onProjectGenerated,
     parserText,
     replaceTimeline,
-    setViewFromNodes,
     setMode,
     setStatus,
   ]);
@@ -368,6 +380,7 @@ export const useGraphStudioImportExport = ({
         setStatus(
           'Edge list copied. IDs renumbered from 0; use Project export to preserve direction and styling.'
         );
+        onExportCompleted?.('edge-list');
       } catch {
         setStatus('Clipboard unavailable; edge list opened for manual copying');
         setIsParserOpen(true);
@@ -376,7 +389,7 @@ export const useGraphStudioImportExport = ({
     } catch (error) {
       setStatus(`Edge list export error: ${error.message}`);
     }
-  }, [baseGraph, setStatus]);
+  }, [baseGraph, onExportCompleted, setStatus]);
 
   const exportProject = useCallback(() => {
     const payload = exportProjectJson({
@@ -389,13 +402,18 @@ export const useGraphStudioImportExport = ({
         showGrid,
         captionOverlay: normalizeCaptionOverlay(captionOverlay),
         customLegend: normalizeCustomLegend(customLegend),
+        visualStates: normalizeVisualStates(visualStates, {
+          useDefaults: true,
+        }),
         lockCanvas,
         viewState,
+        viewportSize: getZoomViewportSize?.(),
         globalSettings,
       },
     });
     downloadProjectJson(payload);
     setStatus('Project exported');
+    onExportCompleted?.('project');
   }, [
     baseGraph,
     currentFrame,
@@ -404,11 +422,14 @@ export const useGraphStudioImportExport = ({
     edgeRouting,
     globalSettings,
     lockCanvas,
+    onExportCompleted,
     setStatus,
     showGrid,
     snapEnabled,
     steps,
     viewState,
+    getZoomViewportSize,
+    visualStates,
   ]);
 
   const exportSvg = useCallback(
@@ -429,6 +450,7 @@ export const useGraphStudioImportExport = ({
           captureToken: capture.captureToken,
         });
         setStatus('SVG exported');
+        onExportCompleted?.('svg');
       } catch (error) {
         console.error(error);
         setStatus(`SVG export error: ${error.message}`);
@@ -436,7 +458,13 @@ export const useGraphStudioImportExport = ({
         finishVisualExport();
       }
     },
-    [beginVisualExport, finishVisualExport, getReviewedImageCapture, setStatus]
+    [
+      beginVisualExport,
+      finishVisualExport,
+      getReviewedImageCapture,
+      onExportCompleted,
+      setStatus,
+    ]
   );
 
   const exportPng = useCallback(
@@ -458,6 +486,7 @@ export const useGraphStudioImportExport = ({
           captureToken: capture.captureToken,
         });
         setStatus('PNG exported');
+        onExportCompleted?.('png');
       } catch (error) {
         console.error(error);
         setStatus(`PNG export error: ${error.message}`);
@@ -469,6 +498,7 @@ export const useGraphStudioImportExport = ({
       beginVisualExport,
       finishVisualExport,
       getReviewedImageCapture,
+      onExportCompleted,
       pngScale,
       setStatus,
     ]
@@ -486,22 +516,37 @@ export const useGraphStudioImportExport = ({
       setShowGrid(project.settings.showGrid);
       setCaptionOverlay(project.settings.captionOverlay);
       setCustomLegend(project.settings.customLegend);
+      setVisualStates(project.settings.visualStates);
       setLockCanvas(project.settings.lockCanvas);
       setGlobalSettings(project.settings.globalSettings);
+      bumpContentEpoch?.();
       if (project.settings.viewState) {
-        setViewState(project.settings.viewState);
-        // Reapply after timeline replacement so GraphCanvas does not reset the imported viewport.
-        window.setTimeout(() => setViewState(project.settings.viewState), 0);
+        const mappedViewState =
+          recenterViewStateForViewportResize({
+            viewState: project.settings.viewState,
+            previousViewport: project.settings.viewportSize,
+            nextViewport: getZoomViewportSize?.(),
+          }) ?? project.settings.viewState;
+        setViewState(mappedViewState);
+      } else {
+        bumpViewReset?.();
       }
       setMode('select');
       clearSelection?.();
       clearDrawState?.();
       // Keep the previous project recoverable with Undo.
       setStatus('Project imported');
+      onProjectImported?.({
+        hasTimeline: project.timeline.steps.length > 1,
+      });
     },
     [
       clearDrawState,
       clearSelection,
+      bumpViewReset,
+      bumpContentEpoch,
+      getZoomViewportSize,
+      onProjectImported,
       replaceTimeline,
       setEdgeRouting,
       setGlobalSettings,
@@ -510,6 +555,7 @@ export const useGraphStudioImportExport = ({
       setShowGrid,
       setCaptionOverlay,
       setCustomLegend,
+      setVisualStates,
       setSnapEnabled,
       setStatus,
       setViewState,
@@ -625,6 +671,7 @@ export const useGraphStudioImportExport = ({
           ).svgEl,
       });
       setStatus('Video exported successfully');
+      onExportCompleted?.('mp4');
     } catch (error) {
       if (error.name !== 'AbortError') console.error(error);
       setStatus(
@@ -646,6 +693,7 @@ export const useGraphStudioImportExport = ({
     exportCapture,
     finishVisualExport,
     getExportFrameIndexes,
+    onExportCompleted,
     prepareExportFrame,
     setStatus,
   ]);
@@ -674,6 +722,7 @@ export const useGraphStudioImportExport = ({
           ).svgEl,
       });
       setStatus('Slideshow exported');
+      onExportCompleted?.('pptx');
     } catch (error) {
       if (error.name !== 'AbortError') console.error(error);
       setStatus(
@@ -695,6 +744,7 @@ export const useGraphStudioImportExport = ({
     exportCapture,
     finishVisualExport,
     getExportFrameIndexes,
+    onExportCompleted,
     prepareExportFrame,
     setStatus,
   ]);
@@ -730,6 +780,7 @@ export const useGraphStudioImportExport = ({
       setIsScriptOpen(false);
       setScriptError('');
       setStatus(`Script generated ${traceSteps.length} frames`);
+      onTimelineGenerated?.('script');
     } catch (error) {
       const message =
         error.name === 'AbortError'
@@ -745,6 +796,7 @@ export const useGraphStudioImportExport = ({
     baseGraph,
     clearDrawState,
     clearSelection,
+    onTimelineGenerated,
     replaceTimeline,
     scriptText,
     setMode,

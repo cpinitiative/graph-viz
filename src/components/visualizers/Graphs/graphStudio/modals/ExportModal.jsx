@@ -417,7 +417,7 @@ const ExportModal = ({
             <div className="grid grid-cols-3 border border-[#CBD5E1] dark:border-[#475569]">
               {[
                 ['all', 'All'],
-                ['current', 'Current'],
+                ['current', 'Selected'],
                 ['range', 'Range'],
               ].map(([value, label]) => (
                 <label
@@ -530,7 +530,7 @@ const ExportModal = ({
 
         <section className={sectionClass}>
           <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0F172A] dark:text-[#F8FAFC]">
-            Current Frame Image
+            Selected Frame Image
           </h3>
           <div
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1"

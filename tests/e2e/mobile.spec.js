@@ -20,7 +20,7 @@ test.describe('Graph Studio mobile smoke', () => {
       .getByTestId('mobile-tools-toggle')
       .or(page.getByRole('button', { name: 'Open tools panel' }))
       .click();
-    await expect(page.getByText('Tools')).toBeVisible();
+    await expect(page.getByText('Build', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Node' })).toBeVisible();
     await expect(page.getByText('Force strength')).toBeVisible();
     await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();

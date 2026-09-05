@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
@@ -36,9 +36,9 @@ const HELP_TOOLTIP_ESTIMATED_HEIGHT = 78;
 const HELP_TOOLTIP_GUTTER = 12;
 const HELP_TOOLTIP_OFFSET = 6;
 const TIMELINE_HELP_TEXT =
-  'Frame edits affect the current frame. Project settings affect all frames. New nodes and edges appear from this frame onward.';
+  'Each frame can change appearance and visibility. Labels, positions, and canvas settings stay shared across the project. New nodes and edges start on the frame where you add them.';
 const CAPTION_SCOPE_HELP_TEXT =
-  'Show caption is frame-specific. Caption appearance is project-wide.';
+  'Caption visibility belongs to this frame. Caption style and font size are shared across the project.';
 
 const PauseIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -155,7 +155,7 @@ const HelpTooltip = ({
 
 const TimelineHelp = () => (
   <HelpTooltip
-    label="Timeline temporal model help"
+    label="How frame editing works"
     text={TIMELINE_HELP_TEXT}
     testId="timeline-temporal-help-tooltip"
   />
@@ -266,6 +266,7 @@ const CaptionFontSizeInput = ({ value, onCommit }) => {
 const TimelinePanel = ({
   steps,
   currentFrame,
+  editScope = '',
   onFrameChange,
   onStepDurationChange,
   onDescriptionChange,
@@ -286,6 +287,19 @@ const TimelinePanel = ({
   playbackDisabled = false,
 }) => {
   const frameRefs = useRef([]);
+  const frameScrollerRef = useRef(null);
+  useLayoutEffect(() => {
+    const scroller = frameScrollerRef.current;
+    const currentCard = frameRefs.current[currentFrame];
+    if (!scroller || !currentCard) return;
+    const scrollerBounds = scroller.getBoundingClientRect();
+    const cardBounds = currentCard.getBoundingClientRect();
+    if (cardBounds.left < scrollerBounds.left) {
+      scroller.scrollLeft -= scrollerBounds.left - cardBounds.left + 4;
+    } else if (cardBounds.right > scrollerBounds.right) {
+      scroller.scrollLeft += cardBounds.right - scrollerBounds.right + 4;
+    }
+  }, [currentFrame, steps.length]);
   const moveFrameFocus = (index, delta) => {
     const nextIndex = Math.max(0, Math.min(steps.length - 1, index + delta));
     onFrameChange(nextIndex);
@@ -303,7 +317,7 @@ const TimelinePanel = ({
       tabIndex="0"
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
           </div>
@@ -341,6 +355,19 @@ const TimelinePanel = ({
               {currentFrame + 1} / {Math.max(1, steps.length)}
             </span>
           </div>
+          {editScope && (
+            <div
+              className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]"
+              data-testid="timeline-edit-scope"
+              aria-label={`Edit scope: ${editScope}`}
+            >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full bg-[#A66A00] dark:bg-[#F59E0B]"
+              />
+              {editScope}
+            </div>
+          )}
         </div>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 lg:w-[22%] lg:shrink-0 lg:flex-nowrap lg:justify-start lg:gap-1 lg:pl-2">
           <button
@@ -355,7 +382,7 @@ const TimelinePanel = ({
             type="button"
             className={toolbarButtonClass}
             onClick={onDuplicateStep}
-            title="Duplicate copies this frame exactly, including overrides"
+            title="Duplicate copies this frame's appearance and settings"
           >
             Duplicate
           </button>
@@ -395,7 +422,11 @@ const TimelinePanel = ({
         </div>
       </div>
 
-      <div className="min-h-[58px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]">
+      <div
+        ref={frameScrollerRef}
+        className="min-h-[58px] min-w-0 flex-1 overflow-x-auto overflow-y-hidden bg-[#FFFFFF] p-1 font-inter text-[#0F172A] dark:bg-[#0F172A] dark:text-[#F8FAFC]"
+        data-testid="timeline-frame-scroller"
+      >
         <div
           aria-label="Timeline frames"
           className="flex h-full min-w-max items-center gap-2"
@@ -488,7 +519,7 @@ const TimelinePanel = ({
                 onDescriptionChange(currentFrame, event.target.value)
               }
               className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
-              placeholder="Enter a description for this frame..."
+              placeholder="Describe what happens on this frame..."
             />
           </label>
           <div
@@ -523,14 +554,14 @@ const TimelinePanel = ({
               {hasCaptionVisibleOverride && (
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]">
-                    Current frame override
+                    Different on this frame
                   </span>
                   <button
                     type="button"
                     className={inlineActionButtonClass}
                     onClick={onResetCaptionVisibleOverride}
                   >
-                    Reset override
+                    Use project value
                   </button>
                 </span>
               )}

@@ -12,7 +12,10 @@ const watchForUnexpectedErrors = page => {
 
   page.on('console', message => {
     if (unexpectedConsoleTypes.has(message.type())) {
-      errors.push(`console.${message.type()}: ${message.text()}`);
+      const sourceUrl = message.location().url;
+      errors.push(
+        `console.${message.type()}: ${message.text()}${sourceUrl ? ` (${sourceUrl})` : ''}`
+      );
     }
   });
 
@@ -466,7 +469,7 @@ const expandLegendEditor = async page => {
 };
 
 const closeLegendEditor = async page => {
-  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByTestId('custom-legend-modal')).toBeHidden();
 };
 
@@ -587,6 +590,42 @@ const pastedProject = {
   },
 };
 
+const localDraftStorageKey = 'graph-viz:editor:draft:v1';
+const recoveryDraftEnvelope = {
+  format: 'graph-viz-local-draft',
+  version: 1,
+  savedAt: '2026-08-01T12:34:56.000Z',
+  project: {
+    ...pastedProject,
+    settings: {
+      ...pastedProject.settings,
+      lockCanvas: false,
+      viewState: { zoom: 2.6, x: -1800, y: -1400 },
+    },
+    graph: {
+      ...pastedProject.graph,
+      nodes: pastedProject.graph.nodes.map((node, index) =>
+        index === 0 ? { ...node, label: 'Recovered Start' } : node
+      ),
+    },
+    timeline: {
+      ...pastedProject.timeline,
+      currentFrame: 1,
+      steps: [
+        {
+          ...pastedProject.timeline.steps[0],
+          description: 'Earlier recovered frame',
+        },
+        {
+          ...pastedProject.timeline.steps[0],
+          id: 'step-1',
+          description: 'Recovered browser draft',
+        },
+      ],
+    },
+  },
+};
+
 test.describe('Graph Studio desktop smoke', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -610,7 +649,7 @@ test.describe('Graph Studio desktop smoke', () => {
         .first()
     ).toBeVisible();
     await expect(page.getByAltText('USACO Guide Logo')).toBeVisible();
-    await expect(page.getByText('Tools')).toBeVisible();
+    await expect(page.getByText('Build', { exact: true })).toBeVisible();
     for (const tool of ['Select', 'Pan', 'Add Node', 'Draw Edge']) {
       await expect(page.getByRole('button', { name: tool })).toBeVisible();
     }
@@ -623,7 +662,9 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Project')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project', { exact: true })
+    ).toHaveCount(0);
     await expect(propertyPanel(page).getByLabel('Edge routing')).toHaveValue(
       'straight'
     );
@@ -634,11 +675,210 @@ test.describe('Graph Studio desktop smoke', () => {
         .getByTestId('timeline-panel')
         .getByRole('button', { name: 'Play timeline' })
     ).toBeVisible();
+    await page.getByRole('button', { name: 'How frame editing works' }).focus();
+    await expect(page.getByTestId('timeline-temporal-help-tooltip')).toHaveText(
+      'Each frame can change appearance and visibility. Labels, positions, and canvas settings stay shared across the project. New nodes and edges start on the frame where you add them.'
+    );
     await expect(
       page.getByTestId('left-sidebar').getByRole('button', { name: 'Play' })
     ).toHaveCount(0);
     await expect(page.getByText(/item\(s\) selected/)).toHaveCount(0);
+    await expect(page.getByTestId('local-draft-status')).toHaveText(
+      'Local recovery ready'
+    );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        if (!bounds) return false;
+        const horizontalError =
+          bounds.left + bounds.right - bounds.viewportWidth;
+        const verticalError =
+          bounds.top + bounds.bottom - bounds.viewportHeight;
+        return (
+          Math.abs(horizontalError) <= 0.5 && Math.abs(verticalError) <= 0.5
+        );
+      })
+      .toBe(true);
 
+    expect(errors).toEqual([]);
+  });
+
+  test('automatically restores and autosaves a validated browser draft', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    await page.addInitScript(
+      ({ key, envelope }) => {
+        if (!window.localStorage.getItem(key)) {
+          window.localStorage.setItem(key, JSON.stringify(envelope));
+        }
+      },
+      { key: localDraftStorageKey, envelope: recoveryDraftEnvelope }
+    );
+
+    await page.goto('/');
+    await expect(page.getByTestId('local-draft-recovery-modal')).toHaveCount(0);
+    await expect(page.getByText('Local draft restored')).toBeVisible();
+    await expect(
+      graphCanvas(page).locator('[data-node-label-id="A"]')
+    ).toContainText('Recovered Start');
+    const description = page.getByPlaceholder(
+      'Describe what happens on this frame...'
+    );
+    await expect(description).toHaveValue('Recovered browser draft');
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Restored locally'
+    );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+    const recoveredZoom = Number(
+      await graphCanvas(page).getAttribute('data-view-zoom')
+    );
+    expect(recoveredZoom).toBeGreaterThanOrEqual(0.8);
+    expect(recoveredZoom).toBeLessThanOrEqual(1);
+
+    await page.waitForTimeout(1000);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key => JSON.parse(window.localStorage.getItem(key)).savedAt,
+          localDraftStorageKey
+        )
+      )
+      .toBe(recoveryDraftEnvelope.savedAt);
+
+    await description.fill('Recovered and autosaved');
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Saving local draft'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key =>
+            JSON.parse(window.localStorage.getItem(key)).project.timeline
+              .steps[1].description,
+          localDraftStorageKey
+        )
+      )
+      .toBe('Recovered and autosaved');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key =>
+            Object.prototype.hasOwnProperty.call(
+              JSON.parse(window.localStorage.getItem(key)).project.settings,
+              'viewState'
+            ),
+          localDraftStorageKey
+        )
+      )
+      .toBe(false);
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Saved locally'
+    );
+
+    await page.reload();
+    await expect(description).toHaveValue('Recovered and autosaved');
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Restored locally'
+    );
+
+    await choosePreset(page, 'blank');
+    await expect(
+      page.getByPlaceholder('Describe what happens on this frame...')
+    ).toHaveValue('');
+    await expect(graphNodeCircles(page)).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key =>
+            JSON.parse(window.localStorage.getItem(key)).project.graph.nodes
+              .length,
+          localDraftStorageKey
+        )
+      )
+      .toBe(0);
+
+    await page.reload();
+    await expect(graphNodeCircles(page)).toHaveCount(0);
+    await expect(
+      page.getByPlaceholder('Describe what happens on this frame...')
+    ).toHaveValue('');
+
+    await choosePreset(page, 'bfs');
+    await expect
+      .poll(() =>
+        page.evaluate(key => {
+          const stored = window.localStorage.getItem(key);
+          return stored ? JSON.parse(stored).project.timeline.steps.length : 0;
+        }, localDraftStorageKey)
+      )
+      .toBeGreaterThan(1);
+    await expect(page.getByTestId('local-draft-status')).toContainText(
+      'Saved locally'
+    );
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps a persistent warning when browser draft storage fails', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    await page.addInitScript(key => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function setItem(storageKey, value) {
+        if (storageKey === key) throw new DOMException('Quota exceeded');
+        return originalSetItem.call(this, storageKey, value);
+      };
+    }, localDraftStorageKey);
+
+    await page.goto('/');
+    await page
+      .getByPlaceholder('Describe what happens on this frame...')
+      .fill('Trigger local save failure');
+    await expect(page.getByTestId('local-draft-status')).toHaveText(
+      'Recovery draft could not be saved. Export the project to avoid losing work.'
+    );
+    await expect(page.getByTestId('local-draft-status')).toHaveAttribute(
+      'role',
+      'alert'
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('opens normally and removes a corrupt browser draft', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    await page.addInitScript(key => {
+      window.localStorage.setItem(key, '{ broken draft');
+    }, localDraftStorageKey);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(page.getByTestId('local-draft-recovery-modal')).toHaveCount(0);
+    await expect(page.getByTestId('local-draft-status')).toHaveText(
+      'Recovery draft could not be read. Export the project to avoid losing work.'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(
+          key => window.localStorage.getItem(key),
+          localDraftStorageKey
+        )
+      )
+      .toBeNull();
     expect(errors).toEqual([]);
   });
 
@@ -660,23 +900,13 @@ test.describe('Graph Studio desktop smoke', () => {
       'background-color',
       'rgb(15, 39, 71)'
     );
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    await expect(modeIndicator).toBeVisible();
-    await expect(modeIndicator).toContainText('Select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(page.getByTestId('canvas-hud-stack')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
     await expect(page.getByTestId('current-mode-indicator')).toHaveCount(0);
-    await expect
-      .poll(() =>
-        modeIndicator.evaluate(
-          element => window.getComputedStyle(element).textAlign
-        )
-      )
-      .toBe('left');
-    await expect(modeIndicator).toHaveCSS('border-radius', '0px');
-    await expect(modeIndicator).toHaveCSS(
-      'border-left-color',
-      'rgb(166, 106, 0)'
-    );
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' });
     await themeToggle.click();
@@ -700,7 +930,8 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Add Node');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('New items start on Frame 1');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
     await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await expect(graphNodes).toHaveCount(initialNodeCount + 1);
@@ -716,10 +947,16 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeIndicator).toContainText('Draw Edge');
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
+      'aria-label',
+      /Source node \d+ selected; choose target/
+    );
+    await expect(editScope).toHaveText('New items start on Frame 1');
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await page.getByTestId('tool-button-select').click();
-    await expect(modeIndicator).toContainText('Select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const showGrid = page.getByRole('checkbox', { name: 'Show Grid' });
     const snapToGrid = page.getByRole('checkbox', { name: 'Snap to Grid' });
@@ -914,11 +1151,16 @@ test.describe('Graph Studio desktop smoke', () => {
       'Unlock view to change the viewport'
     );
     const lockedViewBeforeAdd = await getCanvasViewSnapshot(page);
-    const nodeCountBeforeLockedAdd = await graphNodes.count();
+    const nodeGroups = graphCanvas(page).locator('[data-node-id]');
+    const countUniqueNodeIds = () =>
+      nodeGroups.evaluateAll(
+        nodes => new Set(nodes.map(node => node.dataset.nodeId)).size
+      );
+    const nodeCountBeforeLockedAdd = await countUniqueNodeIds();
     await page.getByRole('button', { name: 'Add Node' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
-    await graphCanvas(page).click({ position: { x: 120, y: 120 } });
-    await expect(graphNodes).toHaveCount(nodeCountBeforeLockedAdd + 1);
+    await graphCanvas(page).click({ position: { x: 700, y: 120 } });
+    await expect.poll(countUniqueNodeIds).toBe(nodeCountBeforeLockedAdd + 1);
     await expect
       .poll(() => getCanvasViewSnapshot(page))
       .toEqual(lockedViewBeforeAdd);
@@ -927,7 +1169,7 @@ test.describe('Graph Studio desktop smoke', () => {
 
     await page.getByRole('button', { name: 'Pan' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'pan');
-    await expect(modeIndicator).toContainText('Pan');
+    await expect(modeGuidance).toHaveText('Drag canvas');
     const viewBeforePan = [
       await graphCanvas(page).getAttribute('data-view-x'),
       await graphCanvas(page).getAttribute('data-view-y'),
@@ -1007,6 +1249,40 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Node properties')
     ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project details', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Shared by every frame.', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
+    await expect(
+      propertyPanel(page)
+        .getByText('Different on this frame', { exact: true })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page)
+        .getByRole('button', {
+          name: 'Use project value',
+        })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page)
+        .getByRole('button', {
+          name: 'Use on every frame',
+        })
+        .first()
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('All frames', { exact: true })
+    ).toHaveCount(0);
     await expect(propertyPanel(page).getByText('Node Details')).toHaveCount(0);
     await graphCanvas(page)
       .locator('path[stroke="rgba(0,0,0,0)"]')
@@ -1015,6 +1291,15 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(
       propertyPanel(page).getByText('Edge properties')
     ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('Project details', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
     await expect(propertyPanel(page).getByText('Edge Details')).toHaveCount(0);
     await graphCanvas(page).click({ position: { x: 8, y: 8 } });
     await expect(
@@ -1047,7 +1332,7 @@ test.describe('Graph Studio desktop smoke', () => {
     await expect(frameLabels).toHaveCount(initialFrameCount + 1);
 
     const frameDescription = page.getByPlaceholder(
-      'Enter a description for this frame...'
+      'Describe what happens on this frame...'
     );
     const descriptionRow = page.getByTestId('frame-description-row');
     const timelinePanel = page.getByTestId('timeline-panel');
@@ -1533,14 +1818,25 @@ while (true) {}
     const nodeLabel = graphCanvas(page).locator('[data-node-label-id="0"]');
     const nodeCircle = nodeLabel.locator('xpath=..').locator('circle').first();
     await nodeCircle.click();
-    const colorInput = propertyPanel(page).getByLabel('Color', {
-      exact: true,
-    });
-    const originalColor = await colorInput.inputValue();
+    const stateInput = propertyPanel(page).getByLabel('Node visual state');
+    const originalState = await stateInput.inputValue();
     const originalFill = await nodeCircle.getAttribute('fill');
-    await colorInput.fill('#ff00ff');
-    await expect(colorInput).toHaveValue('#ff00ff');
-    await expect(nodeCircle).toHaveAttribute('fill', '#ff00ff');
+    const changedState = await stateInput
+      .locator('option')
+      .evaluateAll(
+        (options, current) =>
+          options.find(option => option.value && option.value !== current)
+            ?.value,
+        originalState
+      );
+    await stateInput.selectOption(changedState);
+    await expect(stateInput).toHaveValue(changedState);
+    const changedFill = await nodeCircle.getAttribute('fill');
+    expect(changedFill).not.toBe(originalFill);
+    const undoButton = leftSidebar(page).getByRole('button', { name: 'Undo' });
+    const redoButton = leftSidebar(page).getByRole('button', { name: 'Redo' });
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
 
     for (let index = 0; index < 20; index += 1) {
       await cards.nth(index % 4).click();
@@ -1558,12 +1854,19 @@ while (true) {}
     await page.getByRole('button', { name: 'Pause timeline' }).click();
 
     await cards.nth(1).click();
-    await expect(colorInput).toHaveValue('#ff00ff');
-    await page.keyboard.press('Control+z');
+    await expect(stateInput).toHaveValue(changedState);
+    await undoButton.click();
 
     await expect(page.getByText('Undid last action')).toBeVisible();
-    await expect(colorInput).toHaveValue(originalColor);
+    await expect(stateInput).toHaveValue(originalState);
     await expect(nodeCircle).toHaveAttribute('fill', originalFill);
+    await expect(redoButton).toBeEnabled();
+    await redoButton.click();
+    await expect(page.getByText('Redid last action')).toBeVisible();
+    await expect(stateInput).toHaveValue(changedState);
+    await expect(nodeCircle).toHaveAttribute('fill', changedFill);
+    await page.keyboard.press('Control+z');
+    await expect(stateInput).toHaveValue(originalState);
 
     await cards.last().click();
     await page.getByRole('button', { name: '+ Keyframe' }).click();
@@ -1592,6 +1895,128 @@ while (true) {}
     await page.keyboard.press('Control+z');
     await expect(showGrid).toBeChecked();
     await expect(snapToGrid).toBeChecked();
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps the active frame visible in long timelines', async ({ page }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await choosePreset(page, 'bfs');
+    const cards = page.getByTestId('timeline-frame-card');
+    const scroller = page.getByTestId('timeline-frame-scroller');
+
+    for (let index = 0; index < 12; index += 1) {
+      await page.getByRole('button', { name: 'Duplicate' }).click();
+    }
+    await expect(cards).toHaveCount(GRAPH_PRESETS.bfs.steps.length + 12);
+    await scroller.evaluate(element => {
+      element.scrollLeft = 0;
+    });
+    await cards.last().evaluate(element => element.click());
+    await expect(cards.last()).toHaveAttribute('data-current', 'true');
+    await expect
+      .poll(async () => {
+        const scrollerBox = await scroller.boundingBox();
+        const cardBox = await cards.last().boundingBox();
+        return Boolean(
+          scrollerBox &&
+          cardBox &&
+          cardBox.x >= scrollerBox.x &&
+          cardBox.x + cardBox.width <= scrollerBox.x + scrollerBox.width
+        );
+      })
+      .toBe(true);
+    expect(
+      await scroller.evaluate(element => element.scrollLeft)
+    ).toBeGreaterThan(0);
+
+    await cards.first().evaluate(element => element.click());
+    await expect(cards.first()).toHaveAttribute('data-current', 'true');
+    await expect
+      .poll(() => scroller.evaluate(element => element.scrollLeft))
+      .toBeLessThanOrEqual(4);
+    expect(errors).toEqual([]);
+  });
+
+  test('treats one snapped node drag as one undoable action', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await expect(
+      page.getByRole('checkbox', { name: 'Snap to Grid' })
+    ).toBeChecked();
+
+    const undoButton = leftSidebar(page).getByRole('button', { name: 'Undo' });
+    const redoButton = leftSidebar(page).getByRole('button', { name: 'Redo' });
+    await expect(undoButton).toContainText('←');
+    await expect(redoButton).toContainText('→');
+    await expect(undoButton).toBeDisabled();
+    await expect(redoButton).toBeDisabled();
+
+    const beforeDrag = await getNodePositionSnapshot(page);
+    await dragFirstGraphNode(page);
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .not.toBe(JSON.stringify(beforeDrag));
+    const afterDrag = await getNodePositionSnapshot(page);
+
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
+    await undoButton.click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .toBe(JSON.stringify(beforeDrag));
+    await expect(undoButton).toBeDisabled();
+    await expect(redoButton).toBeEnabled();
+
+    await redoButton.click();
+    await expect
+      .poll(async () => JSON.stringify(await getNodePositionSnapshot(page)))
+      .toBe(JSON.stringify(afterDrag));
+    await expect(undoButton).toBeEnabled();
+    await expect(redoButton).toBeDisabled();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('preserves selected-node spacing during snapped group drags', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    const nodes = graphNodeCircles(page);
+    await nodes.nth(0).click();
+    await nodes.nth(1).click({ modifiers: ['Shift'] });
+
+    const before = await getNodePositionSnapshot(page);
+    const beforeDelta = {
+      x: before[1].x - before[0].x,
+      y: before[1].y - before[0].y,
+    };
+    const firstNodeBox = await getRequiredBox(nodes.nth(0));
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2,
+      firstNodeBox.y + firstNodeBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      firstNodeBox.x + firstNodeBox.width / 2 + 70,
+      firstNodeBox.y + firstNodeBox.height / 2 + 45,
+      { steps: 6 }
+    );
+    await page.mouse.up();
+
+    const after = await getNodePositionSnapshot(page);
+    expect(after[0]).not.toEqual(before[0]);
+    expect(after[1]).not.toEqual(before[1]);
+    expect(after[1].x - after[0].x).toBeCloseTo(beforeDelta.x, 8);
+    expect(after[1].y - after[0].y).toBeCloseTo(beforeDelta.y, 8);
     expect(errors).toEqual([]);
   });
 
@@ -1856,6 +2281,39 @@ while (true) {}
     await frameDescription.fill('Explain the active frontier');
     await expect(caption).toContainText('Explain the active');
     await expect(caption).toContainText('frontier');
+
+    const outwardCaptionBox = await caption.boundingBox();
+    const captionCanvasBox = await graphCanvas(page).boundingBox();
+    expect(outwardCaptionBox).not.toBeNull();
+    expect(captionCanvasBox).not.toBeNull();
+    expect(Number(await caption.getAttribute('data-caption-position-x'))).toBe(
+      0
+    );
+    expect(Number(await caption.getAttribute('data-caption-position-y'))).toBe(
+      1
+    );
+    await page.mouse.move(
+      outwardCaptionBox.x + outwardCaptionBox.width / 2,
+      outwardCaptionBox.y + outwardCaptionBox.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      captionCanvasBox.x + 2,
+      captionCanvasBox.y + captionCanvasBox.height - 2,
+      { steps: 8 }
+    );
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        caption.evaluate(element => window.getComputedStyle(element).cursor)
+      )
+      .toBe('grab');
+    expect(Number(await caption.getAttribute('data-caption-position-x'))).toBe(
+      0
+    );
+    expect(Number(await caption.getAttribute('data-caption-position-y'))).toBe(
+      1
+    );
 
     const draggedPosition = await dragCaption(page);
     expect(draggedPosition.x).toBeGreaterThan(0);
@@ -2139,14 +2597,14 @@ while (true) {}
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
-    await expect(page.getByText('Presets', { exact: true })).toBeVisible();
+    await expect(page.getByText('Start', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Load graph preset')).toHaveValue('');
     await expect(
       page.getByLabel('Load graph preset').locator('option[value=""]')
     ).toHaveText('Load preset...');
 
     const frameDescription = page.getByPlaceholder(
-      'Enter a description for this frame...'
+      'Describe what happens on this frame...'
     );
     const frameLabels = page.getByText(/^Frame \d+$/);
 
@@ -2165,6 +2623,155 @@ while (true) {}
         await expect(frameDescription).toHaveValue(preset.thirdDescription);
         await expect(graphCanvas(page)).toBeVisible();
       }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('fits every loaded preset once and keeps the viewport stable', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    const presetValues = [
+      'bfs',
+      'dfs',
+      'topological-sort',
+      'disjoint-set-union',
+      'connected-components',
+      'kruskal-mst',
+      'dijkstra',
+      'dijkstra-shortest-paths',
+      'multigraph',
+    ];
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    for (const presetValue of presetValues) {
+      await commitInputValue(page.getByLabel('Zoom percent'), 250);
+      const beforePreset = await getCanvasViewSnapshot(page);
+      await choosePreset(page, presetValue);
+      await expect
+        .poll(async () => {
+          const bounds = await getRenderedContentViewportBounds(page);
+          return Boolean(
+            bounds &&
+            bounds.left >= 20 &&
+            bounds.top >= 20 &&
+            bounds.right <= bounds.viewportWidth - 20 &&
+            bounds.bottom <= bounds.viewportHeight - 20
+          );
+        })
+        .toBe(true);
+
+      const fittedView = await getCanvasViewSnapshot(page);
+      expect(fittedView).not.toEqual(beforePreset);
+      expect(Number(fittedView.zoom)).toBeLessThanOrEqual(1);
+      await page.waitForTimeout(300);
+      const settledView = await getCanvasViewSnapshot(page);
+      expect(Number(settledView.x)).toBeCloseTo(Number(fittedView.x), 5);
+      expect(Number(settledView.y)).toBeCloseTo(Number(fittedView.y), 5);
+      expect(Number(settledView.zoom)).toBeCloseTo(Number(fittedView.zoom), 5);
+    }
+
+    await choosePreset(page, 'disjoint-set-union');
+    await expect(graphCanvas(page).getByText('Path 1')).toHaveCount(0);
+    await expect(graphCanvas(page).getByText('Loop')).toHaveCount(0);
+    await expect(graphCanvas(page).getByText('Back to A')).toHaveCount(0);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('centers the first preset load exactly like later preset loads', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+
+    const showCaption = page.getByRole('checkbox', { name: 'Show caption' });
+    await showCaption.check();
+    await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await expect(showCaption).toBeChecked();
+    await expect(page.getByTestId('frame-caption-overlay')).toBeVisible();
+    const firstBfsView = await getCanvasViewSnapshot(page);
+    const firstBfsBounds = await getRenderedContentViewportBounds(page);
+    expect(firstBfsBounds).not.toBeNull();
+    expect(
+      firstBfsBounds.left + firstBfsBounds.right - firstBfsBounds.viewportWidth
+    ).toBeCloseTo(0, 0);
+    expect(
+      Math.abs(
+        firstBfsBounds.top +
+          firstBfsBounds.bottom -
+          firstBfsBounds.viewportHeight
+      )
+    ).toBeLessThanOrEqual(50);
+    await page.waitForTimeout(400);
+    const settledBfsView = await getCanvasViewSnapshot(page);
+    const settledBfsBounds = await getRenderedContentViewportBounds(page);
+    expect(settledBfsBounds).not.toBeNull();
+    for (const dimension of ['left', 'right', 'top', 'bottom']) {
+      expect(Number(settledBfsBounds[dimension])).toBeCloseTo(
+        Number(firstBfsBounds[dimension]),
+        5
+      );
+    }
+    expect(Number(settledBfsView.x)).toBeCloseTo(Number(firstBfsView.x), 5);
+    expect(Number(settledBfsView.y)).toBeCloseTo(Number(firstBfsView.y), 5);
+    expect(Number(settledBfsView.zoom)).toBeCloseTo(
+      Number(firstBfsView.zoom),
+      5
+    );
+
+    await choosePreset(page, 'dfs');
+    await choosePreset(page, 'bfs');
+    const repeatedBfsView = await getCanvasViewSnapshot(page);
+
+    expect(Number(firstBfsView.x)).toBeCloseTo(Number(repeatedBfsView.x), 5);
+    expect(Number(firstBfsView.y)).toBeCloseTo(Number(repeatedBfsView.y), 5);
+    expect(Number(firstBfsView.zoom)).toBeCloseTo(
+      Number(repeatedBfsView.zoom),
+      5
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('centers every preset when it is the first project replacement', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    const presetValues = [
+      'bfs',
+      'dfs',
+      'topological-sort',
+      'disjoint-set-union',
+      'connected-components',
+      'kruskal-mst',
+      'dijkstra',
+      'dijkstra-shortest-paths',
+      'multigraph',
+    ];
+
+    for (const presetValue of presetValues) {
+      await page.goto('/');
+      await page.evaluate(() => window.localStorage.clear());
+      await page.reload();
+      await expect(graphCanvas(page)).toBeVisible();
+      await choosePreset(page, presetValue);
+
+      const bounds = await getRenderedContentViewportBounds(page);
+      expect(bounds, presetValue).not.toBeNull();
+      expect(
+        bounds.left + bounds.right - bounds.viewportWidth,
+        `${presetValue} horizontal center error`
+      ).toBeCloseTo(0, 0);
+      expect(
+        Math.abs(bounds.top + bounds.bottom - bounds.viewportHeight),
+        `${presetValue} vertical reserved-overlay offset`
+      ).toBeLessThanOrEqual(50);
     }
 
     expect(errors).toEqual([]);
@@ -2200,6 +2807,60 @@ while (true) {}
       }
       await closeLegendEditor(page);
     }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('keeps semantic states and the smart legend synchronized', async ({
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'bfs');
+    await page.getByRole('checkbox', { name: /^Legend$/ }).check();
+    await expandLegendEditor(page);
+
+    await expect(page.getByTestId('custom-legend-mode-select')).toHaveValue(
+      'smart'
+    );
+    await expect(page.locator('[data-visual-state-id]')).toHaveCount(5);
+    const firstStateLabel = page.getByLabel('node state label').first();
+    await expect(firstStateLabel).toHaveValue(
+      GRAPH_PRESETS.bfs.legend.entries.find(entry => entry.kind === 'node')
+        .label
+    );
+    await firstStateLabel.fill('Current vertex');
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('Current vertex', {
+        exact: true,
+      })
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add node state' }).click();
+    await expect(page.locator('[data-visual-state-id]')).toHaveCount(6);
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('New node state', {
+        exact: true,
+      })
+    ).toHaveCount(0);
+    await page.getByLabel('Pin New node state in legend').check();
+    await expect(
+      page.getByTestId('custom-export-legend').getByText('New node state', {
+        exact: true,
+      })
+    ).toBeVisible();
+
+    await closeLegendEditor(page);
+    await graphNodeCircles(page).first().click();
+    const nodeState = propertyPanel(page).getByLabel('Node visual state');
+    await expect(nodeState).toHaveValue('bfs-node-queued');
+    await nodeState.selectOption('bfs-node-current');
+    await expect(graphNodeCircles(page).first()).toHaveAttribute(
+      'fill',
+      '#3B82F6'
+    );
 
     expect(errors).toEqual([]);
   });
@@ -2257,6 +2918,7 @@ while (true) {}
     await legendEditToggle.click();
     await expect(legendModal).toBeVisible();
     await expect(legendEditor).toBeVisible();
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await expect(
       page.getByTestId('custom-legend-entries-header')
     ).not.toHaveClass(/sticky/);
@@ -2545,8 +3207,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -2570,7 +3232,15 @@ while (true) {}
     await expect(
       propertyPanel(page).getByText('Selection', { exact: true })
     ).toBeVisible();
-    await expect(propertyPanel(page).getByText('Selected nodes')).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText(/^Appearance on Frame \d+$/)
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByText('2 nodes selected', { exact: true })
+    ).toBeVisible();
+    await expect(
+      propertyPanel(page).getByLabel('Visibility change scope')
+    ).toHaveValue('frame');
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id]')
     ).toHaveCount(0);
@@ -2647,8 +3317,8 @@ while (true) {}
     );
     await expect(selectionRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -2677,8 +3347,8 @@ while (true) {}
     await page.getByTestId('timeline-frame-card').nth(1).click();
     await expect(drawSourceRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await page.keyboard.press('Escape');
     await expect(propertyPanel(page)).toHaveAttribute(
@@ -2686,8 +3356,8 @@ while (true) {}
       'canvas'
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
     );
     await expect(drawSourceRing).toHaveCount(0);
 
@@ -2782,26 +3452,23 @@ while (true) {}
     await choosePreset(page, 'bfs');
     await page.getByTestId('timeline-frame-card').nth(1).click();
 
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    const modeGuidance = page.getByTestId('canvas-mode-guidance');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
+    const modeGuidance = page.getByTestId('tool-mode-guidance');
+    const editScope = page.getByTestId('timeline-edit-scope');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
     await expect(modeGuidance).toHaveCount(0);
-    const selectModeWidth = (await getRequiredBox(modeIndicator)).width;
+    await expect(editScope).toHaveCount(0);
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
 
     await page.getByTestId('tool-button-add').click();
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'add');
-    await expect(modeGuidance).toHaveText(
-      'Click canvasApplies from Frame 2 onward'
-    );
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'add');
+    await expect(modeGuidance).toHaveText('Click canvas');
+    await expect(editScope).toHaveText('New items start on Frame 2');
     await expect(
-      leftSidebar(page).getByText('Applies from Frame 2 onward')
+      leftSidebar(page).getByText('New items start on Frame 2')
     ).toHaveCount(0);
     await expect(
-      page.getByText('Applies from Frame 2 onward', { exact: true })
+      page.getByText('New items start on Frame 2', { exact: true })
     ).toHaveCount(1);
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2813,20 +3480,14 @@ while (true) {}
       .toBe('not-allowed');
 
     await page.getByTestId('tool-button-draw').click();
-    await expect(modeGuidance).toHaveText(
-      'Choose source, then targetApplies from Frame 2 onward'
-    );
+    await expect(modeGuidance).toHaveText('Choose source, then target');
+    await expect(editScope).toHaveText('New items start on Frame 2');
     await graphNodeCircles(page).first().click();
-    await expect(modeGuidance).toHaveText(
-      'Choose targetApplies from Frame 2 onward'
-    );
-    await expect(modeIndicator).toHaveAttribute(
+    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveAttribute(
       'aria-label',
       /Source node 0 selected; choose target/
     );
-    expect(
-      Math.abs((await getRequiredBox(modeIndicator)).width - selectModeWidth)
-    ).toBeLessThanOrEqual(1);
     await expect
       .poll(() =>
         graphNodeCircles(page)
@@ -2837,6 +3498,8 @@ while (true) {}
       )
       .toBe('crosshair');
     await page.getByTestId('tool-button-select').click();
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(editScope).toHaveCount(0);
 
     const minorGridLine = graphCanvas(page).locator(
       '[data-grid-level="minor"]'
@@ -2967,8 +3630,11 @@ while (true) {}
     const panButton = page.getByTestId('tool-button-pan');
     await lockView.check();
     await expect(graphCanvas(page)).toHaveAttribute('data-view-locked', 'true');
-    await expect(modeIndicator).toHaveAttribute('data-mode', 'select');
-    await expect(modeIndicator).toContainText('View locked');
+    await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'select');
+    await expect(modeGuidance).toHaveCount(0);
+    await expect(page.getByTestId('view-lock-indicator')).toHaveText(
+      'View locked'
+    );
     await expect(panButton).toBeDisabled();
     await expect(panButton).toHaveAttribute('title', 'Unlock view to pan');
     await page.evaluate(
@@ -3117,6 +3783,9 @@ while (true) {}
     await page.getByTestId('project-export-button').click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.graphviz\.json$/);
+    const exportedProject = await readJsonDownload(download);
+    expect(exportedProject.settings.viewportSize.width).toBeGreaterThan(0);
+    expect(exportedProject.settings.viewportSize.height).toBeGreaterThan(0);
     await closeExportMenu(page);
 
     await openImportMenu(page);
@@ -3128,7 +3797,7 @@ while (true) {}
     await expect(graphCanvas(page)).toBeVisible();
     await expect(page.getByText(/^Frame \d+$/)).toHaveCount(2);
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Imported fixture frame two');
     await expect(page.getByLabel('Show caption')).not.toBeChecked();
     await expect(page.getByTestId('frame-caption-overlay')).toHaveCount(0);
@@ -3169,6 +3838,8 @@ while (true) {}
       x: 120,
       y: 80,
     });
+    expect(roundTripProject.settings.viewportSize.width).toBeGreaterThan(0);
+    expect(roundTripProject.settings.viewportSize.height).toBeGreaterThan(0);
     expect(roundTripProject.settings.globalSettings.forceStrength).toBe(1.2);
     await closeExportMenu(page);
 
@@ -3179,7 +3850,7 @@ while (true) {}
     await expect(page.getByText(/Project import error:/)).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Imported fixture frame two');
 
     expect(errors).toEqual([]);
@@ -3308,13 +3979,13 @@ while (true) {}
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByText(
-        'Edge eAB is not shown because Node B is not shown on this frame'
+        'Edge eAB is hidden because Node B is hidden on Frame 1'
       )
     ).toBeVisible();
     await expect(
       page
         .getByTestId('presence-recovery-affordance')
-        .getByText('1 object not shown this frame')
+        .getByText('1 object hidden on this frame')
     ).toBeVisible();
 
     await propertyPanel(page).getByTestId('inspector-clear-selection').click();
@@ -3322,24 +3993,18 @@ while (true) {}
       propertyPanel(page).getByText('Canvas settings')
     ).toBeVisible();
     await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
-    const modeIndicator = page.getByTestId('canvas-mode-indicator');
-    await expect(modeIndicator).toContainText('Select');
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     const recoveryAffordance = page.getByTestId('presence-recovery-affordance');
     await expect(
-      recoveryAffordance.getByText('1 object not shown this frame')
+      recoveryAffordance.getByText('1 object hidden on this frame')
     ).toBeVisible();
-    const modeIndicatorBox = await getRequiredBox(modeIndicator);
-    const recoveryBox = await getRequiredBox(recoveryAffordance);
-    expect(
-      modeIndicatorBox.y + modeIndicatorBox.height <= recoveryBox.y + 1 ||
-        modeIndicatorBox.x + modeIndicatorBox.width <= recoveryBox.x + 1 ||
-        recoveryBox.x + recoveryBox.width <= modeIndicatorBox.x + 1
-    ).toBe(true);
     await recoveryAffordance
-      .getByRole('button', { name: /1 object not shown this frame/i })
+      .getByRole('button', { name: /1 object hidden on this frame/i })
       .click();
     await expect(recoveryAffordance.getByText('Node B')).toBeVisible();
-    await recoveryAffordance.getByRole('button', { name: 'Show here' }).click();
+    await recoveryAffordance
+      .getByRole('button', { name: 'Show on this frame' })
+      .click();
     await expect(
       graphCanvas(page).locator('[data-node-label-id="B"]')
     ).toBeVisible();
@@ -3374,54 +4039,70 @@ while (true) {}
       'selection'
     );
     await expect(
-      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+      propertyPanel(page).getByText('3 of 3 shown on Frame 1')
     ).toBeVisible();
 
     await propertyPanel(page)
-      .getByRole('button', { name: 'Not shown selected here' })
+      .getByRole('button', { name: 'Hide selected nodes on this frame' })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+      propertyPanel(page).getByText('0 of 3 shown on Frame 1')
     ).toBeVisible();
     await expect(page.getByTestId('presence-recovery-affordance')).toHaveCount(
       0
     );
     await expect(
-      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+      propertyPanel(page).getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByRole('button', { name: 'Show selected onward' })
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     await page.getByText('Frame 2', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 0 not shown here')
+      propertyPanel(page).getByText('3 of 3 shown on Frame 2')
     ).toBeVisible();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Not shown selected onward' })
+      .getByLabel('Visibility change scope')
+      .selectOption('following');
+    await propertyPanel(page)
+      .getByRole('button', {
+        name: 'Hide selected nodes on this and following frames',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await expect(
-      propertyPanel(page).getByText('3 items selected · 3 not shown here')
+      propertyPanel(page).getByText('0 of 3 shown on Frame 2')
     ).toBeVisible();
     await page.getByText('Frame 3', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
     await page.getByText('Frame 2', { exact: true }).click();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Show selected onward' })
+      .getByRole('button', {
+        name: 'Show selected nodes on this and following frames',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await page.getByText('Frame 3', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
     await page.getByText('Frame 1', { exact: true }).click();
     await expect(graphNodeCircles(page)).toHaveCount(2);
+    await propertyPanel(page)
+      .getByLabel('Visibility change scope')
+      .selectOption('frame');
     await expect(
-      propertyPanel(page).getByRole('button', { name: 'Show selected here' })
+      propertyPanel(page).getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
     ).toBeVisible();
     await propertyPanel(page)
-      .getByRole('button', { name: 'Show selected here' })
+      .getByRole('button', {
+        name: 'Show selected nodes on this frame',
+      })
       .click();
     await expect(graphNodeCircles(page)).toHaveCount(5);
 
@@ -3449,7 +4130,7 @@ while (true) {}
     await page.getByText('Frame 1', { exact: true }).click();
 
     await expect(
-      propertyPanel(page).getByText('Node B is not shown on this frame')
+      propertyPanel(page).getByText('Node B is hidden on Frame 1')
     ).toBeVisible();
     await expect(
       propertyPanel(page).getByText('Connected edges (2)', { exact: true })
@@ -3475,13 +4156,13 @@ while (true) {}
     await page.getByText('Frame 1', { exact: true }).click();
     await expect(
       propertyPanel(page).getByText(
-        'Edge eAB is not shown because Node B is not shown on this frame'
+        'Edge eAB is hidden because Node B is hidden on Frame 1'
       )
     ).toBeVisible();
     await expect(
       page
         .getByTestId('presence-recovery-affordance')
-        .getByText('1 object not shown this frame')
+        .getByText('1 object hidden on this frame')
     ).toBeVisible();
 
     expect(errors).toEqual([]);
@@ -3520,6 +4201,9 @@ while (true) {}
     await expect(
       exportMenu.getByRole('heading', { name: 'Export' })
     ).toBeVisible();
+    await expect(
+      exportMenu.getByText('Selected Frame Image', { exact: true })
+    ).toBeVisible();
     await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
     await expect(page.getByTestId('graph-studio-status')).toHaveText(
       /Edge list copied to clipboard|Clipboard unavailable/
@@ -3544,7 +4228,7 @@ while (true) {}
     await choosePreset(page, 'bfs');
 
     const originalDescription = await page
-      .getByPlaceholder('Enter a description for this frame...')
+      .getByPlaceholder('Describe what happens on this frame...')
       .inputValue();
     const originalNodeCount = await graphNodeCircles(page).count();
     const originalEdgeCount = await graphCanvas(page)
@@ -3602,7 +4286,7 @@ while (true) {}
         graphCanvas(page).locator('[data-edge-path-id]')
       ).toHaveCount(originalEdgeCount);
       await expect(
-        page.getByPlaceholder('Enter a description for this frame...')
+        page.getByPlaceholder('Describe what happens on this frame...')
       ).toHaveValue(originalDescription);
     }
 
@@ -3664,12 +4348,63 @@ while (true) {}
     expect(errors).toEqual([]);
   });
 
+  test('round-trips exported multi-edges and loops through strict input', async ({
+    context,
+    page,
+  }) => {
+    const errors = watchForUnexpectedErrors(page);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await page.goto('/');
+    await expect(graphCanvas(page)).toBeVisible();
+    await choosePreset(page, 'multigraph');
+
+    const exportMenu = await openExportMenu(page);
+    await exportMenu.getByRole('button', { name: 'Export Edge List' }).click();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Edge list copied. IDs renumbered from 0; use Project export to preserve direction and styling.'
+    );
+    const exported = await page.evaluate(() => navigator.clipboard.readText());
+    expect(exported).toBe(
+      ['3 6', '0 1', '0 1', '0 1', '1 1', '1 2', '2 0'].join('\n')
+    );
+    await closeExportMenu(page);
+
+    const parserModal = await openEdgeListParser(page);
+    await parserModal.locator('textarea').fill(exported);
+    await parserModal.getByRole('button', { name: 'Generate graph' }).click();
+    await expect(parserModal).toBeHidden();
+    await expect(page.getByTestId('graph-studio-status')).toHaveText(
+      'Graph parsed: 3 nodes / 6 edges'
+    );
+    await expect(graphNodeCircles(page)).toHaveCount(3);
+    await expect(graphCanvas(page).locator('[data-edge-path-id]')).toHaveCount(
+      6
+    );
+
+    expect(errors).toEqual([]);
+  });
+
   test('keeps import and export menus usable on mobile', async ({ page }) => {
     const errors = watchForUnexpectedErrors(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await page.getByTestId('mobile-tools-toggle').click();
+
+    await page.getByTestId('tool-button-draw').click();
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose source, then target'
+    );
+    await page.getByRole('button', { name: 'Dismiss tools overlay' }).click();
+    await expect(page.getByTestId('mobile-mode-guidance')).toHaveText(
+      'Draw Edge · Choose source, then target'
+    );
+    await expect(page.getByTestId('timeline-edit-scope')).toHaveText(
+      'New items start on Frame 1'
+    );
+    await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     await page.getByTestId('mobile-tools-toggle').click();
 
     const importButton = page.getByTestId('open-import-menu');
@@ -3976,13 +4711,11 @@ while (true) {}
     await firstNode.click();
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
     exportMenu = await openExportMenu(page);
-    await expect(exportMenu.getByTestId('canvas-mode-indicator')).toHaveCount(
-      0
-    );
+    await expect(exportMenu.getByTestId('tool-mode-guidance')).toHaveCount(0);
     previewState = await getSvgPresentationState(
       page,
       await getPreviewSvgText(page)
@@ -3994,8 +4727,8 @@ while (true) {}
     expect(previewState.edgeSelectionUnderlayCount).toBe(0);
     await closeExportMenu(page);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
-    await expect(page.getByTestId('canvas-mode-indicator')).toContainText(
-      'Draw Edge'
+    await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
+      'Choose target'
     );
 
     await page.getByTestId('tool-button-select').click();
@@ -4068,7 +4801,7 @@ while (true) {}
       .not.toBe(firstFramePreviewUrl);
     await expect(frameCounter).toHaveText(editorFrameBeforeReview);
 
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await expect(frameItems).toHaveCount(1);
     await expect(
       exportMenu.getByTestId('export-preview-frame-item-0')
@@ -4364,7 +5097,7 @@ while (true) {}
       page.getByRole('button', { name: 'Play timeline' })
     ).toBeVisible();
     const editorFrameAtExportStart = await frameCounter.textContent();
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
     await expect(page.getByText('Export MP4 Video')).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
@@ -4443,7 +5176,7 @@ while (true) {}
     ).toBeVisible();
     const exportMenu = await openExportMenu(page);
     const editorFrameAtExportStart = await frameCounter.textContent();
-    await exportMenu.getByRole('radio', { name: 'Current' }).check();
+    await exportMenu.getByRole('radio', { name: 'Selected' }).check();
     await exportMenu.getByRole('button', { name: 'Export MP4' }).click();
     await page.getByRole('button', { name: 'Export', exact: true }).click();
 
@@ -4477,6 +5210,7 @@ while (true) {}
 
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
+    await commitInputValue(page.getByLabel('Zoom percent'), 250);
 
     await openImportMenu(page);
     await page.getByTestId('project-paste-json-button').click();
@@ -4493,7 +5227,7 @@ while (true) {}
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue('Pasted JSON import test');
     await expect(
       graphCanvas(page).locator('text').filter({ hasText: 'Pasted A' })
@@ -4524,6 +5258,21 @@ while (true) {}
       'data-caption-font-size',
       '12'
     );
+    await expect
+      .poll(async () => {
+        const bounds = await getRenderedContentViewportBounds(page);
+        return Boolean(
+          bounds &&
+          bounds.left >= 20 &&
+          bounds.top >= 20 &&
+          bounds.right <= bounds.viewportWidth - 20 &&
+          bounds.bottom <= bounds.viewportHeight - 20
+        );
+      })
+      .toBe(true);
+    expect(
+      Number(await graphCanvas(page).getAttribute('data-view-zoom'))
+    ).toBeLessThanOrEqual(1);
     await expect(page.getByTestId('frame-caption-overlay')).toHaveAttribute(
       'data-caption-position-x',
       '0.2'
@@ -4559,7 +5308,7 @@ while (true) {}
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
     const originalDescription = await page
-      .getByPlaceholder('Enter a description for this frame...')
+      .getByPlaceholder('Describe what happens on this frame...')
       .inputValue();
 
     await openImportMenu(page);
@@ -4593,7 +5342,7 @@ while (true) {}
     );
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByPlaceholder('Enter a description for this frame...')
+      page.getByPlaceholder('Describe what happens on this frame...')
     ).toHaveValue(originalDescription);
 
     await modal.getByRole('button', { name: 'Cancel' }).click();
@@ -4632,6 +5381,7 @@ while (true) {}
     ).toBeVisible();
 
     await legendTitle.fill('Traversal Key');
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await page.getByTestId('custom-legend-add-entry').click();
     await page.getByTestId('custom-legend-entry-group-0').fill('hi');
     await page.getByTestId('custom-legend-entry-label-0').fill('Frontier');
@@ -5289,7 +6039,7 @@ api.edge('e0', '#f59e0b');
     await expect(page.getByTestId('export-frame-range-controls')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(
-      page.getByRole('radio', { name: 'Current' })
+      page.getByRole('radio', { name: 'Selected' })
     ).not.toBeChecked();
     await expect(page.getByRole('radio', { name: 'Range' })).not.toBeChecked();
 
@@ -5350,6 +6100,7 @@ api.edge('e0', '#f59e0b');
     await page.getByRole('checkbox', { name: /^Legend$/ }).check();
     await expandLegendEditor(page);
     await page.getByTestId('custom-legend-title-input').fill('Export Key');
+    await page.getByTestId('custom-legend-mode-select').selectOption('custom');
     await page.getByTestId('custom-legend-add-entry').click();
     await page.getByTestId('custom-legend-entry-group-0').fill('Edges');
     await page.getByTestId('custom-legend-entry-label-0').fill('Critical path');
@@ -5471,8 +6222,8 @@ api.edge('e0', '#f59e0b');
     await expect(frameCounter).toHaveText(initialFrameCounter);
     await expect(graphCanvas(page)).toBeVisible();
 
-    await page.getByRole('radio', { name: 'Current' }).check();
-    await expect(page.getByRole('radio', { name: 'Current' })).toBeChecked();
+    await page.getByRole('radio', { name: 'Selected' }).check();
+    await expect(page.getByRole('radio', { name: 'Selected' })).toBeChecked();
     const currentFrameSlideshow = await expectDownloadFrom({
       page,
       locator: page.getByTestId('slideshow-export-button'),
@@ -5630,7 +6381,7 @@ test.describe('Audit regressions', () => {
       .fill('Recovered draft');
     await propertyPanel(page).getByLabel('Label', { exact: true }).blur();
     await expect(
-      page.getByText('Draft saved on this device', { exact: true })
+      page.getByTestId('local-draft-status').getByText(/Saved locally/)
     ).toBeVisible();
     await page.reload();
     await expect(
@@ -5643,9 +6394,8 @@ test.describe('Audit regressions', () => {
   }) => {
     await page.goto('/');
     await graphCanvas(page).locator('[data-node-id="0"]').click();
-    await page
-      .getByLabel('Status / Style', { exact: true })
-      .selectOption('queued');
+    const visualState = page.getByLabel('Node visual state');
+    await visualState.selectOption('node-queued');
     const node = graphCanvas(page).locator('[data-node-id="0"]');
     await expect(node.locator('circle').first()).toHaveAttribute(
       'fill',
@@ -5655,7 +6405,8 @@ test.describe('Audit regressions', () => {
       'stroke-dasharray',
       '6 3'
     );
-    await page.getByLabel('Color', { exact: true }).fill('#000000');
+    await visualState.selectOption('');
+    await page.getByLabel('Custom color', { exact: true }).fill('#000000');
     await expect(node.locator('[data-node-label-id]')).toHaveAttribute(
       'fill',
       '#FFFFFF'

@@ -34,8 +34,8 @@ const ExportVideoModal = ({ open, onClose, onExport }) => {
       }
     >
       <p className={modalBodyTextClass}>
-        This will generate a static video of the timeline steps. Enabled frame
-        captions use their canvas position.
+        Export the selected animation frames as a video. Captions appear in
+        their saved canvas positions.
       </p>
     </ModalFrame>
   );

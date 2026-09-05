@@ -31,7 +31,7 @@ const SIDE_PANEL_CLASS =
   'graphstudio-side-panel min-h-0 bg-[#F8F9FA] dark:bg-[#111827]';
 const STATUS_ERROR_PATTERN = /\b(error|failed|failure|invalid|unsupported)\b/i;
 const STATUS_SUCCESS_PATTERN =
-  /\b(parsed|imported|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
+  /\b(parsed|imported|restored|exported|generated|copied|loaded|added|deleted|applied|complete|success)\b/i;
 const MODE_LABELS = {
   select: 'Select',
   pan: 'Pan',
@@ -39,20 +39,25 @@ const MODE_LABELS = {
   draw: 'Draw Edge',
 };
 
-const getModeGuidance = ({ mode, currentFrame = 0, drawFrom }) => {
-  const scope = `Applies from Frame ${Math.max(0, Number(currentFrame) || 0) + 1} onward`;
-  if (mode === 'pan') return { action: 'Drag canvas', scope: '' };
-  if (mode === 'add') return { action: 'Click canvas', scope };
+const getModeGuidance = ({ mode, drawFrom }) => {
+  const modeLabel = MODE_LABELS[mode] ?? MODE_LABELS.select;
+  if (mode === 'pan') return { modeLabel, action: 'Drag canvas' };
+  if (mode === 'add') return { modeLabel, action: 'Click canvas' };
   if (mode !== 'draw') return null;
   if (drawFrom !== null && drawFrom !== undefined) {
     return {
+      modeLabel,
       action: 'Choose target',
-      scope,
       accessibleAction: `Source node ${drawFrom} selected; choose target`,
     };
   }
-  return { action: 'Choose source, then target', scope };
+  return { modeLabel, action: 'Choose source, then target' };
 };
+
+const getTimelineEditScope = ({ mode, currentFrame = 0 }) =>
+  mode === 'add' || mode === 'draw'
+    ? `New items start on Frame ${Math.max(0, Number(currentFrame) || 0) + 1}`
+    : '';
 
 const getStatusClassName = status => {
   const tone = STATUS_ERROR_PATTERN.test(status)
@@ -66,13 +71,11 @@ const getStatusClassName = status => {
       : tone === 'success'
         ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46] dark:border-[#34D399] dark:bg-[#052E16] dark:text-[#D1FAE5]'
         : 'border-[#D7DEE8] bg-[#F8F9FA] text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]';
-  return `pointer-events-none select-none border px-2 py-1 text-[11px] leading-snug break-words ${toneClass}`;
+  return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
 };
 
 const canvasHudStackClass =
-  'pointer-events-none relative order-first z-30 flex shrink-0 flex-wrap items-start justify-end gap-2 p-2';
-const canvasModeIndicatorClass =
-  'pointer-events-none w-[220px] max-w-full border border-[#CBD5E1] border-l-2 border-l-[#A66A00] bg-[#FFFFFF] px-3 py-2 text-left text-[#0F172A] shadow-[0_2px_4px_#0F172A0D] dark:border-[#475569] dark:border-l-[#F59E0B] dark:bg-[#111827] dark:text-[#F8FAFC]';
+  'pointer-events-none absolute right-3 top-3 z-30 flex w-80 max-w-[90%] flex-col items-end gap-2';
 const recoveryShellClass =
   'pointer-events-auto w-80 max-w-full border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryToggleClass =
@@ -84,63 +87,6 @@ const getRecoverySignature = entries =>
   (entries ?? [])
     .map(entry => `${entry.type}:${entry.id}:${entry.note ?? ''}`)
     .join('|');
-
-const CanvasModeIndicator = ({ mode, currentFrame, drawFrom, lockCanvas }) => {
-  const modeLabel = MODE_LABELS[mode] ?? MODE_LABELS.select;
-  const guidance = getModeGuidance({ mode, currentFrame, drawFrom });
-  const accessibleLabel = [
-    `Current canvas mode: ${modeLabel}`,
-    lockCanvas ? 'View locked' : '',
-    guidance?.accessibleAction ?? guidance?.action,
-    guidance?.scope,
-  ]
-    .filter(Boolean)
-    .join('. ');
-
-  return (
-    <div
-      className={canvasModeIndicatorClass}
-      data-testid="canvas-mode-indicator"
-      data-mode={mode}
-      aria-label={accessibleLabel}
-      aria-live="polite"
-    >
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#64748B] dark:text-[#94A3B8]">
-          Mode
-        </span>
-        <span className="text-[11px] font-bold leading-tight text-[#0F2747] dark:text-[#F8FAFC]">
-          {modeLabel}
-        </span>
-      </div>
-      {(lockCanvas || guidance) && (
-        <div className="mt-1 space-y-0.5 border-t border-[#E2E8F0] pt-1 text-[10px] font-medium leading-snug dark:border-[#334155]">
-          {lockCanvas && (
-            <div
-              className="font-bold uppercase tracking-[0.1em] text-[#A66A00] dark:text-[#F59E0B]"
-              data-testid="canvas-view-lock-indicator"
-            >
-              View locked
-            </div>
-          )}
-          {guidance && (
-            <div
-              className="space-y-0.5 text-[#475569] dark:text-[#CBD5E1]"
-              data-testid="canvas-mode-guidance"
-            >
-              <div>{guidance.action}</div>
-              {guidance.scope && (
-                <div className="text-[#64748B] dark:text-[#94A3B8]">
-                  {guidance.scope}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const PresenceRecoveryAffordance = ({ recovery }) => {
   const entries = Array.isArray(recovery?.entries) ? recovery.entries : [];
@@ -168,7 +114,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
         }
       >
         <span>
-          {entries.length} {objectLabel} not shown this frame
+          {entries.length} {objectLabel} hidden on this frame
         </span>
         <span aria-hidden="true" className="text-[#64748B] dark:text-[#94A3B8]">
           {expanded ? 'Collapse' : 'Expand'}
@@ -201,7 +147,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
                       setExpandedSignature('');
                     }}
                   >
-                    Show here
+                    Show on this frame
                   </button>
                   <button
                     type="button"
@@ -211,7 +157,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
                       setExpandedSignature('');
                     }}
                   >
-                    Show onward
+                    Show from this frame
                   </button>
                 </div>
               </div>
@@ -313,53 +259,31 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   );
 };
 
-const CanvasStage = ({ canvas, currentFrame, status, presenceRecovery }) => (
-  <motion.div
-    className="relative flex h-full min-h-0 flex-col"
-    layoutId="graphstudio-main-canvas"
-  >
-    <div className="min-h-0 flex-1">
-      <GraphCanvas {...canvas} />
-    </div>
-    <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
-      <details className="pointer-events-auto w-[220px] max-w-full border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 max-[768px]:flex-1">
-        <summary className="cursor-pointer font-semibold">
-          Keyboard controls
-        </summary>
-        <p className="mt-2 leading-relaxed">
-          Tab to the graph. Arrow keys explore nodes and edges; Enter selects.
-          Alt + arrows moves a node. In Draw Edge mode, Enter chooses each
-          endpoint. In Add Node mode, Enter on the canvas adds a node at the
-          center.
-        </p>
-      </details>
-      <CanvasModeIndicator
-        mode={canvas.mode}
-        currentFrame={currentFrame}
-        drawFrom={canvas.drawFrom}
-        lockCanvas={canvas.lockCanvas}
-      />
-      <PresenceRecoveryAffordance recovery={presenceRecovery} />
-    </div>
-    <div className="h-8 shrink-0 overflow-y-auto px-2 pb-1">
-      {status && (
-        <div
-          className={getStatusClassName(status)}
-          data-testid="graph-studio-status"
-          data-status-tone={
-            STATUS_ERROR_PATTERN.test(status)
-              ? 'error'
-              : STATUS_SUCCESS_PATTERN.test(status)
-                ? 'success'
-                : 'neutral'
-          }
-          role="status"
-          aria-live="polite"
-        >
-          {status}
-        </div>
-      )}
-    </div>
+const CanvasStage = ({ canvas, status, presenceRecovery }) => (
+  <motion.div className="relative h-full" layoutId="graphstudio-main-canvas">
+    <GraphCanvas {...canvas} />
+    {Boolean(presenceRecovery?.entries?.length) && (
+      <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
+        <PresenceRecoveryAffordance recovery={presenceRecovery} />
+      </div>
+    )}
+    {status && (
+      <div
+        className={getStatusClassName(status)}
+        data-testid="graph-studio-status"
+        data-status-tone={
+          STATUS_ERROR_PATTERN.test(status)
+            ? 'error'
+            : STATUS_SUCCESS_PATTERN.test(status)
+              ? 'success'
+              : 'neutral'
+        }
+        role="status"
+        aria-live="polite"
+      >
+        {status}
+      </div>
+    )}
   </motion.div>
 );
 
@@ -448,6 +372,12 @@ const ModalStack = ({
       open={modals.legend.open}
       customLegend={modals.legend.customLegend}
       setCustomLegend={modals.legend.setCustomLegend}
+      resolvedLegend={modals.legend.resolvedLegend}
+      visualStates={modals.legend.visualStates}
+      onAddVisualState={modals.legend.onAddVisualState}
+      onUpdateVisualState={modals.legend.onUpdateVisualState}
+      onMoveVisualState={modals.legend.onMoveVisualState}
+      onRemoveVisualState={modals.legend.onRemoveVisualState}
       onClose={modals.legend.onClose}
     />
   </>
@@ -462,7 +392,6 @@ const GraphStudioLayout = ({
   presenceRecovery,
   exportCapture,
   status,
-  draftStatus,
 }) => {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [canvasFocused, setCanvasFocused] = useState(false);
@@ -470,8 +399,20 @@ const GraphStudioLayout = ({
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const modeGuidance = getModeGuidance({
+    mode: canvas.mode,
+    drawFrom: canvas.drawFrom,
+  });
+  const timelineProps = {
+    ...timeline,
+    editScope: getTimelineEditScope({
+      mode: canvas.mode,
+      currentFrame: timeline.currentFrame,
+    }),
+  };
   const sidebarProps = {
     ...sidebar,
+    modeGuidance,
     onOpenImportMenu: () => setIsImportMenuOpen(true),
     onOpenExportMenu: () => {
       if (sidebar.onBeginExportReview?.() === false) return;
@@ -506,21 +447,6 @@ const GraphStudioLayout = ({
   if (isMobile) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
-        <div
-          role="status"
-          className="px-3 py-1 text-xs text-slate-600 dark:text-slate-300"
-        >
-          {draftStatus}
-          {sidebar.isVisualExporting && (
-            <button
-              type="button"
-              onClick={sidebar.onCancelExport}
-              className="ml-3 rounded border border-slate-400 px-2 py-1"
-            >
-              Cancel export ({Math.round(sidebar.exportProgress * 100)}%)
-            </button>
-          )}
-        </div>
         {/* Mobile Header with Toggle Buttons */}
         <div className="flex items-center justify-between border-b border-outline-variant/20 bg-surface-container-low p-3 dark:border-dark-outline-variant/20 dark:bg-dark-surface-container-low">
           <MobileHeaderButton
@@ -532,7 +458,8 @@ const GraphStudioLayout = ({
           </MobileHeaderButton>
           <button
             type="button"
-            className="rounded border border-slate-400 px-3 py-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2"
+            className="min-w-0 rounded border border-slate-400 px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2"
+            aria-label={canvasFocused ? 'Show timeline' : 'Focus canvas'}
             aria-pressed={canvasFocused}
             onClick={() => {
               setCanvasFocused(value => !value);
@@ -541,7 +468,19 @@ const GraphStudioLayout = ({
               );
             }}
           >
-            {canvasFocused ? 'Show timeline' : 'Focus canvas'}
+            <span className="block">
+              {canvasFocused ? 'Show timeline' : 'Focus canvas'}
+            </span>
+            {(canvas.lockCanvas || modeGuidance) && (
+              <span
+                className="block max-w-[210px] truncate text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]"
+                data-testid="mobile-mode-guidance"
+              >
+                {canvas.lockCanvas
+                  ? 'View locked'
+                  : `${modeGuidance.modeLabel} · ${modeGuidance.action}`}
+              </span>
+            )}
           </button>
           <MobileHeaderButton
             label={
@@ -579,7 +518,6 @@ const GraphStudioLayout = ({
         <div className="relative min-h-0 flex-1">
           <CanvasStage
             canvas={canvas}
-            currentFrame={sidebar.currentFrame}
             presenceRecovery={presenceRecovery}
             status={status}
           />
@@ -592,7 +530,7 @@ const GraphStudioLayout = ({
               : 'max-h-[50dvh] min-h-0 flex-none overflow-auto border-t border-outline-variant/20 dark:border-dark-outline-variant/20'
           }
         >
-          <TimelinePanel {...timeline} />
+          <TimelinePanel {...timelineProps} />
         </div>
 
         <ModalStack {...modalStackProps} />
@@ -602,21 +540,6 @@ const GraphStudioLayout = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface font-inter text-on-surface dark:bg-dark-surface dark:text-dark-on-surface">
-      <div
-        role="status"
-        className="shrink-0 border-b border-slate-200 px-4 py-1 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
-      >
-        {draftStatus}
-        {sidebar.isVisualExporting && (
-          <button
-            type="button"
-            onClick={sidebar.onCancelExport}
-            className="ml-3 rounded border border-slate-400 px-2 py-1"
-          >
-            Cancel export ({Math.round(sidebar.exportProgress * 100)}%)
-          </button>
-        )}
-      </div>
       <PanelGroup orientation="vertical" className="min-h-0 flex-1">
         <Panel minSize="360px" className="min-h-0">
           <PanelGroup orientation="horizontal" className="h-full min-h-0">
@@ -627,7 +550,6 @@ const GraphStudioLayout = ({
             <Panel minSize="40%" defaultSize="60%">
               <CanvasStage
                 canvas={canvas}
-                currentFrame={sidebar.currentFrame}
                 presenceRecovery={presenceRecovery}
                 status={status}
               />
@@ -645,7 +567,7 @@ const GraphStudioLayout = ({
           maxSize="320px"
           className="min-h-0"
         >
-          <TimelinePanel {...timeline} />
+          <TimelinePanel {...timelineProps} />
         </Panel>
       </PanelGroup>
       <ModalStack {...modalStackProps} />

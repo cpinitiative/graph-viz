@@ -24,8 +24,20 @@ const EDITOR_RING_COLORS = {
   },
 };
 
+const getSemanticNodeStatus = node => {
+  const explicitStatus = String(node?.status ?? 'default').toLowerCase();
+  if (explicitStatus !== 'default') return explicitStatus;
+  const cue =
+    `${node?.stateId ?? ''} ${node?.resolvedStateLabel ?? ''}`.toLowerCase();
+  if (/queued|waiting|frontier/.test(cue)) return 'queued';
+  if (/visited|done|finished|completed|finalized/.test(cue)) return 'visited';
+  if (/discarded|rejected|skipped/.test(cue)) return 'discarded';
+  if (/active|current|minimum|source/.test(cue)) return 'active';
+  return 'default';
+};
+
 const getNodePalette = (node, theme) => {
-  const state = NODE_STATES[node?.status] ?? NODE_STATES.default;
+  const state = NODE_STATES[getSemanticNodeStatus(node)] ?? NODE_STATES.default;
   const fill =
     isGraphColor(node?.color) && node.color ? node.color : state.color;
   return {
@@ -72,7 +84,7 @@ const GraphNode = ({
       className={isExporting ? undefined : 'graphstudio-object'}
       role={isExporting ? 'img' : 'button'}
       tabIndex={isExporting ? undefined : tabIndex}
-      aria-label={`Node ${node.annotation || node.label}${node.annotation ? `. ${node.annotation}` : ''}. ${NODE_STATES[node.status]?.label ?? 'Default'}${drawAnchor ? '. Edge source' : ''}`}
+      aria-label={`Node ${node.annotation || node.label}${node.annotation ? `. ${node.annotation}` : ''}. ${node.resolvedStateLabel ?? NODE_STATES[getSemanticNodeStatus(node)]?.label ?? 'Default'}${drawAnchor ? '. Edge source' : ''}`}
       aria-pressed={
         isExporting ? undefined : Boolean(selected || multiSelected)
       }
@@ -98,9 +110,10 @@ const GraphNode = ({
         r={nodeRadius}
         fill={palette.fill}
         stroke={palette.stroke}
-        strokeWidth={node.status === 'active' ? 3.5 : 2}
+        strokeWidth={getSemanticNodeStatus(node) === 'active' ? 3.5 : 2}
         strokeDasharray={palette.dash}
         layoutId={`${layoutIdPrefix}node-${node.id}`}
+        initial={false}
         animate={{ cx: node.x, cy: node.y }}
         transition={
           shouldAnimate

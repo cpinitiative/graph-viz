@@ -7,8 +7,14 @@ export const DEFAULT_FORCE_STRENGTH = 1;
 export const FORCE_LAYOUT_ITERATIONS = 120;
 
 const FORCE_EPSILON = 1e-6;
-const FORCE_FINAL_TEMPERATURE = 0.2;
-const FORCE_VIEWPORT_INSET = NODE_RADIUS + 8;
+const FORCE_VIEWPORT_INSET = NODE_RADIUS + 64;
+const FORCE_REPULSION_SCALE = 0.72;
+const FORCE_SPRING_SCALE = 0.9;
+const FORCE_GRAVITY_SCALE = 0.4;
+const FORCE_INITIAL_STEP_SCALE = 0.09;
+const FORCE_FINAL_STEP_SCALE = 0.012;
+const FORCE_INITIAL_MAX_DISPLACEMENT = 22;
+const FORCE_FINAL_MAX_DISPLACEMENT = 0.3;
 
 export const normalizeForceStrength = strength =>
   Math.max(
@@ -55,6 +61,36 @@ const getPairVector = (left, right, leftIndex, rightIndex) => {
   }
   const direction = getStablePairDirection(left, right, leftIndex, rightIndex);
   return { distance: 1, ux: direction.x, uy: direction.y };
+};
+
+const createForceSeedNodes = inputNodes => {
+  const nodeCount = inputNodes.length;
+  const radius = Math.min(420, Math.max(120, Math.sqrt(nodeCount) * 76));
+
+  return inputNodes.map((node, index) => {
+    const stableOffset =
+      hashStableString(JSON.stringify([String(node.id), index])) / 0x100000000;
+    const angle =
+      (index / Math.max(1, nodeCount)) * Math.PI * 2 +
+      (stableOffset - 0.5) * 0.42;
+    const nodeRadius = radius * (0.84 + stableOffset * 0.24);
+
+    return {
+      ...node,
+      x: VIEWBOX_WIDTH / 2 + Math.cos(angle) * nodeRadius,
+      y: VIEWBOX_HEIGHT / 2 + Math.sin(angle) * nodeRadius * 0.72,
+    };
+  });
+};
+
+const getIdealForceDistance = (nodeCount, strength) => {
+  const densityDistance = Math.sqrt(
+    (VIEWBOX_WIDTH * VIEWBOX_HEIGHT) / Math.max(1, nodeCount)
+  );
+  const baseDistance = Math.max(90, Math.min(210, densityDistance * 0.22));
+  const strengthProgress =
+    (strength - FORCE_STRENGTH_MIN) / (FORCE_STRENGTH_MAX - FORCE_STRENGTH_MIN);
+  return baseDistance * (0.65 + strengthProgress * 0.8);
 };
 
 const normalizeForceLayoutToViewport = nodes => {
@@ -192,16 +228,22 @@ export const forceDirectedLayout = (
         }
       : {}),
   };
-  const nodes = (graph.nodes ?? []).map((node, index) => ({
-    ...node,
-    x: Number.isFinite(Number(node.x))
-      ? Number(node.x)
-      : VIEWBOX_WIDTH / 2 + index,
-    y: Number.isFinite(Number(node.y))
-      ? Number(node.y)
-      : VIEWBOX_HEIGHT / 2 + index,
-  }));
-  if (nodes.length <= 1) return { ...graph, nodes };
+  const inputNodes = graph.nodes ?? [];
+  if (inputNodes.length <= 1) {
+    return {
+      ...graph,
+      nodes: inputNodes.map((node, index) => ({
+        ...node,
+        x: Number.isFinite(Number(node.x))
+          ? Number(node.x)
+          : VIEWBOX_WIDTH / 2 + index,
+        y: Number.isFinite(Number(node.y))
+          ? Number(node.y)
+          : VIEWBOX_HEIGHT / 2 + index,
+      })),
+    };
+  }
+  const nodes = createForceSeedNodes(inputNodes);
 
   const nodeIndexById = new Map(
     nodes.map((node, index) => [String(node.id), index])
@@ -217,51 +259,65 @@ export const forceDirectedLayout = (
         Number.isInteger(edge.toIndex) &&
         edge.fromIndex !== edge.toIndex
     );
-  const idealDistance =
-    Math.sqrt((VIEWBOX_WIDTH * VIEWBOX_HEIGHT) / nodes.length) *
-    (0.12 + options.strength * 0.1);
-  const initialTemperature = Math.min(64, Math.max(18, idealDistance * 0.18));
+  const idealDistance = getIdealForceDistance(nodes.length, options.strength);
+  const referenceDistance = getIdealForceDistance(
+    nodes.length,
+    DEFAULT_FORCE_STRENGTH
+  );
+  const gravityScale =
+    FORCE_GRAVITY_SCALE * Math.pow(idealDistance / referenceDistance, 2);
+  const centerX = VIEWBOX_WIDTH / 2;
+  const centerY = VIEWBOX_HEIGHT / 2;
 
   for (let step = 0; step < options.iterations; step += 1) {
-    const forces = new Map(
-      nodes.map(node => [String(node.id), { x: 0, y: 0 }])
-    );
+    const forces = nodes.map(() => ({ x: 0, y: 0 }));
     for (let i = 0; i < nodes.length; i += 1) {
       for (let j = i + 1; j < nodes.length; j += 1) {
         const a = nodes[i];
         const b = nodes[j];
         const vector = getPairVector(a, b, i, j);
         const repulsion =
-          (idealDistance * idealDistance) / Math.max(1, vector.distance);
-        forces.get(String(a.id)).x -= vector.ux * repulsion;
-        forces.get(String(a.id)).y -= vector.uy * repulsion;
-        forces.get(String(b.id)).x += vector.ux * repulsion;
-        forces.get(String(b.id)).y += vector.uy * repulsion;
+          ((idealDistance * idealDistance) /
+            Math.max(idealDistance * 0.15, vector.distance)) *
+          FORCE_REPULSION_SCALE;
+        forces[i].x -= vector.ux * repulsion;
+        forces[i].y -= vector.uy * repulsion;
+        forces[j].x += vector.ux * repulsion;
+        forces[j].y += vector.uy * repulsion;
       }
     }
     edges.forEach(({ fromIndex, toIndex }) => {
       const from = nodes[fromIndex];
       const to = nodes[toIndex];
       const vector = getPairVector(from, to, fromIndex, toIndex);
-      const attraction =
-        (vector.distance * vector.distance) / Math.max(1, idealDistance);
-      forces.get(String(from.id)).x += vector.ux * attraction;
-      forces.get(String(from.id)).y += vector.uy * attraction;
-      forces.get(String(to.id)).x -= vector.ux * attraction;
-      forces.get(String(to.id)).y -= vector.uy * attraction;
+      const spring = (vector.distance - idealDistance) * FORCE_SPRING_SCALE;
+      forces[fromIndex].x += vector.ux * spring;
+      forces[fromIndex].y += vector.uy * spring;
+      forces[toIndex].x -= vector.ux * spring;
+      forces[toIndex].y -= vector.uy * spring;
     });
 
     const progress =
       options.iterations <= 1 ? 1 : step / (options.iterations - 1);
-    const temperature =
-      initialTemperature * (1 - progress) + FORCE_FINAL_TEMPERATURE * progress;
-    nodes.forEach(node => {
-      const force = forces.get(String(node.id));
-      const magnitude = Math.hypot(force.x, force.y);
+    const stepScale =
+      FORCE_INITIAL_STEP_SCALE * (1 - progress) +
+      FORCE_FINAL_STEP_SCALE * progress;
+    const maxDisplacement =
+      FORCE_INITIAL_MAX_DISPLACEMENT * (1 - progress) +
+      FORCE_FINAL_MAX_DISPLACEMENT * progress;
+
+    nodes.forEach((node, index) => {
+      const force = forces[index];
+      force.x += (centerX - node.x) * gravityScale;
+      force.y += (centerY - node.y) * gravityScale;
+
+      const dx = force.x * stepScale;
+      const dy = force.y * stepScale;
+      const magnitude = Math.hypot(dx, dy);
       if (!Number.isFinite(magnitude) || magnitude <= FORCE_EPSILON) return;
-      const displacement = Math.min(magnitude, temperature);
-      node.x += (force.x / magnitude) * displacement;
-      node.y += (force.y / magnitude) * displacement;
+      const displacementScale = Math.min(1, maxDisplacement / magnitude);
+      node.x += dx * displacementScale;
+      node.y += dy * displacementScale;
     });
   }
 

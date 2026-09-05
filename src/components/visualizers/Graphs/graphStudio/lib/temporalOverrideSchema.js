@@ -2,6 +2,7 @@ import { isVisualPropertyValid } from './visualProperties.js';
 
 export const TEMPORAL_NODE_OVERRIDE_KEYS = Object.freeze([
   'annotation',
+  'stateId',
   'status',
   'color',
   'visible',
@@ -9,6 +10,7 @@ export const TEMPORAL_NODE_OVERRIDE_KEYS = Object.freeze([
 
 // Edge status is part of the existing frame-property routing contract.
 export const TEMPORAL_EDGE_OVERRIDE_KEYS = Object.freeze([
+  'stateId',
   'status',
   'color',
   'visible',

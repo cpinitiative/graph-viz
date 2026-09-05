@@ -14,10 +14,14 @@ for (const [name, preset] of Object.entries(GRAPH_PRESETS)) {
       })
     );
     assert.equal(parsed.timeline.steps.length, preset.steps.length);
-    assert.deepEqual(
-      parsed.timeline.steps.at(-1).nodeOverrides,
+    for (const [nodeId, expected] of Object.entries(
       preset.steps.at(-1).nodeOverrides
-    );
+    )) {
+      const actual = parsed.timeline.steps.at(-1).nodeOverrides[nodeId];
+      for (const [key, value] of Object.entries(expected)) {
+        assert.deepEqual(actual[key], value);
+      }
+    }
     assert.ok(preset.legend.entries.length <= 5);
     for (const step of preset.steps) {
       assert.ok(step.description.length <= 64, step.description);
@@ -96,4 +100,117 @@ test('DSU cycle edge clears the intermediate node and labels end with the same r
     )
   );
   assert.equal(p.steps.at(-1).edgeOverrides.e5.status, 'rejected');
+});
+
+const assertUniqueIds = (items, label) => {
+  const ids = items.map(item => String(item.id));
+  assert.equal(
+    new Set(ids).size,
+    ids.length,
+    `${label} must not contain duplicate ids`
+  );
+};
+
+test('worked presets contain valid graph and timeline references', () => {
+  for (const [presetName, preset] of Object.entries(GRAPH_PRESETS)) {
+    const nodes = preset.graph?.nodes ?? [];
+    const edges = preset.graph?.edges ?? [];
+    const steps = preset.steps ?? [];
+    const nodeIds = new Set(nodes.map(node => String(node.id)));
+    const edgeIds = new Set(edges.map(edge => String(edge.id)));
+
+    assert.ok(nodes.length > 0, `${presetName} needs at least one node`);
+    assert.ok(
+      steps.length >= 4,
+      `${presetName} needs a useful worked timeline`
+    );
+    assertUniqueIds(nodes, `${presetName} nodes`);
+    assertUniqueIds(edges, `${presetName} edges`);
+    assertUniqueIds(steps, `${presetName} steps`);
+
+    for (const edge of edges) {
+      assert.ok(
+        nodeIds.has(String(edge.from)),
+        `${presetName} edge ${edge.id} has a missing source`
+      );
+      assert.ok(
+        nodeIds.has(String(edge.to)),
+        `${presetName} edge ${edge.id} has a missing target`
+      );
+    }
+
+    for (const step of steps) {
+      for (const nodeId of Object.keys(step.nodeOverrides ?? {})) {
+        assert.ok(
+          nodeIds.has(String(nodeId)),
+          `${presetName} step ${step.id} overrides missing node ${nodeId}`
+        );
+      }
+      for (const edgeId of Object.keys(step.edgeOverrides ?? {})) {
+        assert.ok(
+          edgeIds.has(String(edgeId)),
+          `${presetName} step ${step.id} overrides missing edge ${edgeId}`
+        );
+      }
+    }
+  }
+});
+
+test('worked presets use explanatory captions and teaching legends', () => {
+  for (const [presetName, preset] of Object.entries(GRAPH_PRESETS)) {
+    for (const step of preset.steps) {
+      const description = String(step.description ?? '').trim();
+      assert.ok(
+        description.length >= 12,
+        `${presetName} step ${step.id} needs a more explanatory caption`
+      );
+      assert.doesNotMatch(
+        description,
+        /^step\s+\d+$/i,
+        `${presetName} step ${step.id} uses a placeholder caption`
+      );
+    }
+
+    const legend = preset.legend;
+    assert.ok(legend, `${presetName} needs a teaching legend`);
+    assert.ok(
+      String(legend.title ?? '').trim().length >= 3,
+      `${presetName} needs a descriptive legend title`
+    );
+    assert.doesNotMatch(
+      legend.title,
+      /\blegend\b/i,
+      `${presetName} legend title should name the concept, not the component`
+    );
+    assert.ok(
+      ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(
+        legend.position
+      ),
+      `${presetName} legend needs a stable corner position`
+    );
+    assert.ok(
+      legend.entries.some(entry => entry.kind === 'node'),
+      `${presetName} legend needs a node explanation`
+    );
+    assert.ok(
+      legend.entries.some(entry => entry.kind === 'edge'),
+      `${presetName} legend needs an edge explanation`
+    );
+    assert.equal(
+      new Set(legend.entries.map(entry => entry.label)).size,
+      legend.entries.length,
+      `${presetName} legend labels must be unique`
+    );
+    for (const entry of legend.entries) {
+      assert.ok(
+        String(entry.label ?? '').trim().length >= 3,
+        `${presetName} has an unclear legend label`
+      );
+      assert.match(
+        entry.color,
+        /^#[0-9a-f]{6}$/i,
+        `${presetName} legend colors must be six-digit hex values`
+      );
+    }
+  }
 });

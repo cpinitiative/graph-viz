@@ -3,22 +3,24 @@ import {
   NODE_RADIUS,
   VIEWBOX_HEIGHT,
   VIEWBOX_WIDTH,
-} from './constants';
-import { normalizeFrameDuration } from './lib/frameDuration';
-import { clamp, clampNodePosition } from './lib/graphGeometry';
+} from './constants.js';
+import { normalizeFrameDuration } from './lib/frameDuration.js';
+import { clamp, clampNodePosition } from './lib/graphGeometry.js';
 import {
   PROJECT_LIMITS,
   requireLimit,
   requireTextBudget,
 } from './lib/projectLimits.js';
 
-export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry';
+const EDGE_LIST_WEIGHT_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
+
+export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry.js';
 export {
   circularLayout,
   forceDirectedLayout,
   treeLayout,
-} from './lib/graphLayouts';
-export { runScriptTrace } from './lib/scriptTrace';
+} from './lib/graphLayouts.js';
+export { runScriptTrace } from './lib/scriptTrace.js';
 
 export const normalizeNodeId = (rawId, fallback) => {
   if (Number.isFinite(Number(rawId))) return Number(rawId);
@@ -190,7 +192,7 @@ export const parseEdgeListText = text => {
     return value;
   };
   const parseWeight = (token, lineNumber) => {
-    if (!/^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token)) {
+    if (!EDGE_LIST_WEIGHT_PATTERN.test(token)) {
       throw new Error(`Line ${lineNumber} weight must be numeric.`);
     }
     const value = Number(token);
@@ -271,27 +273,22 @@ export const parseEdgeListText = text => {
 export const exportEdgeListText = graph => {
   const nodes = graph?.nodes ?? [];
   const edges = graph?.edges ?? [];
-  const ids = new Map(nodes.map((node, index) => [String(node.id), index]));
-  const header = `${nodes.length} ${edges.length}`;
-  const body = edges
-    .map(edge => {
-      const from = ids.get(String(edge.from));
-      const to = ids.get(String(edge.to));
-      if (from === undefined || to === undefined)
-        throw new Error('An edge references a missing node');
-      const label = String(edge.label ?? '').trim();
-      if (
-        label &&
-        (!/^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(label) ||
-          !Number.isFinite(Number(label)))
-      )
-        throw new Error(
-          'Edge list weights must be numeric. Use Export Project to preserve text labels.'
-        );
-      return `${from} ${to}${label ? ` ${label}` : ''}`;
-    })
-    .join('\n');
-  return `${header}\n${body}`;
+  const nodeIndexById = new Map(
+    nodes.map((node, index) => [String(node.id), index])
+  );
+  const rows = edges.flatMap(edge => {
+    const from = nodeIndexById.get(String(edge.from));
+    const to = nodeIndexById.get(String(edge.to));
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return [];
+
+    const label = String(edge.label ?? '').trim();
+    const weight =
+      /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(label) && Number.isFinite(Number(label))
+        ? ` ${label}`
+        : '';
+    return [`${from} ${to}${weight}`];
+  });
+  return [`${nodes.length} ${rows.length}`, ...rows].join('\n');
 };
 export const getSelectionBounds = nodes => {
   if (!nodes.length) return null;

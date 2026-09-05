@@ -16,28 +16,54 @@ export const useGraphStudioUndo = ({
   setStatus,
 }) => {
   const undoHistoryRef = useRef([]);
+  const redoHistoryRef = useRef([]);
   const historyMetaRef = useRef(null);
-  const applyingUndoRef = useRef(false);
-  const transactionRef = useRef(false);
-  const [revision, setRevision] = useState(0);
-  const beginTransaction = useCallback(() => {
-    transactionRef.current = true;
-  }, []);
-  const endTransaction = useCallback(() => {
-    if (!transactionRef.current) return;
-    transactionRef.current = false;
-    setRevision(value => value + 1);
+  const historyTransactionRef = useRef(null);
+  const applyingHistoryRef = useRef(false);
+  const [transactionRevision, setTransactionRevision] = useState(0);
+  const [historyAvailability, setHistoryAvailability] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
+
+  const syncHistoryAvailability = useCallback(() => {
+    setHistoryAvailability({
+      canUndo: undoHistoryRef.current.length > 0,
+      canRedo: redoHistoryRef.current.length > 0,
+    });
   }, []);
 
   const resetUndoHistory = useCallback(() => {
     undoHistoryRef.current = [];
+    redoHistoryRef.current = [];
     historyMetaRef.current = null;
-    applyingUndoRef.current = false;
-    transactionRef.current = false;
+    historyTransactionRef.current = null;
+    applyingHistoryRef.current = false;
+    syncHistoryAvailability();
+  }, [syncHistoryAvailability]);
+
+  const beginHistoryTransaction = useCallback(() => {
+    if (
+      historyTransactionRef.current ||
+      applyingHistoryRef.current ||
+      !historyMetaRef.current
+    ) {
+      return;
+    }
+    historyTransactionRef.current = {
+      startSignature: historyMetaRef.current.signature,
+      startSnapshot: historyMetaRef.current.snapshot,
+      ended: false,
+    };
+  }, []);
+
+  const endHistoryTransaction = useCallback(() => {
+    if (!historyTransactionRef.current) return;
+    historyTransactionRef.current.ended = true;
+    setTransactionRevision(revision => revision + 1);
   }, []);
 
   useEffect(() => {
-    if (transactionRef.current) return;
     const currentSnapshot = snapshotTimelineState({
       baseGraph,
       steps,
@@ -49,9 +75,26 @@ export const useGraphStudioUndo = ({
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
       return;
     }
-    if (applyingUndoRef.current) {
-      applyingUndoRef.current = false;
+    const transaction = historyTransactionRef.current;
+    if (transaction) {
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      if (transaction.ended) {
+        historyTransactionRef.current = null;
+        if (signature !== transaction.startSignature) {
+          undoHistoryRef.current.push(transaction.startSnapshot);
+          if (undoHistoryRef.current.length > HISTORY_LIMIT) {
+            undoHistoryRef.current.shift();
+          }
+          redoHistoryRef.current = [];
+        }
+        syncHistoryAvailability();
+      }
+      return;
+    }
+    if (applyingHistoryRef.current) {
+      applyingHistoryRef.current = false;
+      historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      syncHistoryAvailability();
       return;
     }
     if (signature.some((value, index) => value !== previous.signature[index])) {
@@ -59,25 +102,17 @@ export const useGraphStudioUndo = ({
       if (undoHistoryRef.current.length > HISTORY_LIMIT) {
         undoHistoryRef.current.shift();
       }
+      redoHistoryRef.current = [];
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
+      syncHistoryAvailability();
     }
-  }, [baseGraph, settings, steps, revision]);
-
-  useEffect(() => {
-    const start = event => {
-      if (event.target.matches?.('input[type=range]')) beginTransaction();
-    };
-    document.addEventListener('pointerdown', start, true);
-    window.addEventListener('pointerup', endTransaction);
-    window.addEventListener('pointercancel', endTransaction);
-    window.addEventListener('blur', endTransaction);
-    return () => {
-      document.removeEventListener('pointerdown', start, true);
-      window.removeEventListener('pointerup', endTransaction);
-      window.removeEventListener('pointercancel', endTransaction);
-      window.removeEventListener('blur', endTransaction);
-    };
-  }, [beginTransaction, endTransaction]);
+  }, [
+    baseGraph,
+    settings,
+    steps,
+    syncHistoryAvailability,
+    transactionRevision,
+  ]);
 
   const undoLastAction = useCallback(() => {
     const previousSnapshot = undoHistoryRef.current.pop();
@@ -85,7 +120,11 @@ export const useGraphStudioUndo = ({
       setStatus('Nothing to undo');
       return;
     }
-    applyingUndoRef.current = true;
+    if (historyMetaRef.current?.snapshot) {
+      redoHistoryRef.current.push(historyMetaRef.current.snapshot);
+    }
+    applyingHistoryRef.current = true;
+    syncHistoryAvailability();
     replaceTimeline(
       previousSnapshot.baseGraph,
       previousSnapshot.steps,
@@ -93,7 +132,35 @@ export const useGraphStudioUndo = ({
     );
     restoreSettings?.(previousSnapshot.settings);
     setStatus('Undid last action');
-  }, [currentFrame, replaceTimeline, restoreSettings, setStatus]);
+  }, [
+    currentFrame,
+    replaceTimeline,
+    restoreSettings,
+    setStatus,
+    syncHistoryAvailability,
+  ]);
+
+  const redoLastAction = useCallback(() => {
+    const nextSnapshot = redoHistoryRef.current.pop();
+    if (!nextSnapshot) {
+      setStatus('Nothing to redo');
+      return;
+    }
+    if (historyMetaRef.current?.snapshot) {
+      undoHistoryRef.current.push(historyMetaRef.current.snapshot);
+    }
+    applyingHistoryRef.current = true;
+    syncHistoryAvailability();
+    replaceTimeline(nextSnapshot.baseGraph, nextSnapshot.steps, currentFrame);
+    restoreSettings?.(nextSnapshot.settings);
+    setStatus('Redid last action');
+  }, [
+    currentFrame,
+    replaceTimeline,
+    restoreSettings,
+    setStatus,
+    syncHistoryAvailability,
+  ]);
 
   useEffect(() => {
     const onKeyDown = event => {
@@ -109,13 +176,20 @@ export const useGraphStudioUndo = ({
         event.stopPropagation();
         return;
       }
-      if (!isUndo) return;
       event.preventDefault();
-      undoLastAction();
+      if (isUndo) undoLastAction();
+      else redoLastAction();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undoLastAction]);
+  }, [redoLastAction, undoLastAction]);
 
-  return { undoLastAction, resetUndoHistory, beginTransaction, endTransaction };
+  return {
+    ...historyAvailability,
+    undoLastAction,
+    redoLastAction,
+    resetUndoHistory,
+    beginHistoryTransaction,
+    endHistoryTransaction,
+  };
 };

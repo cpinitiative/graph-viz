@@ -8,14 +8,7 @@ import {
   NODE_LABEL_FONT_SIZE_RANGE,
 } from './lib/fontSizing';
 import { isGraphColor } from './lib/visualProperties';
-
-const NODE_STATUS_OPTIONS = [
-  ['default', 'Default'],
-  ['active', 'Active'],
-  ['queued', 'Queued'],
-  ['visited', 'Visited'],
-  ['discarded', 'Discarded'],
-];
+import { getVisualStatesForKind } from './lib/visualStates';
 
 const panelClass =
   'graphstudio-scroll-panel h-full space-y-5 overflow-y-auto bg-[#F8F9FA] p-4 text-sm dark:bg-[#111827]';
@@ -28,10 +21,8 @@ const sectionTitleClass =
 const bodyTextClass = 'text-xs text-[#334155] dark:text-[#E2E8F0]';
 const fieldLabelClass =
   'text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748B] dark:text-[#94A3B8]';
-const scopeLabelClass =
-  'inline-flex shrink-0 items-center rounded-sm bg-[#EEF2F6] px-1.5 py-0.5 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:bg-[#1E293B] dark:text-[#94A3B8]';
-const sectionScopeLabelClass =
-  'shrink-0 text-[10px] font-semibold normal-case leading-none tracking-normal text-[#64748B] dark:text-[#94A3B8]';
+const sectionDescriptionClass =
+  'mt-0.5 text-[10px] font-medium leading-relaxed text-[#64748B] dark:text-[#94A3B8]';
 const overrideIndicatorClass =
   'text-[10px] font-semibold text-[#7C2D12] dark:text-[#FDBA74]';
 const inlineActionButtonClass =
@@ -56,53 +47,32 @@ const checkboxClass =
 
 const joinClasses = (...classes) => classes.filter(Boolean).join(' ');
 
-const getScopeLabel = scope => (scope === 'Project-wide' ? 'Project' : scope);
-
-const ScopeLabel = ({ scope, variant = 'field' }) => {
-  if (!scope) return null;
-  return (
-    <span
-      className={
-        variant === 'section' ? sectionScopeLabelClass : scopeLabelClass
-      }
-    >
-      {getScopeLabel(scope)}
-    </span>
-  );
-};
-
 const FieldMeta = ({ hasOverride, onResetOverride, onApplyToAll }) => {
-  if (!hasOverride && !onApplyToAll) return null;
+  if (!hasOverride) return null;
 
   return (
     <div className="mt-2 flex min-h-6 flex-wrap items-center justify-between gap-2">
-      <span className="min-w-0">
-        {hasOverride && (
-          <span className={overrideIndicatorClass}>Current frame override</span>
+      <span className={overrideIndicatorClass}>Different on this frame</span>
+      <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+        {onResetOverride && (
+          <button
+            type="button"
+            className={inlineActionButtonClass}
+            onClick={onResetOverride}
+          >
+            Use project value
+          </button>
+        )}
+        {onApplyToAll && (
+          <button
+            type="button"
+            className={inlineActionButtonClass}
+            onClick={onApplyToAll}
+          >
+            Use on every frame
+          </button>
         )}
       </span>
-      {(hasOverride || onApplyToAll) && (
-        <span className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
-          {hasOverride && onResetOverride && (
-            <button
-              type="button"
-              className={inlineActionButtonClass}
-              onClick={onResetOverride}
-            >
-              Reset override
-            </button>
-          )}
-          {onApplyToAll && (
-            <button
-              type="button"
-              className={inlineActionButtonClass}
-              onClick={onApplyToAll}
-            >
-              Apply to all frames
-            </button>
-          )}
-        </span>
-      )}
     </div>
   );
 };
@@ -137,13 +107,7 @@ const ClearSelectionButton = ({ label, onClick }) => {
   );
 };
 
-const PanelShell = ({
-  title,
-  scope,
-  inspectorType,
-  headerAction,
-  children,
-}) => (
+const PanelShell = ({ title, inspectorType, headerAction, children }) => (
   <div
     className={panelClass}
     data-testid="property-panel"
@@ -154,7 +118,6 @@ const PanelShell = ({
       <div className="mt-1 flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
           <div className={`${panelContextClass} min-w-0`}>{title}</div>
-          <ScopeLabel scope={scope} variant="section" />
         </div>
         {headerAction}
       </div>
@@ -163,12 +126,16 @@ const PanelShell = ({
   </div>
 );
 
-const Section = ({ title, scope, help, children }) => (
+const Section = ({ title, description, help, children }) => (
   <section className="space-y-3">
-    <div className="flex items-baseline gap-2">
-      <div className={sectionTitleClass}>{title}</div>
-      <ScopeLabel scope={scope} variant="section" />
-      {help}
+    <div>
+      <div className="flex items-baseline gap-2">
+        <div className={sectionTitleClass}>{title}</div>
+        {help}
+      </div>
+      {description && (
+        <div className={sectionDescriptionClass}>{description}</div>
+      )}
     </div>
     {children}
   </section>
@@ -176,7 +143,6 @@ const Section = ({ title, scope, help, children }) => (
 
 const Field = ({
   label,
-  scope,
   hasOverride,
   onResetOverride,
   onApplyToAll,
@@ -185,7 +151,6 @@ const Field = ({
   <div className="block space-y-1.5">
     <div className="flex min-w-0 items-center justify-between gap-2">
       <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
-      <ScopeLabel scope={scope} />
     </div>
     {children}
     <FieldMeta
@@ -213,7 +178,6 @@ const ColorField = ({
   value,
   fallback,
   placeholder,
-  scope,
   hasOverride,
   onResetOverride,
   onApplyToAll,
@@ -233,7 +197,6 @@ const ColorField = ({
   return (
     <Field
       label={label}
-      scope={scope}
       hasOverride={hasOverride}
       onResetOverride={onResetOverride}
       onApplyToAll={onApplyToAll}
@@ -270,10 +233,66 @@ const ColorField = ({
   );
 };
 
+const VisualStateField = ({
+  kind,
+  value,
+  visualStates,
+  hasOverride,
+  onResetOverride,
+  onApplyToAll,
+  onChange,
+  onOpenStateEditor,
+}) => {
+  const states = getVisualStatesForKind(visualStates, kind);
+  const selectedState = states.find(state => state.id === value);
+
+  return (
+    <Field
+      label="Visual state"
+      hasOverride={hasOverride}
+      onResetOverride={onResetOverride}
+      onApplyToAll={onApplyToAll}
+    >
+      <NativeSelect
+        aria-label={`${kind === 'edge' ? 'Edge' : 'Node'} visual state`}
+        value={selectedState?.id ?? ''}
+        onChange={event => onChange(event.target.value)}
+      >
+        <option value="">No visual state</option>
+        {states.map(state => (
+          <option key={state.id} value={state.id}>
+            {state.label}
+          </option>
+        ))}
+      </NativeSelect>
+      <div className="flex items-center justify-between gap-2 rounded-sm border border-[#D7DEE8] bg-[#FFFFFF] px-2.5 py-2 dark:border-[#475569] dark:bg-[#1E293B]">
+        <span className="flex min-w-0 items-center gap-2 text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+          <span
+            aria-hidden="true"
+            className="h-3 w-3 shrink-0 rounded-full border border-black/15 dark:border-white/30"
+            style={{ backgroundColor: selectedState?.color ?? '#CBD5E1' }}
+          />
+          <span className="min-w-0 leading-snug">
+            {selectedState
+              ? 'Color and legend label stay linked.'
+              : 'Use a state to keep meaning consistent.'}
+          </span>
+        </span>
+        <button
+          type="button"
+          className={`${inlineActionButtonClass} shrink-0`}
+          onClick={onOpenStateEditor}
+        >
+          Edit states
+        </button>
+      </div>
+    </Field>
+  );
+};
+
 const ToggleRow = ({
   label,
   checked,
-  scope,
   hasOverride,
   onResetOverride,
   onApplyToAll,
@@ -282,8 +301,7 @@ const ToggleRow = ({
   <div className="space-y-1">
     <label className={toggleRowClass}>
       <span className={`${fieldLabelClass} min-w-0 truncate`}>{label}</span>
-      <span className="flex shrink-0 items-center gap-2">
-        <ScopeLabel scope={scope} />
+      <span className="flex shrink-0 items-center">
         <input
           type="checkbox"
           checked={checked}
@@ -331,69 +349,87 @@ const PresenceNotice = ({ children }) => (
   </div>
 );
 
-const PresenceActions = ({
+const VisibilityControl = ({
+  visible,
+  frameNumber,
+  selectedCount = 0,
+  notShownCount = 0,
+  hasOverride = false,
+  onResetOverride,
   onSetVisibilityForFrame,
   onSetVisibilityFromFrame,
-  selection = false,
+  onSetVisibilityForAll,
 }) => {
-  const labels = selection
-    ? {
-        hideHere: 'Not shown selected here',
-        hideOnward: 'Not shown selected onward',
-        showHere: 'Show selected here',
-        showOnward: 'Show selected onward',
-      }
-    : {
-        hideHere: 'Not shown here',
-        hideOnward: 'Not shown onward',
-        showHere: 'Show here',
-        showOnward: 'Show onward',
-      };
+  const [changeScope, setChangeScope] = useState('frame');
+  const isSelection = selectedCount > 0;
+  const shownCount = Math.max(0, selectedCount - notShownCount);
+  const currentState = isSelection
+    ? `${shownCount} of ${selectedCount} shown on Frame ${frameNumber}`
+    : `${visible ? 'Shown' : 'Hidden'} on Frame ${frameNumber}`;
+  const scopePhrase =
+    changeScope === 'following'
+      ? 'on this and following frames'
+      : changeScope === 'all'
+        ? 'on every frame'
+        : 'on this frame';
+  const applyVisibility = nextVisible => {
+    if (changeScope === 'following') {
+      onSetVisibilityFromFrame?.(nextVisible);
+    } else if (changeScope === 'all') {
+      onSetVisibilityForAll?.(nextVisible);
+    } else {
+      onSetVisibilityForFrame?.(nextVisible);
+    }
+  };
+  const actionLabel = action =>
+    `${action}${isSelection ? ' selected nodes' : ''} ${scopePhrase}`;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="visibility-control">
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className={`${fieldLabelClass} min-w-0 truncate`}>Presence</span>
-        <ScopeLabel scope="Frame" />
+        <span className={`${fieldLabelClass} min-w-0 truncate`}>
+          Visibility
+        </span>
+        <span className="text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+          {currentState}
+        </span>
       </div>
+      <label className="block space-y-1.5">
+        <span className="text-[10px] font-medium text-[#64748B] dark:text-[#94A3B8]">
+          Change applies to
+        </span>
+        <NativeSelect
+          aria-label="Visibility change scope"
+          value={changeScope}
+          onChange={event => setChangeScope(event.target.value)}
+          size="dense"
+        >
+          <option value="frame">This frame</option>
+          <option value="following">This and following frames</option>
+          {onSetVisibilityForAll && <option value="all">Every frame</option>}
+        </NativeSelect>
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           className={visibilityActionButtonClass}
-          aria-label={labels.hideHere}
-          title={labels.hideHere}
-          onClick={() => onSetVisibilityForFrame?.(false)}
+          aria-label={actionLabel('Hide')}
+          title={actionLabel('Hide')}
+          onClick={() => applyVisibility(false)}
         >
-          {labels.hideHere}
+          Hide
         </button>
         <button
           type="button"
           className={visibilityActionButtonClass}
-          aria-label={labels.hideOnward}
-          title={labels.hideOnward}
-          onClick={() => onSetVisibilityFromFrame?.(false)}
+          aria-label={actionLabel('Show')}
+          title={actionLabel('Show')}
+          onClick={() => applyVisibility(true)}
         >
-          {labels.hideOnward}
-        </button>
-        <button
-          type="button"
-          className={visibilityActionButtonClass}
-          aria-label={labels.showHere}
-          title={labels.showHere}
-          onClick={() => onSetVisibilityForFrame?.(true)}
-        >
-          {labels.showHere}
-        </button>
-        <button
-          type="button"
-          className={visibilityActionButtonClass}
-          aria-label={labels.showOnward}
-          title={labels.showOnward}
-          onClick={() => onSetVisibilityFromFrame?.(true)}
-        >
-          {labels.showOnward}
+          Show
         </button>
       </div>
+      <FieldMeta hasOverride={hasOverride} onResetOverride={onResetOverride} />
     </div>
   );
 };
@@ -406,7 +442,6 @@ const RangeControl = ({
   step,
   onChange,
   disabled = false,
-  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -453,7 +488,6 @@ const RangeControl = ({
           <span id={labelId} className={`${fieldLabelClass} truncate`}>
             {label}
           </span>
-          <ScopeLabel scope={scope} />
         </span>
         <input
           aria-label={`${label} value`}
@@ -510,7 +544,6 @@ const NumberControl = ({
   onChange,
   suffix,
   testId,
-  scope,
 }) => {
   const labelId = useId();
   const [draftValue, setDraftValue] = useState('');
@@ -556,7 +589,6 @@ const NumberControl = ({
         <span id={labelId} className={`${fieldLabelClass} truncate`}>
           {label}
         </span>
-        <ScopeLabel scope={scope} />
       </span>
       <span className="flex items-center gap-1">
         <input
@@ -623,11 +655,14 @@ const LinkedList = ({ items, emptyLabel, renderItem, onSelect }) => {
 const MultiSelectionPanel = ({
   selectedCount,
   notShownCount = 0,
+  frameNumber,
   onApplyToSelection,
   onSetVisibilityForFrame,
   onSetVisibilityFromFrame,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => (
   <PanelShell
     title="Selection"
@@ -639,24 +674,44 @@ const MultiSelectionPanel = ({
       />
     }
   >
-    <Section title="Selected nodes">
-      <p className={bodyTextClass}>
-        {selectedCount} items selected · {notShownCount} not shown here
-      </p>
-      <PresenceActions
-        selection
+    <Section
+      title={`Appearance on Frame ${frameNumber}`}
+      description="Changes in this section affect only this frame."
+    >
+      <p className={bodyTextClass}>{selectedCount} nodes selected</p>
+      <VisibilityControl
+        frameNumber={frameNumber}
+        selectedCount={selectedCount}
+        notShownCount={notShownCount}
         onSetVisibilityForFrame={onSetVisibilityForFrame}
         onSetVisibilityFromFrame={onSetVisibilityFromFrame}
       />
       <div className="space-y-2">
-        <ActionButton onClick={() => onApplyToSelection({ status: 'visited' })}>
-          Set visited
-        </ActionButton>
-        <ActionButton onClick={() => onApplyToSelection({ status: 'active' })}>
-          Set active
-        </ActionButton>
+        <Field label="Apply visual state">
+          <NativeSelect
+            aria-label="Apply node visual state to selection"
+            value=""
+            onChange={event => {
+              if (event.target.value) {
+                onApplyToSelection({
+                  stateId: event.target.value,
+                });
+              }
+            }}
+          >
+            <option value="">Choose a state…</option>
+            {getVisualStatesForKind(visualStates, 'node').map(state => (
+              <option key={state.id} value={state.id}>
+                {state.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
         <ActionButton onClick={() => onApplyToSelection({ color: '#22c55e' })}>
           Color green
+        </ActionButton>
+        <ActionButton onClick={onOpenStateEditor}>
+          Edit visual states
         </ActionButton>
         <DeleteButton
           ariaLabel="Delete selected nodes from project"
@@ -673,6 +728,7 @@ const MultiSelectionPanel = ({
 const NodeInspector = ({
   selectedNode,
   connectedEdges,
+  currentFrame = 0,
   frameOverrides = {},
   onUpdateNode,
   onResetOverride,
@@ -682,10 +738,13 @@ const NodeInspector = ({
   onSelectEdge,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => {
   const nodeColor = selectedNode.color ?? '';
-  const nodeStatus = String(selectedNode.status ?? 'default');
+  const nodeStateId = String(selectedNode.stateId ?? '');
   const nodeVisible = selectedNode.visible !== false;
+  const frameNumber = currentFrame + 1;
   const connectedEdgeCount = connectedEdges.length;
   const deleteTitle = connectedEdgeCount
     ? `Remove this node and its ${connectedEdgeCount} connected ${
@@ -709,13 +768,8 @@ const NodeInspector = ({
         />
       }
     >
-      <div className="space-y-4">
-        {!nodeVisible && (
-          <PresenceNotice>
-            Node {selectedNode.id} is not shown on this frame
-          </PresenceNotice>
-        )}
-        <Field label="Label" scope="All frames">
+      <Section title="Project details" description="Shared by every frame.">
+        <Field label="Label">
           <TextInput
             value={selectedNode.label ?? ''}
             onChange={value => onUpdateNode({ label: value })}
@@ -724,7 +778,6 @@ const NodeInspector = ({
         </Field>
         <Field
           label="Frame text"
-          scope="Frame"
           hasOverride={frameOverrides.annotation}
           onResetOverride={() => onResetOverride?.('annotation')}
           onApplyToAll={() =>
@@ -738,55 +791,54 @@ const NodeInspector = ({
             placeholder="Use node label"
           />
         </Field>
-        <Field label="Position" scope="All frames">
+        <Field label="Position">
           <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
             X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
           </div>
         </Field>
-        <Field
-          label="Status / Style"
-          scope="Frame"
-          hasOverride={frameOverrides.status}
-          onResetOverride={() => onResetOverride?.('status')}
-          onApplyToAll={() => onApplyToAllFrames?.({ status: nodeStatus })}
-        >
-          <NativeSelect
-            aria-label="Status / Style"
-            value={nodeStatus}
-            onChange={event => onUpdateNode({ status: event.target.value })}
-          >
-            {NODE_STATUS_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <ColorField
-          label="Color"
-          value={nodeColor}
-          fallback="#3b82f6"
-          placeholder="#22c55e or blank"
-          scope="Frame"
-          hasOverride={frameOverrides.color}
-          onResetOverride={() => onResetOverride?.('color')}
-          onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
-          onChange={value => onUpdateNode({ color: value })}
+      </Section>
+
+      <Section
+        title={`Appearance on Frame ${frameNumber}`}
+        description="Changes in this section affect only this frame."
+      >
+        {!nodeVisible && (
+          <PresenceNotice>
+            Node {selectedNode.id} is hidden on Frame {frameNumber}
+          </PresenceNotice>
+        )}
+        <VisualStateField
+          kind="node"
+          value={nodeStateId}
+          visualStates={visualStates}
+          hasOverride={frameOverrides.stateId}
+          onResetOverride={() => onResetOverride?.('stateId')}
+          onApplyToAll={() => onApplyToAllFrames?.({ stateId: nodeStateId })}
+          onChange={stateId => onUpdateNode({ stateId })}
+          onOpenStateEditor={onOpenStateEditor}
         />
-        <ToggleRow
-          label="Visible"
-          checked={nodeVisible}
-          scope="Frame"
+        {!nodeStateId && (
+          <ColorField
+            label="Custom color"
+            value={nodeColor}
+            fallback="#3b82f6"
+            placeholder="#22c55e or blank"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: nodeColor })}
+            onChange={value => onUpdateNode({ color: value })}
+          />
+        )}
+        <VisibilityControl
+          visible={nodeVisible}
+          frameNumber={frameNumber}
           hasOverride={frameOverrides.visible}
           onResetOverride={() => onResetOverride?.('visible')}
-          onApplyToAll={() => onApplyToAllFrames?.({ visible: nodeVisible })}
-          onChange={checked => onUpdateNode({ visible: checked })}
-        />
-        <PresenceActions
           onSetVisibilityForFrame={onSetVisibilityForFrame}
           onSetVisibilityFromFrame={onSetVisibilityFromFrame}
+          onSetVisibilityForAll={visible => onApplyToAllFrames?.({ visible })}
         />
-      </div>
+      </Section>
 
       <Section title={`Connected edges (${connectedEdgeCount})`}>
         <LinkedList
@@ -820,6 +872,7 @@ const NodeInspector = ({
 const EdgeInspector = ({
   selectedEdge,
   connectedNodes,
+  currentFrame = 0,
   frameOverrides = {},
   onUpdateEdge,
   onResetOverride,
@@ -829,9 +882,13 @@ const EdgeInspector = ({
   onSelectNode,
   onDeleteSelection,
   onClearSelection,
+  visualStates,
+  onOpenStateEditor,
 }) => {
   const edgeColor = selectedEdge.color ?? '#64748b';
+  const edgeStateId = String(selectedEdge.stateId ?? '');
   const edgeVisible = selectedEdge.visible !== false;
+  const frameNumber = currentFrame + 1;
   const notShownEndpointNodes = connectedNodes.filter(
     node => node?.visible === false
   );
@@ -840,9 +897,9 @@ const EdgeInspector = ({
       ? `Node ${notShownEndpointNodes[0].id}`
       : 'an endpoint';
   const edgePresenceNotice = !edgeVisible
-    ? `Edge ${selectedEdge.id} is not shown on this frame`
+    ? `Edge ${selectedEdge.id} is hidden on Frame ${frameNumber}`
     : notShownEndpointNodes.length > 0
-      ? `Edge ${selectedEdge.id} is not shown because ${endpointLabel} is not shown on this frame`
+      ? `Edge ${selectedEdge.id} is hidden because ${endpointLabel} is hidden on Frame ${frameNumber}`
       : '';
 
   return (
@@ -856,11 +913,8 @@ const EdgeInspector = ({
         />
       }
     >
-      <div className="space-y-4">
-        {edgePresenceNotice && (
-          <PresenceNotice>{edgePresenceNotice}</PresenceNotice>
-        )}
-        <Field label="Weight / Label" scope="All frames">
+      <Section title="Project details" description="Shared by every frame.">
+        <Field label="Weight / Label">
           <TextInput
             value={selectedEdge.label ?? ''}
             onChange={value => onUpdateEdge({ label: value })}
@@ -871,34 +925,49 @@ const EdgeInspector = ({
         <ToggleRow
           label="Directed"
           checked={Boolean(selectedEdge.directed)}
-          scope="All frames"
           onChange={checked => onUpdateEdge({ directed: checked })}
         />
-        <ColorField
-          label="Color"
-          value={edgeColor}
-          fallback="#64748b"
-          placeholder="#64748b"
-          scope="Frame"
-          hasOverride={frameOverrides.color}
-          onResetOverride={() => onResetOverride?.('color')}
-          onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
-          onChange={value => onUpdateEdge({ color: value })}
+      </Section>
+
+      <Section
+        title={`Appearance on Frame ${frameNumber}`}
+        description="Changes in this section affect only this frame."
+      >
+        {edgePresenceNotice && (
+          <PresenceNotice>{edgePresenceNotice}</PresenceNotice>
+        )}
+        <VisualStateField
+          kind="edge"
+          value={edgeStateId}
+          visualStates={visualStates}
+          hasOverride={frameOverrides.stateId}
+          onResetOverride={() => onResetOverride?.('stateId')}
+          onApplyToAll={() => onApplyToAllFrames?.({ stateId: edgeStateId })}
+          onChange={stateId => onUpdateEdge({ stateId })}
+          onOpenStateEditor={onOpenStateEditor}
         />
-        <ToggleRow
-          label="Visible"
-          checked={edgeVisible}
-          scope="Frame"
+        {!edgeStateId && (
+          <ColorField
+            label="Custom color"
+            value={edgeColor}
+            fallback="#64748b"
+            placeholder="#64748b"
+            hasOverride={frameOverrides.color}
+            onResetOverride={() => onResetOverride?.('color')}
+            onApplyToAll={() => onApplyToAllFrames?.({ color: edgeColor })}
+            onChange={value => onUpdateEdge({ color: value })}
+          />
+        )}
+        <VisibilityControl
+          visible={edgeVisible}
+          frameNumber={frameNumber}
           hasOverride={frameOverrides.visible}
           onResetOverride={() => onResetOverride?.('visible')}
-          onApplyToAll={() => onApplyToAllFrames?.({ visible: edgeVisible })}
-          onChange={checked => onUpdateEdge({ visible: checked })}
-        />
-        <PresenceActions
           onSetVisibilityForFrame={onSetVisibilityForFrame}
           onSetVisibilityFromFrame={onSetVisibilityFromFrame}
+          onSetVisibilityForAll={visible => onApplyToAllFrames?.({ visible })}
         />
-      </div>
+      </Section>
 
       <Section title="Connected nodes">
         <LinkedList
@@ -933,11 +1002,7 @@ const GlobalSettingsPanel = ({
   const isCurvedRouting = edgeRouting === EDGE_ROUTING.bezier;
 
   return (
-    <PanelShell
-      title="Canvas settings"
-      scope="Project-wide"
-      inspectorType="canvas"
-    >
+    <PanelShell title="Canvas settings" inspectorType="canvas">
       <div className="space-y-3">
         <Field label="Edge routing">
           <NativeSelect
@@ -1015,6 +1080,7 @@ const PropertyPanel = ({
   connectedEdges,
   connectedNodes,
   multiSelection,
+  currentFrame = 0,
   globalSettings,
   edgeRouting,
   nodeFrameOverrides,
@@ -1039,17 +1105,22 @@ const PropertyPanel = ({
   onClearSelection,
   onUpdateGlobal,
   onEdgeRoutingChange,
+  visualStates,
+  onOpenLegendEditor,
 }) => {
   if (multiSelection.length > 1) {
     return (
       <MultiSelectionPanel
         selectedCount={multiSelection.length}
         notShownCount={multiSelectionNotShownCount}
+        frameNumber={currentFrame + 1}
         onApplyToSelection={onApplyToSelection}
         onSetVisibilityForFrame={onSetSelectionVisibilityForFrame}
         onSetVisibilityFromFrame={onSetSelectionVisibilityFromFrame}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }
@@ -1059,6 +1130,7 @@ const PropertyPanel = ({
       <NodeInspector
         selectedNode={selectedNode}
         connectedEdges={connectedEdges}
+        currentFrame={currentFrame}
         frameOverrides={nodeFrameOverrides}
         onUpdateNode={onUpdateNode}
         onResetOverride={onResetNodeOverride}
@@ -1068,6 +1140,8 @@ const PropertyPanel = ({
         onSelectEdge={onSelectEdge}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }
@@ -1077,6 +1151,7 @@ const PropertyPanel = ({
       <EdgeInspector
         selectedEdge={selectedEdge}
         connectedNodes={connectedNodes}
+        currentFrame={currentFrame}
         frameOverrides={edgeFrameOverrides}
         onUpdateEdge={onUpdateEdge}
         onResetOverride={onResetEdgeOverride}
@@ -1086,6 +1161,8 @@ const PropertyPanel = ({
         onSelectNode={onSelectNode}
         onDeleteSelection={onDeleteSelection}
         onClearSelection={onClearSelection}
+        visualStates={visualStates}
+        onOpenStateEditor={onOpenLegendEditor}
       />
     );
   }

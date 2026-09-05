@@ -239,8 +239,12 @@ export const useGraphStudioGraphModel = ({
         setStatus(`Node limit reached (${PROJECT_LIMITS.nodes})`);
         return;
       }
-      const id = nextNodeIdRef.current;
-      nextNodeIdRef.current += 1;
+      const existingNodeIds = new Set(
+        baseGraph.nodes.map(node => String(node.id))
+      );
+      let id = nextNodeIdRef.current;
+      while (existingNodeIds.has(String(id))) id += 1;
+      nextNodeIdRef.current = id + 1;
       const position = clampNodePosition({
         x: snapEnabled ? snapToGrid(point.x) : point.x,
         y: snapEnabled ? snapToGrid(point.y) : point.y,
@@ -267,7 +271,7 @@ export const useGraphStudioGraphModel = ({
       replaceTimeline(nextBaseGraph, nextSteps, currentFrame);
       setSelectedObject({ type: 'node', id });
       setSelectedNodeIds([String(id)]);
-      setStatus(`Node ${id} added from Frame ${currentFrame + 1} onward`);
+      setStatus(`Node ${id} added on Frame ${currentFrame + 1} and following`);
     },
     [
       baseGraph,
@@ -291,8 +295,13 @@ export const useGraphStudioGraphModel = ({
         setStatus(`Edge limit reached (${PROJECT_LIMITS.edges})`);
         return;
       }
-      const id = `e${nextEdgeIdRef.current}`;
-      nextEdgeIdRef.current += 1;
+      const existingEdgeIds = new Set(
+        baseGraph.edges.map(edge => String(edge.id))
+      );
+      let edgeNumber = nextEdgeIdRef.current;
+      while (existingEdgeIds.has(`e${edgeNumber}`)) edgeNumber += 1;
+      const id = `e${edgeNumber}`;
+      nextEdgeIdRef.current = edgeNumber + 1;
       const nextBaseGraph = {
         ...baseGraph,
         edges: [
@@ -319,7 +328,7 @@ export const useGraphStudioGraphModel = ({
       setSelectedNodeIds([]);
       setSelectedObject({ type: 'edge', id });
       setStatus(
-        `Edge ${from} → ${to} added from Frame ${currentFrame + 1} onward`
+        `Edge ${from} → ${to} added on Frame ${currentFrame + 1} and following`
       );
       return id;
     },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../../../context/useTheme';
 import GraphEdge from './GraphEdge';
 import GraphNode from './GraphNode';
@@ -11,6 +11,8 @@ import {
   createFitViewState,
   EPSILON,
   getRectSelection,
+  getWheelZoomFactor,
+  recenterViewStateForViewportResize,
   toWorld,
 } from './graphCanvasUtils';
 import { normalizeCaptionOverlay } from './lib/captionOverlay';
@@ -643,6 +645,90 @@ const FrameCaption = ({
   const dragStateRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  useEffect(() => {
+    if (!isDragging || isExporting) return undefined;
+
+    const releaseCapture = dragState => {
+      const captureTarget = dragState?.captureTarget;
+      if (!captureTarget) return;
+      try {
+        if (
+          !captureTarget.hasPointerCapture?.(dragState.pointerId) ||
+          !captureTarget.releasePointerCapture
+        ) {
+          return;
+        }
+        captureTarget.releasePointerCapture(dragState.pointerId);
+      } catch {
+        // The overlay may have been detached while the pointer was outside it.
+      }
+    };
+    const finishDragging = event => {
+      const dragState = dragStateRef.current;
+      if (
+        !dragState ||
+        (event?.pointerId !== undefined &&
+          dragState.pointerId !== event.pointerId)
+      ) {
+        return;
+      }
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      releaseCapture(dragState);
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    const updatePosition = event => {
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const svgBounds = svgRef.current?.getBoundingClientRect();
+      if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
+      const scaleX = dragState.canvasWidth / svgBounds.width;
+      const scaleY = dragState.canvasHeight / svgBounds.height;
+      const nextX =
+        dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
+      const nextY =
+        dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
+      const normalizedX =
+        dragState.rightX > dragState.leftX
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextX - dragState.leftX) / (dragState.rightX - dragState.leftX)
+              )
+            )
+          : 0;
+      const normalizedY =
+        dragState.bottomY > dragState.topY
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (nextY - dragState.topY) / (dragState.bottomY - dragState.topY)
+              )
+            )
+          : 0;
+      setCaptionOverlay?.(prev => ({
+        ...normalizeCaptionOverlay(prev),
+        position: { x: normalizedX, y: normalizedY },
+      }));
+    };
+
+    window.addEventListener('pointermove', updatePosition, true);
+    window.addEventListener('pointerup', finishDragging, true);
+    window.addEventListener('pointercancel', finishDragging, true);
+    window.addEventListener('blur', finishDragging);
+    return () => {
+      window.removeEventListener('pointermove', updatePosition, true);
+      window.removeEventListener('pointerup', finishDragging, true);
+      window.removeEventListener('pointercancel', finishDragging, true);
+      window.removeEventListener('blur', finishDragging);
+    };
+  }, [isDragging, isExporting, setCaptionOverlay, svgRef]);
+
   if (
     !caption.enabled ||
     !text ||
@@ -711,45 +797,6 @@ const FrameCaption = ({
     position: caption.position,
   });
 
-  const updatePosition = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const svgBounds = svgRef.current?.getBoundingClientRect();
-    if (!svgBounds || svgBounds.width <= 0 || svgBounds.height <= 0) return;
-    const scaleX = canvasSize.width / svgBounds.width;
-    const scaleY = canvasSize.height / svgBounds.height;
-    const nextX =
-      dragState.originX + (event.clientX - dragState.startClientX) * scaleX;
-    const nextY =
-      dragState.originY + (event.clientY - dragState.startClientY) * scaleY;
-    const normalizedX =
-      rightX > leftX
-        ? Math.max(0, Math.min(1, (nextX - leftX) / (rightX - leftX)))
-        : 0;
-    const normalizedY =
-      bottomY > topY
-        ? Math.max(0, Math.min(1, (nextY - topY) / (bottomY - topY)))
-        : 0;
-    setCaptionOverlay?.(prev => ({
-      ...normalizeCaptionOverlay(prev),
-      position: {
-        x: normalizedX,
-        y: normalizedY,
-      },
-    }));
-  };
-  const finishDragging = event => {
-    const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    dragStateRef.current = null;
-    setIsDragging(false);
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  };
-
   return (
     <g
       aria-label="Frame caption"
@@ -771,6 +818,7 @@ const FrameCaption = ({
         isExporting
           ? undefined
           : event => {
+              if (event.button !== 0) return;
               event.preventDefault();
               event.stopPropagation();
               dragStateRef.current = {
@@ -779,14 +827,22 @@ const FrameCaption = ({
                 startClientY: event.clientY,
                 originX: x,
                 originY: y,
+                leftX,
+                topY,
+                rightX,
+                bottomY,
+                canvasWidth: canvasSize.width,
+                canvasHeight: canvasSize.height,
+                captureTarget: event.currentTarget,
               };
               setIsDragging(true);
-              event.currentTarget.setPointerCapture?.(event.pointerId);
+              try {
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              } catch {
+                // Window listeners retain drag ownership when capture is unavailable.
+              }
             }
       }
-      onPointerMove={isExporting ? undefined : updatePosition}
-      onPointerUp={isExporting ? undefined : finishDragging}
-      onPointerCancel={isExporting ? undefined : finishDragging}
       style={
         isExporting
           ? undefined
@@ -864,6 +920,7 @@ const GraphCanvas = ({
   nodeLabelFontSize,
   edgeLabelFontSize,
   resetViewTrigger = 0,
+  contentEpoch = 0,
   svgElementId = 'graph-studio-canvas-svg',
   svgTestId = 'graph-canvas-svg',
   svgResourcePrefix = '',
@@ -897,9 +954,12 @@ const GraphCanvas = ({
           height: Number(canvasSizeOverride.height),
         }
       : canvasSize;
+  const contentEpochKey = isExporting ? 'export' : `editor-${contentEpoch}`;
+  const contentLayoutIdPrefix = `${layoutIdPrefix}${contentEpochKey}-`;
   const [dragRect, setDragRect] = useState(null);
   const pointerStateRef = useRef(null);
   const hasInitializedViewRef = useRef(false);
+  const fittedViewportSizeRef = useRef({ width: 0, height: 0 });
   const previousResetTriggerRef = useRef(resetViewTrigger);
   const nodeMap = useMemo(() => {
     const map = new Map();
@@ -998,12 +1058,40 @@ const GraphCanvas = ({
     };
   }, [onViewportSizeChange]);
   useEffect(() => {
+    if (!hasInitializedViewRef.current || isExporting) return;
+    const previousViewport = fittedViewportSizeRef.current;
+    const nextViewport = canvasSize;
+    fittedViewportSizeRef.current = nextViewport;
+    if (
+      previousViewport.width <= 0 ||
+      previousViewport.height <= 0 ||
+      nextViewport.width <= 0 ||
+      nextViewport.height <= 0 ||
+      (previousViewport.width === nextViewport.width &&
+        previousViewport.height === nextViewport.height)
+    ) {
+      return;
+    }
+    setViewState(previousView => {
+      return (
+        recenterViewStateForViewportResize({
+          viewState: previousView,
+          previousViewport,
+          nextViewport,
+        }) ?? previousView
+      );
+    });
+  }, [canvasSize, isExporting, setViewState]);
+  useLayoutEffect(() => {
     const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
     previousResetTriggerRef.current = resetViewTrigger;
     if (hasInitializedViewRef.current && !resetChanged) return undefined;
 
     const el = svgRef.current;
     if (!el) return undefined;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let disposed = false;
     const doInit = () => {
       const bounds = { width: el.clientWidth, height: el.clientHeight };
       if (bounds.width <= 0 || bounds.height <= 0) return false;
@@ -1017,6 +1105,10 @@ const GraphCanvas = ({
           x: (viewportWidth - VIEWBOX_WIDTH * zoom) / 2,
           y: (viewportHeight - VIEWBOX_HEIGHT * zoom) / 2,
         });
+        fittedViewportSizeRef.current = {
+          width: viewportWidth,
+          height: viewportHeight,
+        };
         hasInitializedViewRef.current = true;
         return true;
       }
@@ -1056,24 +1148,42 @@ const GraphCanvas = ({
         x: nextView.x + safeViewport.x,
         y: nextView.y + safeViewport.y,
       });
+      fittedViewportSizeRef.current = {
+        width: viewportWidth,
+        height: viewportHeight,
+      };
       hasInitializedViewRef.current = true;
       return true;
     };
-    if (doInit()) return;
-    const ro = new ResizeObserver(() => {
-      if (doInit()) ro.disconnect();
-    });
-    ro.observe(el);
-    const onWindowResize = () => {
-      if (doInit()) {
-        ro.disconnect();
-        window.removeEventListener('resize', onWindowResize);
-      }
-    };
-    window.addEventListener('resize', onWindowResize);
-    return () => {
+    if (resetChanged) {
+      // Presets and explicit Fit View requests already have stable canvas
+      // geometry. Fit synchronously so the replacement graph is never painted
+      // in the previous graph's viewport.
+      doInit();
+      return undefined;
+    }
+    const cleanupListeners = () => {
       ro.disconnect();
-      window.removeEventListener('resize', onWindowResize);
+      window.removeEventListener('resize', scheduleInit);
+    };
+    const scheduleInit = () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      firstFrame = window.requestAnimationFrame(() => {
+        secondFrame = window.requestAnimationFrame(() => {
+          if (!disposed && doInit()) cleanupListeners();
+        });
+      });
+    };
+    const ro = new ResizeObserver(scheduleInit);
+    ro.observe(el);
+    window.addEventListener('resize', scheduleInit);
+    scheduleInit();
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      cleanupListeners();
     };
   }, [graph.nodes, nodeRadius, setViewState, resetViewTrigger]);
   useEffect(() => {
@@ -1098,14 +1208,16 @@ const GraphCanvas = ({
       if (!bounds) return;
       const cursorX = event.clientX - bounds.left;
       const cursorY = event.clientY - bounds.top;
-      const worldBefore = toWorld({ x: cursorX, y: cursorY }, viewState);
-      const zoomDelta = event.deltaY > 0 ? -0.1 : 0.1;
-      const nextZoom = clampZoom(
-        viewState.zoom + zoomDelta,
-        bounds.width,
-        bounds.height
-      );
       setViewState(prev => {
+        const worldBefore = toWorld({ x: cursorX, y: cursorY }, prev);
+        const nextZoom = clampZoom(
+          prev.zoom *
+            getWheelZoomFactor({
+              deltaY: event.deltaY,
+              deltaMode: event.deltaMode,
+              viewportHeight: bounds.height,
+            })
+        );
         const candidate = {
           ...prev,
           zoom: nextZoom,
@@ -1121,7 +1233,7 @@ const GraphCanvas = ({
     };
     svg.addEventListener('wheel', handleWheel, { passive: false });
     return () => svg.removeEventListener('wheel', handleWheel);
-  }, [isExporting, lockCanvas, viewState, setViewState]);
+  }, [isExporting, lockCanvas, setViewState]);
   const onPointerDownBackground = event => {
     svgRef.current?.focus();
     const bounds = svgRef.current?.getBoundingClientRect();
@@ -1386,6 +1498,7 @@ const GraphCanvas = ({
         onPointerMove={isExporting ? undefined : onPointerMove}
         onPointerUp={isExporting ? undefined : onPointerUp}
         onPointerCancel={isExporting ? undefined : onPointerUp}
+        onLostPointerCapture={isExporting ? undefined : onPointerUp}
         onPointerLeave={isExporting ? undefined : onPointerUp}
         style={
           isExporting
@@ -1470,7 +1583,7 @@ const GraphCanvas = ({
               />
             </g>
           )}
-          <g data-export-content="true">
+          <g key={contentEpochKey} data-export-content="true">
             {edgeVisualData.map(
               ({
                 edge,
@@ -1501,7 +1614,7 @@ const GraphCanvas = ({
                     labelPosition={labelPosition}
                     labelFontSize={edgeLabelSize}
                     strokeWidth={strokeWidth}
-                    layoutIdPrefix={`${layoutIdPrefix}${resetViewTrigger}-`}
+                    layoutIdPrefix={contentLayoutIdPrefix}
                     shouldAnimate={
                       !isExporting &&
                       (endpointMoved || diff.changedEdges.has(String(edge.id)))
@@ -1551,7 +1664,7 @@ const GraphCanvas = ({
                     }
                     isExporting={isExporting}
                     themeOverride={themeOverride}
-                    layoutIdPrefix={`${layoutIdPrefix}${resetViewTrigger}-`}
+                    layoutIdPrefix={contentLayoutIdPrefix}
                     mode={mode}
                     onPointerDown={event =>
                       handleNodePointerDown(event, node.id)
