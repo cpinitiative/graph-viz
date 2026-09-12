@@ -171,6 +171,46 @@ test('migrates legacy node status while preserving its visible color', () => {
   assert.equal(frameState.color, '#E2E2E2');
 });
 
+test('preserves an explicit choice of raw styling instead of migrating it', () => {
+  const input = {
+    graph: {
+      nodes: [{ id: 1, stateId: '', status: 'active', color: '#0af' }],
+      edges: [],
+    },
+    steps: [
+      {
+        nodeOverrides: { 1: { stateId: '', status: 'visited' } },
+        edgeOverrides: {},
+      },
+    ],
+    visualStates: [],
+  };
+  const migrated = migrateLegacyVisualStates(input);
+  assert.deepEqual(migrated.graph, input.graph);
+  assert.deepEqual(migrated.steps, input.steps);
+  assert.deepEqual(migrated.visualStates, []);
+});
+
+test('retains the historical palette for legacy status-only projects', () => {
+  const statuses = ['active', 'queued', 'visited', 'discarded'];
+  const migrated = migrateLegacyVisualStates({
+    graph: {
+      nodes: statuses.map((status, id) => ({ id, status })),
+      edges: [],
+    },
+    steps: [],
+    visualStates: [],
+  });
+  const resolved = resolveGraphVisualStates(
+    migrated.graph,
+    migrated.visualStates
+  );
+  assert.deepEqual(
+    resolved.nodes.map(node => node.color),
+    ['#000000', '#EEEEEE', '#E2E2E2', '#FFFFFF']
+  );
+});
+
 test('removing a state clears project and frame references', () => {
   const cleaned = removeVisualStateReferences({
     stateId: 'active',

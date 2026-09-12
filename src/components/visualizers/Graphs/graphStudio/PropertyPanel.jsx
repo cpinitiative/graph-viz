@@ -1,12 +1,17 @@
 import { useId, useState } from 'react';
 import NativeSelect from './NativeSelect';
 import { EDGE_ROUTING } from './constants';
+import { useCommittedNumberInput } from './hooks/useCommittedNumberInput.js';
 import {
   EDGE_LABEL_FONT_SIZE_RANGE,
   getDefaultEdgeLabelFontSize,
   getDefaultNodeLabelFontSize,
   NODE_LABEL_FONT_SIZE_RANGE,
 } from './lib/fontSizing';
+import {
+  getNodeAnnotationPlacement,
+  getNodeShape,
+} from './lib/nodeGeometry.js';
 import { isGraphColor } from './lib/visualProperties';
 import { getVisualStatesForKind } from './lib/visualStates';
 
@@ -444,76 +449,26 @@ const RangeControl = ({
   disabled = false,
 }) => {
   const labelId = useId();
-  const [draftValue, setDraftValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const displayValue = isEditing ? draftValue : String(value);
-  const numericMin = Number(min);
-  const numericMax = Number(max);
-  const numericStep = Number(step);
-  const decimalPlaces = String(step).includes('.')
-    ? String(step).split('.')[1].length
-    : 0;
-
-  const normalizeValue = rawValue => {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed)) return null;
-    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
-    if (!Number.isFinite(numericStep) || numericStep <= 0) {
-      return Number(clamped.toFixed(decimalPlaces));
-    }
-    const stepped =
-      numericMin +
-      Math.round((clamped - numericMin) / numericStep) * numericStep;
-    return Number(
-      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
-    );
-  };
-
-  const commitDraftValue = () => {
-    const nextValue = normalizeValue(displayValue);
-    if (nextValue === null) {
-      setDraftValue('');
-      setIsEditing(false);
-      return;
-    }
-    setDraftValue('');
-    setIsEditing(false);
-    onChange(nextValue);
-  };
-
+  const numberInput = useCommittedNumberInput({
+    value,
+    min,
+    max,
+    step,
+    onCommit: onChange,
+  });
   return (
     <div className="space-y-1">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <span className="flex min-w-0 items-center gap-2">
-          <span id={labelId} className={`${fieldLabelClass} truncate`}>
-            {label}
-          </span>
+        <span id={labelId} className={`${fieldLabelClass} truncate`}>
+          {label}
         </span>
         <input
+          {...numberInput}
           aria-label={`${label} value`}
           className={compactNumberInputClass}
           disabled={disabled}
           inputMode="decimal"
-          onBlur={commitDraftValue}
-          onChange={event => {
-            setIsEditing(true);
-            setDraftValue(event.target.value);
-          }}
-          onFocus={() => {
-            setIsEditing(true);
-            setDraftValue(String(value));
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.currentTarget.blur();
-            } else if (event.key === 'Escape') {
-              setDraftValue('');
-              setIsEditing(false);
-              event.currentTarget.blur();
-            }
-          }}
           type="text"
-          value={displayValue}
         />
       </div>
       <input
@@ -544,78 +499,29 @@ const NumberControl = ({
   onChange,
   suffix,
   testId,
+  wide = false,
 }) => {
   const labelId = useId();
-  const [draftValue, setDraftValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const displayValue = isEditing ? draftValue : String(value);
-  const numericMin = Number(min);
-  const numericMax = Number(max);
-  const numericStep = Number(step);
-  const decimalPlaces = String(step).includes('.')
-    ? String(step).split('.')[1].length
-    : 0;
-
-  const normalizeValue = rawValue => {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed)) return null;
-    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
-    if (!Number.isFinite(numericStep) || numericStep <= 0) {
-      return Number(clamped.toFixed(decimalPlaces));
-    }
-    const stepped =
-      numericMin +
-      Math.round((clamped - numericMin) / numericStep) * numericStep;
-    return Number(
-      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
-    );
-  };
-
-  const commitDraftValue = () => {
-    const nextValue = normalizeValue(displayValue);
-    if (nextValue === null) {
-      setDraftValue('');
-      setIsEditing(false);
-      return;
-    }
-    setDraftValue('');
-    setIsEditing(false);
-    onChange(nextValue);
-  };
-
+  const numberInput = useCommittedNumberInput({
+    value,
+    min,
+    max,
+    step,
+    onCommit: onChange,
+  });
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-      <span className="flex min-w-0 items-center gap-2">
-        <span id={labelId} className={`${fieldLabelClass} truncate`}>
-          {label}
-        </span>
+      <span id={labelId} className={`${fieldLabelClass} truncate`}>
+        {label}
       </span>
       <span className="flex items-center gap-1">
         <input
+          {...numberInput}
           aria-labelledby={labelId}
-          className={compactNumberInputClass}
+          className={joinClasses(compactNumberInputClass, wide && 'h-10 w-28')}
           data-testid={testId}
           inputMode="decimal"
-          onBlur={commitDraftValue}
-          onChange={event => {
-            setIsEditing(true);
-            setDraftValue(event.target.value);
-          }}
-          onFocus={() => {
-            setIsEditing(true);
-            setDraftValue(String(value));
-          }}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.currentTarget.blur();
-            } else if (event.key === 'Escape') {
-              setDraftValue('');
-              setIsEditing(false);
-              event.currentTarget.blur();
-            }
-          }}
           type="text"
-          value={displayValue}
         />
         {suffix && (
           <span className="w-4 text-left text-[10px] font-semibold text-[#64748B] dark:text-[#94A3B8]">
@@ -663,6 +569,7 @@ const MultiSelectionPanel = ({
   onClearSelection,
   visualStates,
   onOpenStateEditor,
+  onArrangeSelection,
 }) => (
   <PanelShell
     title="Selection"
@@ -674,6 +581,56 @@ const MultiSelectionPanel = ({
       />
     }
   >
+    <Section
+      title="Arrange across the project"
+      description="Positions are shared by every frame. Align outlines or space node centers evenly."
+    >
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          ['left', 'Left', 'Align left edges'],
+          ['center-x', 'Center X', 'Align horizontal centers'],
+          ['right', 'Right', 'Align right edges'],
+          ['top', 'Top', 'Align top edges'],
+          ['center-y', 'Center Y', 'Align vertical centers'],
+          ['bottom', 'Bottom', 'Align bottom edges'],
+        ].map(([operation, label, ariaLabel]) => (
+          <button
+            key={operation}
+            type="button"
+            className={visibilityActionButtonClass}
+            aria-label={ariaLabel}
+            onClick={() => onArrangeSelection?.(operation)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className={`${visibilityActionButtonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+          disabled={selectedCount < 3}
+          aria-label="Distribute horizontal centers"
+          onClick={() => onArrangeSelection?.('distribute-x')}
+        >
+          Space horizontally
+        </button>
+        <button
+          type="button"
+          className={`${visibilityActionButtonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+          disabled={selectedCount < 3}
+          aria-label="Distribute vertical centers"
+          onClick={() => onArrangeSelection?.('distribute-y')}
+        >
+          Space vertically
+        </button>
+      </div>
+      {selectedCount < 3 && (
+        <p className={sectionDescriptionClass}>
+          Select at least three nodes to distribute them.
+        </p>
+      )}
+    </Section>
     <Section
       title={`Appearance on Frame ${frameNumber}`}
       description="Changes in this section affect only this frame."
@@ -776,8 +733,71 @@ const NodeInspector = ({
             ariaLabel="Label"
           />
         </Field>
+        <Field label="Shape">
+          <NativeSelect
+            aria-label="Node shape"
+            value={getNodeShape(selectedNode)}
+            onChange={event => onUpdateNode({ shape: event.target.value })}
+          >
+            <option value="circle">Circle</option>
+            <option value="square">Square</option>
+            <option value="rectangle">Rectangle</option>
+            <option value="diamond">Diamond</option>
+            <option value="text">Text (no outline)</option>
+          </NativeSelect>
+          {getNodeShape(selectedNode) === 'text' && (
+            <p className={sectionDescriptionClass}>
+              Text has no fill and keeps this node&apos;s connections and
+              selection.
+            </p>
+          )}
+        </Field>
+        <Field label="Position">
+          <NumberControl
+            label="X coordinate"
+            value={selectedNode.x}
+            min={-10000000}
+            max={10000000}
+            step="any"
+            wide
+            testId="node-x-input"
+            onChange={x => onUpdateNode({ x })}
+          />
+          <NumberControl
+            label="Y coordinate"
+            value={selectedNode.y}
+            min={-10000000}
+            max={10000000}
+            step="any"
+            wide
+            testId="node-y-input"
+            onChange={y => onUpdateNode({ y })}
+          />
+        </Field>
+        <Field label="Annotation placement">
+          <NativeSelect
+            aria-label="Node annotation placement"
+            value={getNodeAnnotationPlacement(selectedNode)}
+            onChange={event =>
+              onUpdateNode({ annotationPlacement: event.target.value })
+            }
+          >
+            <option value="below">Below node · keep label visible</option>
+            <option value="replace">Replace label · legacy appearance</option>
+          </NativeSelect>
+          <p className={sectionDescriptionClass}>
+            Below node keeps its identity visible alongside each frame&apos;s
+            annotation.
+          </p>
+        </Field>
+      </Section>
+
+      <Section
+        title={`Appearance on Frame ${frameNumber}`}
+        description="Changes in this section affect only this frame."
+      >
         <Field
-          label="Frame text"
+          label="Frame annotation"
           hasOverride={frameOverrides.annotation}
           onResetOverride={() => onResetOverride?.('annotation')}
           onApplyToAll={() =>
@@ -786,22 +806,14 @@ const NodeInspector = ({
         >
           <TextInput
             value={selectedNode.annotation ?? ''}
-            onChange={value => onUpdateNode({ annotation: value })}
-            ariaLabel="Frame text"
-            placeholder="Use node label"
+            onChange={annotation => onUpdateNode({ annotation })}
+            ariaLabel="Frame annotation"
+            placeholder="Distance, queue state, or a short note"
           />
+          <p className={sectionDescriptionClass}>
+            Only Frame {frameNumber}; the project label stays unchanged.
+          </p>
         </Field>
-        <Field label="Position">
-          <div className="border border-[#D7DEE8] bg-[#FFFFFF] px-3 py-2 font-mono text-xs font-semibold tabular-nums text-[#475569] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#CBD5E1]">
-            X {Math.round(selectedNode.x)} / Y {Math.round(selectedNode.y)}
-          </div>
-        </Field>
-      </Section>
-
-      <Section
-        title={`Appearance on Frame ${frameNumber}`}
-        description="Changes in this section affect only this frame."
-      >
         {!nodeVisible && (
           <PresenceNotice>
             Node {selectedNode.id} is hidden on Frame {frameNumber}
@@ -1101,6 +1113,7 @@ const PropertyPanel = ({
   onSelectEdge,
   onSelectNode,
   onApplyToSelection,
+  onArrangeSelection,
   onDeleteSelection,
   onClearSelection,
   onUpdateGlobal,
@@ -1115,6 +1128,7 @@ const PropertyPanel = ({
         notShownCount={multiSelectionNotShownCount}
         frameNumber={currentFrame + 1}
         onApplyToSelection={onApplyToSelection}
+        onArrangeSelection={onArrangeSelection}
         onSetVisibilityForFrame={onSetSelectionVisibilityForFrame}
         onSetVisibilityFromFrame={onSetSelectionVisibilityFromFrame}
         onDeleteSelection={onDeleteSelection}

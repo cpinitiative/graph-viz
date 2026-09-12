@@ -37,16 +37,7 @@ export const createInitialViewState = (
 ) => {
   const bounds = getSelectionBounds(nodes);
   if (!bounds) {
-    const minGridZoom = computeMinGridZoomForViewport(
-      viewportWidth,
-      viewportHeight
-    );
-    return createCenteredViewState(
-      [],
-      minGridZoom,
-      viewportWidth,
-      viewportHeight
-    );
+    return createCenteredViewState([], 1, viewportWidth, viewportHeight);
   }
   const padding = 42;
   const fitWidth = bounds.width + padding * 2;

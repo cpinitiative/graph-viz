@@ -42,7 +42,7 @@ const ImportModal = ({
       testId="import-menu-modal"
       titleId="import-menu-title"
       title="Import"
-      description="Bring project data or an Edge List into the current Graph Studio workspace."
+      description="Load a project, paste a contest edge list, or build a graph from an ASCII grid."
       onClose={onClose}
       closeOnBackdrop
       bodyClassName="space-y-4"
@@ -71,7 +71,8 @@ const ImportModal = ({
         <div>
           <h3 className={modalEyebrowClass}>Project Data</h3>
           <p className={`mt-1 ${modalBodyTextClass}`}>
-            Load a complete Graph Studio project without changing its schema.
+            Restore the graph, frames, and visual settings from a saved Graph
+            Studio project.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -114,16 +115,35 @@ const ImportModal = ({
         <div>
           <h3 className={modalEyebrowClass}>Edge List</h3>
           <p className={`mt-1 ${modalBodyTextClass}`}>
-            Strict 0-based format: first line n m, then exactly m rows of u v or
-            u v weight. Spaces only.
+            First line n m, then m edges. Choose zero-based or one-based IDs and
+            numeric weights or text labels.
           </p>
         </div>
         <button
           type="button"
           className={modalActionButtonClass}
-          onClick={() => openNextModal(onOpenParser)}
+          onClick={() => openNextModal(() => onOpenParser?.('edge-list'))}
         >
           Paste / Import Edge List
+        </button>
+      </section>
+
+      <section className={modalSectionClass}>
+        <div>
+          <h3 className={modalEyebrowClass}>ASCII Grid</h3>
+          <p className={`mt-1 ${modalBodyTextClass}`}>
+            Paste a maze such as a CSES sample using #, ., A, B, and M. A rows
+            columns header is optional. Walls and cell positions are preserved;
+            open neighbours are connected.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={modalActionButtonClass}
+          data-testid="grid-import-button"
+          onClick={() => openNextModal(() => onOpenParser?.('grid'))}
+        >
+          Paste / Import ASCII Grid
         </button>
       </section>
     </ModalFrame>

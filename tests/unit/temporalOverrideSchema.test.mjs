@@ -193,10 +193,10 @@ test('script patch frames cannot bypass the temporal override schema', () => {
   ]);
 
   assert.deepEqual(steps[1].nodeOverrides, {
-    A: { color: '#FF0000', visible: false },
+    A: { color: '#FF0000', visible: false, stateId: '' },
   });
   assert.deepEqual(steps[1].edgeOverrides, {
-    e1: { status: 'active', color: '#00FF00' },
+    e1: { status: 'active', color: '#00FF00', stateId: '' },
   });
 });
 

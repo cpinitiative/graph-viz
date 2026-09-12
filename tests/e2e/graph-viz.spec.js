@@ -961,7 +961,10 @@ test.describe('Graph Studio desktop smoke', () => {
     );
     const modeGuidance = page.getByTestId('tool-mode-guidance');
     const editScope = page.getByTestId('timeline-edit-scope');
-    await expect(page.getByTestId('canvas-hud-stack')).toHaveCount(0);
+    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
+    await expect(
+      page.getByText('Shift-click to select multiple nodes', { exact: true })
+    ).toBeVisible();
     await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     await expect(modeGuidance).toHaveCount(0);
     await expect(editScope).toHaveCount(0);
@@ -1006,7 +1009,7 @@ test.describe('Graph Studio desktop smoke', () => {
       'aria-pressed',
       'true'
     );
-    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveText(/^Source \d+ → choose target$/);
     await expect(modeGuidance).toHaveAttribute(
       'aria-label',
       /Source node \d+ selected; choose target/
@@ -3267,7 +3270,7 @@ while (true) {}
     );
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
-      'Choose target'
+      /^Source \d+ → choose target$/
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
@@ -3377,7 +3380,7 @@ while (true) {}
     await expect(selectionRing).toHaveCount(0);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
-      'Choose target'
+      /^Source \d+ → choose target$/
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
@@ -3542,7 +3545,7 @@ while (true) {}
     await expect(modeGuidance).toHaveText('Choose source, then target');
     await expect(editScope).toHaveText('New items start on Frame 2');
     await graphNodeCircles(page).first().click();
-    await expect(modeGuidance).toHaveText('Choose target');
+    await expect(modeGuidance).toHaveText(/^Source \d+ → choose target$/);
     await expect(modeGuidance).toHaveAttribute(
       'aria-label',
       /Source node 0 selected; choose target/
@@ -3952,7 +3955,7 @@ while (true) {}
     await expect(page.getByText('Project imported')).toBeVisible();
     await expect(graphCanvas(page)).toBeVisible();
     await expect(
-      page.getByTestId('timeline-panel').getByText('Node B not shown')
+      page.getByTestId('timeline-frame-scroller').getByText('Node B not shown')
     ).toBeVisible();
 
     await expect(
@@ -4250,7 +4253,9 @@ while (true) {}
     await expect(
       importMenu.getByRole('button', { name: 'Paste / Import Edge List' })
     ).toBeVisible();
-    await expect(importMenu.getByText(/Strict 0-based format/)).toBeVisible();
+    await expect(
+      importMenu.getByText(/Choose zero-based or one-based IDs/)
+    ).toBeVisible();
     await importMenu.getByRole('button', { name: 'Cancel' }).click();
     await expect(importMenu).toBeHidden();
 
@@ -4295,9 +4300,8 @@ while (true) {}
       .count();
 
     const parserModal = await openEdgeListParser(page);
-    await expect(
-      parserModal.getByText(/Strict 0-based CP format/)
-    ).toBeVisible();
+    await expect(parserModal.getByLabel('Vertex IDs')).toHaveValue('0');
+    await expect(parserModal.getByLabel('Edge values')).toHaveValue('weight');
     const parserEditor = parserModal.locator('textarea');
     const invalidCases = [
       {
@@ -4771,7 +4775,7 @@ while (true) {}
     await page.getByRole('button', { name: 'Draw Edge' }).click();
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
-      'Choose target'
+      /^Source \d+ → choose target$/
     );
     exportMenu = await openExportMenu(page);
     await expect(exportMenu.getByTestId('tool-mode-guidance')).toHaveCount(0);
@@ -4787,7 +4791,7 @@ while (true) {}
     await closeExportMenu(page);
     await expect(graphCanvas(page)).toHaveAttribute('data-mode', 'draw');
     await expect(page.getByTestId('tool-mode-guidance')).toHaveText(
-      'Choose target'
+      /^Source \d+ → choose target$/
     );
 
     await page.getByTestId('tool-button-select').click();

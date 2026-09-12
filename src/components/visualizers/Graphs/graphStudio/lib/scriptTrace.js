@@ -12,7 +12,7 @@ import {
   sanitizeTemporalOverrideMap,
   sanitizeTemporalOverridePatch,
 } from './temporalOverrideSchema.js';
-import { validateVisualProperties } from './visualProperties.js';
+import { NODE_STATES, validateVisualProperties } from './visualProperties.js';
 
 const SCRIPT_MAX_LENGTH = 20000;
 const SCRIPT_MAX_TRACE_ENTRIES = 1000;
@@ -257,6 +257,30 @@ const runScriptTraceWorker = ({ source, graph, timeoutMs, signal }) =>
     worker.postMessage({ code: source, graph });
   });
 
+const mergeScriptOverrides = (previous, updates, objectType) => {
+  const next = { ...previous };
+  for (const [id, incoming] of Object.entries(
+    sanitizeTemporalOverrideMap(objectType, updates)
+  )) {
+    const patch = { ...incoming };
+    const changesStatus = patch.status !== undefined;
+    const changesColor = patch.color !== undefined;
+    if ((changesStatus || changesColor) && !Object.hasOwn(patch, 'stateId')) {
+      // A raw style command must take precedence over a semantic state inherited
+      // from the base graph or an earlier trace event. An empty ID means the
+      // author deliberately chose raw styling; an absent ID may be legacy data.
+      patch.stateId = '';
+    }
+    if (objectType === 'node' && changesStatus && !patch.stateId) {
+      // Persist the palette used for a new status instead of leaving a missing
+      // color for old-project migration to interpret as its historical palette.
+      patch.color = patch.color || NODE_STATES[patch.status].color;
+    }
+    next[id] = { ...(previous?.[id] ?? {}), ...patch };
+  }
+  return next;
+};
+
 export const buildTimelineSteps = trace => {
   const steps = [
     {
@@ -280,27 +304,39 @@ export const buildTimelineSteps = trace => {
       edgeOverrides: JSON.parse(JSON.stringify(previous.edgeOverrides ?? {})),
     };
     if (entry.type === 'node') {
-      next.nodeOverrides[String(entry.id)] = {
-        ...(next.nodeOverrides[String(entry.id)] ?? {}),
-        status: entry.status ?? 'active',
-        color: entry.color,
-      };
+      next.nodeOverrides = mergeScriptOverrides(
+        next.nodeOverrides,
+        {
+          [String(entry.id)]: {
+            status: entry.status ?? 'active',
+            color: entry.color,
+          },
+        },
+        'node'
+      );
     }
     if (entry.type === 'edge') {
-      next.edgeOverrides[String(entry.id)] = {
-        ...(next.edgeOverrides[String(entry.id)] ?? {}),
-        color: entry.color ?? GRAPH_STATE_COLORS.edgeHighlighted,
-      };
+      next.edgeOverrides = mergeScriptOverrides(
+        next.edgeOverrides,
+        {
+          [String(entry.id)]: {
+            color: entry.color ?? GRAPH_STATE_COLORS.edgeHighlighted,
+          },
+        },
+        'edge'
+      );
     }
     if (entry.type === 'patch') {
-      next.nodeOverrides = {
-        ...next.nodeOverrides,
-        ...sanitizeTemporalOverrideMap('node', entry.nodeOverrides),
-      };
-      next.edgeOverrides = {
-        ...next.edgeOverrides,
-        ...sanitizeTemporalOverrideMap('edge', entry.edgeOverrides),
-      };
+      next.nodeOverrides = mergeScriptOverrides(
+        next.nodeOverrides,
+        entry.nodeOverrides,
+        'node'
+      );
+      next.edgeOverrides = mergeScriptOverrides(
+        next.edgeOverrides,
+        entry.edgeOverrides,
+        'edge'
+      );
     }
     totalOverrides +=
       Object.keys(next.nodeOverrides).length +

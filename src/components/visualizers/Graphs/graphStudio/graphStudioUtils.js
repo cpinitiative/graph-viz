@@ -1,18 +1,7 @@
-import {
-  DEFAULT_GRAPH,
-  NODE_RADIUS,
-  VIEWBOX_HEIGHT,
-  VIEWBOX_WIDTH,
-} from './constants.js';
+import { DEFAULT_GRAPH } from './constants.js';
 import { normalizeFrameDuration } from './lib/frameDuration.js';
 import { clamp, clampNodePosition } from './lib/graphGeometry.js';
-import {
-  PROJECT_LIMITS,
-  requireLimit,
-  requireTextBudget,
-} from './lib/projectLimits.js';
-
-const EDGE_LIST_WEIGHT_PATTERN = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
+export { exportEdgeListText, parseEdgeListText } from './lib/edgeList.js';
 
 export { clamp, clampNodePosition, snapToGrid } from './lib/graphGeometry.js';
 export {
@@ -81,6 +70,9 @@ const normalizeStep = (step, index) => {
   return {
     id: String(step?.id ?? `step-${index}`),
     description: String(step?.description ?? `Step ${index + 1}`),
+    ...(typeof step?.captionText === 'string'
+      ? { captionText: step.captionText }
+      : {}),
     durationMs: normalizeFrameDuration(step?.durationMs),
     ...(typeof captionVisible === 'boolean' ? { captionVisible } : {}),
     nodeOverrides:
@@ -159,136 +151,6 @@ export const computeStepDiff = (previousGraph, nextGraph) => {
     }
   });
   return { changedNodes, changedEdges };
-};
-export const parseEdgeListText = text => {
-  requireTextBudget(String(text ?? ''), 'Edge list');
-  const source = String(text ?? '').trim();
-  if (!source) {
-    throw new Error('Paste an edge list with header "n m" before importing.');
-  }
-  const lines = source
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-  if (!lines.length) {
-    throw new Error('Paste an edge list with header "n m" before importing.');
-  }
-
-  const parseIntegerToken = (token, label) => {
-    if (!/^-?(0|[1-9]\d*)$/.test(token)) {
-      throw new Error(`${label} must be an integer.`);
-    }
-    const value = Number(token);
-    if (!Number.isSafeInteger(value)) {
-      throw new Error(`${label} is too large.`);
-    }
-    return value;
-  };
-  const parseNodeId = (token, label, n) => {
-    const value = parseIntegerToken(token, label);
-    if (value < 0 || value >= n) {
-      throw new Error(`${label} ${value} is out of range 0..${n - 1}.`);
-    }
-    return value;
-  };
-  const parseWeight = (token, lineNumber) => {
-    if (!EDGE_LIST_WEIGHT_PATTERN.test(token)) {
-      throw new Error(`Line ${lineNumber} weight must be numeric.`);
-    }
-    const value = Number(token);
-    if (!Number.isFinite(value)) {
-      throw new Error(`Line ${lineNumber} weight must be numeric.`);
-    }
-    return token;
-  };
-
-  const header = lines[0].split(/\s+/);
-  if (header.length !== 2) {
-    throw new Error('Header must be exactly two integers: n m.');
-  }
-  const n = parseIntegerToken(header[0], 'Header n');
-  const m = parseIntegerToken(header[1], 'Header m');
-  if (n < 1) {
-    throw new Error('Header n must be at least 1.');
-  }
-  if (m < 0) {
-    throw new Error('Header m must be at least 0.');
-  }
-
-  requireLimit(n, PROJECT_LIMITS.nodes, 'Node count');
-  requireLimit(m, PROJECT_LIMITS.edges, 'Edge count');
-  const edgeLines = lines.slice(1);
-  if (edgeLines.length !== m) {
-    throw new Error(
-      `Header declares ${m} edge rows but found ${edgeLines.length}.`
-    );
-  }
-
-  const parsedEdges = [];
-  for (let index = 1; index < lines.length; index += 1) {
-    const lineNumber = index + 1;
-    const parts = lines[index].split(/\s+/);
-    if (parts.length < 2 || parts.length > 3) {
-      throw new Error(`Line ${lineNumber} must be "u v" or "u v weight".`);
-    }
-    const u = parseNodeId(parts[0], `Line ${lineNumber} node id`, n);
-    const v = parseNodeId(parts[1], `Line ${lineNumber} node id`, n);
-    const rawW = parts[2] ? parseWeight(parts[2], lineNumber) : '';
-    parsedEdges.push({ from: u, to: v, label: rawW ?? '' });
-  }
-
-  const orderedIds = Array.from({ length: n }, (_, id) => id);
-  const radius = Math.max(180, Math.min(VIEWBOX_WIDTH, VIEWBOX_HEIGHT) / 2.8);
-  const nodes = orderedIds.map((id, index) => {
-    const angle = (index / Math.max(orderedIds.length, 1)) * Math.PI * 2;
-    const centerX = VIEWBOX_WIDTH / 2;
-    const centerY = VIEWBOX_HEIGHT / 2;
-    const x =
-      orderedIds.length === 1 ? centerX : centerX + Math.cos(angle) * radius;
-    const y =
-      orderedIds.length === 1 ? centerY : centerY + Math.sin(angle) * radius;
-    return {
-      id,
-      label: String(id),
-      x: clamp(x, NODE_RADIUS + 8, VIEWBOX_WIDTH - NODE_RADIUS - 8),
-      y: clamp(y, NODE_RADIUS + 8, VIEWBOX_HEIGHT - NODE_RADIUS - 8),
-      visible: true,
-    };
-  });
-  const edges = parsedEdges.map((edge, index) => ({
-    id: `e${index}`,
-    from: edge.from,
-    to: edge.to,
-    label: edge.label,
-    directed: false,
-    color: '#64748b',
-    duration: 450,
-    visible: true,
-  }));
-  return {
-    graph: normalizeBaseGraph({ nodes, edges }),
-    meta: `${nodes.length} nodes / ${edges.length} edges`,
-  };
-};
-export const exportEdgeListText = graph => {
-  const nodes = graph?.nodes ?? [];
-  const edges = graph?.edges ?? [];
-  const nodeIndexById = new Map(
-    nodes.map((node, index) => [String(node.id), index])
-  );
-  const rows = edges.flatMap(edge => {
-    const from = nodeIndexById.get(String(edge.from));
-    const to = nodeIndexById.get(String(edge.to));
-    if (!Number.isInteger(from) || !Number.isInteger(to)) return [];
-
-    const label = String(edge.label ?? '').trim();
-    const weight =
-      /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(label) && Number.isFinite(Number(label))
-        ? ` ${label}`
-        : '';
-    return [`${from} ${to}${weight}`];
-  });
-  return [`${nodes.length} ${rows.length}`, ...rows].join('\n');
 };
 export const getSelectionBounds = nodes => {
   if (!nodes.length) return null;

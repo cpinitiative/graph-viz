@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VIEWBOX_HEIGHT, VIEWBOX_WIDTH } from '../constants';
-import {
-  circularLayout,
-  clampNodePosition,
-  snapToGrid,
-  treeLayout,
-} from '../graphStudioUtils';
+import { circularLayout, snapToGrid, treeLayout } from '../graphStudioUtils';
+import { clampAuthoredNodePosition } from '../lib/graphGeometry';
 import { getForceLayoutOptions } from '../lib/graphLayouts.js';
 import { PROJECT_LIMITS } from '../lib/projectLimits';
 import { runForceLayout } from '../lib/runForceLayout';
@@ -245,7 +241,7 @@ export const useGraphStudioGraphModel = ({
       let id = nextNodeIdRef.current;
       while (existingNodeIds.has(String(id))) id += 1;
       nextNodeIdRef.current = id + 1;
-      const position = clampNodePosition({
+      const position = clampAuthoredNodePosition({
         x: snapEnabled ? snapToGrid(point.x) : point.x,
         y: snapEnabled ? snapToGrid(point.y) : point.y,
       });
@@ -256,6 +252,7 @@ export const useGraphStudioGraphModel = ({
           {
             id,
             label: String(id),
+            annotationPlacement: 'below',
             x: position.x,
             y: position.y,
             visible: true,

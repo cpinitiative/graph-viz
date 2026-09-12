@@ -1,5 +1,8 @@
 import GraphCanvas from './GraphCanvas';
-import { resolveStepCaptionEnabled } from './lib/captionOverlay';
+import {
+  resolveStepCaptionEnabled,
+  resolveStepCaptionText,
+} from './lib/captionOverlay';
 import {
   EXPORT_CAPTURE_SVG_ELEMENT_ID,
   SLIDE_EXPORT_HEIGHT,
@@ -60,7 +63,7 @@ const ExportFrameRenderer = ({
         setViewState={noop}
         showGrid={false}
         captionOverlay={captionOverlay}
-        captionText={step?.description ?? ''}
+        captionText={resolveStepCaptionText(step)}
         setCaptionOverlay={noop}
         customLegend={canvas?.customLegend}
         setCustomLegend={noop}

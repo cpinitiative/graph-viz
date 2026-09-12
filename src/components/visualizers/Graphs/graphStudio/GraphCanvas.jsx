@@ -7,7 +7,6 @@ import {
   clampFitZoom,
   clampViewStateToPlayspace,
   clampZoom,
-  computeMinZoom,
   createFitViewState,
   EPSILON,
   getRectSelection,
@@ -30,9 +29,22 @@ import {
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
 import { getGraphContentViewport } from './lib/graphFraming';
+import { AUTHORING_VIEW_BOUNDS } from './lib/graphGeometry';
+import {
+  getNodeAccessibleIdentity,
+  getNodeShapeBounds,
+} from './lib/nodeGeometry';
 import { NODE_STATES } from './lib/visualProperties';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
+
+const OverlayOverflowReporter = ({ value, onChange }) => {
+  useLayoutEffect(() => {
+    onChange?.(value);
+    return () => onChange?.(false);
+  }, [value, onChange]);
+  return null;
+};
 const DEFAULT_EDGE_COLOR = '#64748B';
 const EMPTY_SELECTED_NODE_IDS = new Set();
 const CANVAS_BACKGROUND_COLORS = {
@@ -278,6 +290,7 @@ const Legend = ({
   svgRef,
   isExporting = false,
   themeOverride,
+  onOverflowChange,
 }) => {
   const { theme: contextTheme } = useTheme();
   const theme = themeOverride ?? contextTheme;
@@ -289,7 +302,7 @@ const Legend = ({
     return null;
   }
 
-  const title = truncateLegendText(legend.title || 'Legend', 32);
+  const title = legend.title || 'Legend';
   const entries = legend.entries.map(entry => ({
     ...entry,
     label: truncateLegendText(entry.label, 34),
@@ -414,6 +427,12 @@ const Legend = ({
     setIsDragging(false);
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
+  const isTruncated =
+    fittedTitle !== title ||
+    fittedEntries.some(
+      (entry, index) => entry.label !== legend.entries[index].label
+    ) ||
+    visibleRows.length < rows.length;
 
   return (
     <g
@@ -422,6 +441,7 @@ const Legend = ({
       data-custom-position-x={legend.customPosition.x}
       data-custom-position-y={legend.customPosition.y}
       data-legend-theme={theme}
+      data-legend-truncated={isTruncated}
       aria-label="Legend preview"
       pointerEvents={isExporting ? 'none' : 'all'}
       transform={`translate(${x} ${y})`}
@@ -456,6 +476,13 @@ const Legend = ({
             }
       }
     >
+      <title>
+        {[title, ...legend.entries.map(entry => entry.label)].join('. ')}
+      </title>
+      <OverlayOverflowReporter
+        value={isTruncated}
+        onChange={onOverflowChange}
+      />
       <rect
         x="0"
         y="0"
@@ -614,6 +641,7 @@ const FrameCaption = ({
   shadowFilterId,
   isExporting = false,
   themeOverride,
+  onOverflowChange,
 }) => {
   const { theme: contextTheme } = useTheme();
   const theme = themeOverride ?? contextTheme;
@@ -854,6 +882,11 @@ const FrameCaption = ({
             }
       }
     >
+      <title>{text}</title>
+      <OverlayOverflowReporter
+        value={isTruncated}
+        onChange={onOverflowChange}
+      />
       <rect
         x="0"
         y="0"
@@ -941,6 +974,8 @@ const GraphCanvas = ({
   exportCaptureToken,
   canvasSizeOverride,
   themeOverride,
+  onCaptionOverflowChange,
+  onLegendOverflowChange,
 }) => {
   const { theme: contextTheme } = useTheme();
   const theme = themeOverride ?? contextTheme;
@@ -990,6 +1025,7 @@ const GraphCanvas = ({
       edgeCurvature,
       nodeRadius,
       edgeLabelSize,
+      nodeLabelSize,
     });
   }, [
     graph.edges,
@@ -999,6 +1035,7 @@ const GraphCanvas = ({
     edgeCurvature,
     nodeRadius,
     edgeLabelSize,
+    nodeLabelSize,
   ]);
   const effectiveSelectedObject = isExporting ? null : selectedObject;
   const effectiveSelectedNodeIds = isExporting
@@ -1029,7 +1066,7 @@ const GraphCanvas = ({
   const captionShadowFilterId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-caption-shadow`;
   const gridPatternId = `${svgResourcePrefix ? `${svgResourcePrefix}-` : ''}graphstudio-grid`;
   const gridPalette = GRID_PALETTES[theme] ?? GRID_PALETTES.light;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
     const updateCanvasSize = () => {
@@ -1085,9 +1122,13 @@ const GraphCanvas = ({
     });
   }, [canvasSize, isExporting, setViewState]);
   useLayoutEffect(() => {
+    if (isExporting) return undefined;
     const resetChanged = previousResetTriggerRef.current !== resetViewTrigger;
-    previousResetTriggerRef.current = resetViewTrigger;
     if (hasInitializedViewRef.current && !resetChanged) return undefined;
+
+    // The first size measurement renders the screen-space overlays. Fitting
+    // before that commit ignores them and restores a different composition.
+    if (canvasSize.width <= 0 || canvasSize.height <= 0) return undefined;
 
     const el = svgRef.current;
     if (!el) return undefined;
@@ -1096,11 +1137,27 @@ const GraphCanvas = ({
     const doInit = () => {
       const bounds = { width: el.clientWidth, height: el.clientHeight };
       if (bounds.width <= 0 || bounds.height <= 0) return false;
+      // Resizable panels can settle between the measurement and this callback.
+      // The overlays must have rendered for these exact viewport dimensions.
+      if (
+        Math.round(bounds.width) !== canvasSize.width ||
+        Math.round(bounds.height) !== canvasSize.height
+      )
+        return false;
       const viewportWidth = bounds.width;
       const viewportHeight = bounds.height;
+      if (
+        (normalizeCustomLegend(customLegend).enabled &&
+          !el.querySelector('[data-legend-position]')) ||
+        (normalizeCaptionOverlay(captionOverlay).enabled &&
+          String(captionText ?? '').trim() &&
+          !el.querySelector('[data-caption-overlay]'))
+      ) {
+        return false;
+      }
       const visibleNodes = graph.nodes.filter(node => node.visible !== false);
       if (!visibleNodes.length) {
-        const zoom = Math.min(1, computeMinZoom(viewportWidth, viewportHeight));
+        const zoom = 1;
         setViewState({
           zoom,
           x: (viewportWidth - VIEWBOX_WIDTH * zoom) / 2,
@@ -1111,23 +1168,17 @@ const GraphCanvas = ({
           height: viewportHeight,
         };
         hasInitializedViewRef.current = true;
+        previousResetTriggerRef.current = resetViewTrigger;
         setIsInitialViewReady(true);
         return true;
       }
       const content = el.querySelector('[data-export-content="true"]');
       const renderedBounds = measureRenderedContentBounds(content);
-      const fallbackBounds = {
-        x: Math.min(...visibleNodes.map(node => node.x)) - nodeRadius,
-        y: Math.min(...visibleNodes.map(node => node.y)) - nodeRadius,
-        width:
-          Math.max(...visibleNodes.map(node => node.x)) -
-          Math.min(...visibleNodes.map(node => node.x)) +
-          nodeRadius * 2,
-        height:
-          Math.max(...visibleNodes.map(node => node.y)) -
-          Math.min(...visibleNodes.map(node => node.y)) +
-          nodeRadius * 2,
-      };
+      const fallbackBounds = mergeSvgBounds(
+        ...visibleNodes.map(node =>
+          getNodeShapeBounds(node, nodeRadius, nodeLabelSize)
+        )
+      );
       const safeViewport = getGraphContentViewport(el, {
         x: 0,
         y: 0,
@@ -1155,6 +1206,7 @@ const GraphCanvas = ({
         height: viewportHeight,
       };
       hasInitializedViewRef.current = true;
+      previousResetTriggerRef.current = resetViewTrigger;
       setIsInitialViewReady(true);
       return true;
     };
@@ -1184,7 +1236,19 @@ const GraphCanvas = ({
       window.cancelAnimationFrame(frame);
       cleanupListeners();
     };
-  }, [graph.nodes, nodeRadius, setViewState, resetViewTrigger]);
+  }, [
+    graph.nodes,
+    nodeRadius,
+    nodeLabelSize,
+    setViewState,
+    resetViewTrigger,
+    isExporting,
+    canvasSize.width,
+    canvasSize.height,
+    customLegend,
+    captionOverlay,
+    captionText,
+  ]);
   useEffect(() => {
     const bounds = svgRef.current?.getBoundingClientRect();
     if (!bounds) return;
@@ -1226,7 +1290,8 @@ const GraphCanvas = ({
         return clampViewStateToPlayspace(
           candidate,
           bounds.width,
-          bounds.height
+          bounds.height,
+          AUTHORING_VIEW_BOUNDS
         );
       });
     };
@@ -1290,7 +1355,8 @@ const GraphCanvas = ({
         return clampViewStateToPlayspace(
           candidate,
           bounds.width,
-          bounds.height
+          bounds.height,
+          AUTHORING_VIEW_BOUNDS
         );
       });
       return;
@@ -1605,7 +1671,7 @@ const GraphCanvas = ({
                     key={`${resetViewTrigger}:${edge.id}`}
                     edge={edge}
                     tabIndex={selected ? 0 : -1}
-                    accessibleLabel={`Edge ${nodeMap.get(String(edge.from))?.label ?? edge.from} ${edge.directed ? 'to' : 'and'} ${nodeMap.get(String(edge.to))?.label ?? edge.to}${edge.label ? `. Weight ${edge.label}` : ''}${edge.status ? `. ${edge.status}` : ''}`}
+                    accessibleLabel={`Edge ${getNodeAccessibleIdentity(nodeMap.get(String(edge.from)) ?? { id: edge.from })} ${edge.directed ? 'to' : 'and'} ${getNodeAccessibleIdentity(nodeMap.get(String(edge.to)) ?? { id: edge.to })}${edge.label ? `. Label ${edge.label}` : ''}${edge.status ? `. ${edge.status}` : ''}`}
                     pathD={pathD}
                     pathType={pathType}
                     pathPoints={pathPoints}
@@ -1703,6 +1769,7 @@ const GraphCanvas = ({
           svgRef={svgRef}
           isExporting={isExporting}
           themeOverride={themeOverride}
+          onOverflowChange={onLegendOverflowChange}
         />
         {/* Captions render above the legend so nearby overlays remain draggable. */}
         <FrameCaption
@@ -1714,6 +1781,7 @@ const GraphCanvas = ({
           shadowFilterId={captionShadowFilterId}
           isExporting={isExporting}
           themeOverride={themeOverride}
+          onOverflowChange={onCaptionOverflowChange}
         />
       </svg>
     </div>

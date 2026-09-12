@@ -201,36 +201,39 @@ export const getContainedViewState = ({
 export const clampViewStateToPlayspace = (
   candidate,
   viewportWidth,
-  viewportHeight
+  viewportHeight,
+  worldBounds = { x: 0, y: 0, width: VIEWBOX_WIDTH, height: VIEWBOX_HEIGHT }
 ) => {
   if (!viewportWidth || !viewportHeight) return candidate;
   const minZoom = computeMinZoom();
   const zoom = Math.max(minZoom, Math.min(MAX_ZOOM, candidate.zoom));
-  const worldWidthPx = VIEWBOX_WIDTH * zoom;
-  const worldHeightPx = VIEWBOX_HEIGHT * zoom;
+  const worldWidthPx = worldBounds.width * zoom;
+  const worldHeightPx = worldBounds.height * zoom;
+  const originX = worldBounds.x * zoom;
+  const originY = worldBounds.y * zoom;
   let nextX = candidate.x;
   let nextY = candidate.y;
   // If zoom was clamped, re-center the bounded editing playspace.
   if (zoom !== candidate.zoom) {
-    nextX = (viewportWidth - worldWidthPx) / 2;
-    nextY = (viewportHeight - worldHeightPx) / 2;
+    nextX = (viewportWidth - worldWidthPx) / 2 - originX;
+    nextY = (viewportHeight - worldHeightPx) / 2 - originY;
   } else {
     if (worldWidthPx <= viewportWidth) {
-      const minX = 0;
-      const maxX = viewportWidth - worldWidthPx;
+      const minX = -originX;
+      const maxX = viewportWidth - worldWidthPx - originX;
       nextX = Math.max(minX, Math.min(maxX, nextX));
     } else {
-      const minX = viewportWidth - worldWidthPx;
-      const maxX = 0;
+      const minX = viewportWidth - worldWidthPx - originX;
+      const maxX = -originX;
       nextX = Math.max(minX, Math.min(maxX, nextX));
     }
     if (worldHeightPx <= viewportHeight) {
-      const minY = 0;
-      const maxY = viewportHeight - worldHeightPx;
+      const minY = -originY;
+      const maxY = viewportHeight - worldHeightPx - originY;
       nextY = Math.max(minY, Math.min(maxY, nextY));
     } else {
-      const minY = viewportHeight - worldHeightPx;
-      const maxY = 0;
+      const minY = viewportHeight - worldHeightPx - originY;
+      const maxY = -originY;
       nextY = Math.max(minY, Math.min(maxY, nextY));
     }
   }
