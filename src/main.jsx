@@ -6,13 +6,19 @@ import {
   shouldEnableWebAnalytics,
 } from './analytics.js';
 import App from './App.jsx';
+import DomainMigration from './components/DomainMigration.jsx';
 import './index.css';
+import { LEGACY_HOSTNAME } from './siteDomain.js';
 
 const webAnalyticsEnabled = shouldEnableWebAnalytics(window.location.hostname);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    {window.location.hostname === LEGACY_HOSTNAME ? (
+      <DomainMigration />
+    ) : (
+      <App />
+    )}
     {webAnalyticsEnabled && (
       <Analytics
         beforeSend={prepareAnalyticsEvent}

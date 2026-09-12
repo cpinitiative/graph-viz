@@ -4,7 +4,14 @@ Graph Viz is a desktop-first authoring tool for turning graph algorithms into
 clear, editable teaching visuals. It is built for USACO Guide authors, but works
 for anyone creating step-by-step graph explanations.
 
-Use the editor at [graph-viz.usaco.guide](https://graph-viz.usaco.guide/).
+Use the editor at [graph.usaco.guide](https://graph.usaco.guide/).
+
+`graph-viz.usaco.guide` is a recovery address for existing browser saves.
+Visitors without a save continue to the main address automatically. Visitors
+with a save can download it and import it at the main address. The editor runs
+at the main address. Keep both domains attached to the same production
+deployment; do not add an HTTP redirect on the old domain, because its recovery
+page needs to read that origin’s browser storage.
 
 ## What You Can Make
 
@@ -232,19 +239,28 @@ import/export, Script Mode, and rendering workflows.
 To run the smoke test against production:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide npm run test:e2e:smoke
+PLAYWRIGHT_BASE_URL=https://graph.usaco.guide npm run test:e2e:smoke
 ```
 
 To additionally confirm that a particular commit is deployed, provide its SHA:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://graph-viz.usaco.guide EXPECTED_GRAPH_STUDIO_COMMIT_SHA=$(git rev-parse HEAD) npm run test:e2e:smoke
+PLAYWRIGHT_BASE_URL=https://graph.usaco.guide EXPECTED_GRAPH_STUDIO_COMMIT_SHA=$(git rev-parse HEAD) npm run test:e2e:smoke
 ```
 
 Production builds expose commit, build timestamp, and deployment metadata on the
 `graph-studio-root` element. Build systems may override detected values with
 `GRAPH_STUDIO_COMMIT_SHA`, `GRAPH_STUDIO_BUILD_TIMESTAMP`, and
 `GRAPH_STUDIO_DEPLOYMENT`.
+
+### Production Hosting
+
+Both public domains belong to the `graph-viz` project in the
+[CP Initiative Vercel team](https://vercel.com/cpinitiative/graph-viz). Its
+production branch is `main`. A project with the same name in a personal Vercel
+team does not publish changes to these domains. Confirm the deployment in the CP
+Initiative project and run the smoke test against `graph.usaco.guide` with the
+expected commit SHA after publishing.
 
 ### Private Usage Analytics
 
