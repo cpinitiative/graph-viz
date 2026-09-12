@@ -46,7 +46,7 @@ const getModeGuidance = ({ mode, drawFrom }) => {
   if (drawFrom !== null && drawFrom !== undefined) {
     return {
       modeLabel,
-      action: 'Choose target',
+      action: `Source ${drawFrom} → choose target`,
       accessibleAction: `Source node ${drawFrom} selected; choose target`,
     };
   }
@@ -70,11 +70,11 @@ const getStatusClassName = status => {
       : tone === 'success'
         ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46] dark:border-[#34D399] dark:bg-[#052E16] dark:text-[#D1FAE5]'
         : 'border-[#D7DEE8] bg-[#F8F9FA] text-[#334155] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0]';
-  return `pointer-events-none absolute bottom-3 left-3 right-3 z-20 select-none rounded-sm border px-2 py-1 text-[11px] leading-snug shadow-sm break-words ${toneClass}`;
+  return `select-none rounded-sm border px-2 py-1 text-[11px] leading-snug break-words ${toneClass}`;
 };
 
 const canvasHudStackClass =
-  'pointer-events-none absolute right-3 top-3 z-30 flex w-80 max-w-[90%] flex-col items-end gap-2';
+  'flex min-h-9 shrink-0 justify-end border-b border-[#E2E8F0] bg-[#F8F9FA] px-2 py-1 dark:border-[#334155] dark:bg-[#111827]';
 const recoveryShellClass =
   'pointer-events-auto w-80 max-w-full border border-[#CBD5E1] bg-[#FFFFFF] text-[#0F172A] shadow-[0_6px_18px_#0F172A14] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC]';
 const recoveryToggleClass =
@@ -120,7 +120,7 @@ const PresenceRecoveryAffordance = ({ recovery }) => {
         </span>
       </button>
       {expanded && (
-        <div className="max-h-56 overflow-y-auto border-t border-[#D7DEE8] p-2 dark:border-[#334155]">
+        <div className="max-h-28 overflow-y-auto border-t border-[#D7DEE8] p-2 dark:border-[#334155]">
           <div className="space-y-1.5">
             {entries.map(entry => (
               <div
@@ -258,31 +258,50 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
   );
 };
 
-const CanvasStage = ({ canvas, status, presenceRecovery }) => (
-  <div className="relative h-full">
-    <GraphCanvas {...canvas} />
-    {Boolean(presenceRecovery?.entries?.length) && (
-      <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
+const CanvasStage = ({ canvas, status, presenceRecovery, legendTruncated }) => (
+  <div className="flex h-full min-h-0 flex-col">
+    <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
+      <span className="my-auto min-w-0 flex-1 truncate pr-2 text-[11px] text-[#475569] dark:text-[#CBD5E1]">
+        {getModeGuidance(canvas)?.accessibleAction ??
+          getModeGuidance(canvas)?.action ??
+          'Shift-click to select multiple nodes'}
+      </span>
+      {Boolean(presenceRecovery?.entries?.length) && (
         <PresenceRecoveryAffordance recovery={presenceRecovery} />
-      </div>
-    )}
-    {status && (
-      <div
-        className={getStatusClassName(status)}
-        data-testid="graph-studio-status"
-        data-status-tone={
-          STATUS_ERROR_PATTERN.test(status)
-            ? 'error'
-            : STATUS_SUCCESS_PATTERN.test(status)
-              ? 'success'
-              : 'neutral'
-        }
-        role="status"
-        aria-live="polite"
-      >
-        {status}
-      </div>
-    )}
+      )}
+    </div>
+    <div className="relative min-h-0 flex-1">
+      <GraphCanvas {...canvas} />
+    </div>
+    <div className="min-h-8 shrink-0 px-2 py-1">
+      {legendTruncated && (
+        <p
+          className="text-[11px] text-[#92400E] dark:text-[#FCD34D]"
+          role="status"
+          data-testid="legend-overflow-warning"
+        >
+          Legend text is shortened in this viewport. Shorten entries or use a
+          wider canvas.
+        </p>
+      )}
+      {status && (
+        <div
+          className={getStatusClassName(status)}
+          data-testid="graph-studio-status"
+          data-status-tone={
+            STATUS_ERROR_PATTERN.test(status)
+              ? 'error'
+              : STATUS_SUCCESS_PATTERN.test(status)
+                ? 'success'
+                : 'neutral'
+          }
+          role="status"
+          aria-live="polite"
+        >
+          {status}
+        </div>
+      )}
+    </div>
   </div>
 );
 
@@ -340,6 +359,8 @@ const ModalStack = ({
       open={modals.parser.open}
       text={modals.parser.text}
       error={modals.parser.error}
+      mode={modals.parser.mode}
+      onModeChange={modals.parser.onModeChange}
       onTextChange={modals.parser.onTextChange}
       onClose={modals.parser.onClose}
       onSubmit={modals.parser.onSubmit}
@@ -398,12 +419,20 @@ const GraphStudioLayout = ({
   const [showPropertyPanel, setShowPropertyPanel] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [captionTruncated, setCaptionTruncated] = useState(false);
+  const [legendTruncated, setLegendTruncated] = useState(false);
+  const canvasProps = {
+    ...canvas,
+    onCaptionOverflowChange: setCaptionTruncated,
+    onLegendOverflowChange: setLegendTruncated,
+  };
   const modeGuidance = getModeGuidance({
     mode: canvas.mode,
     drawFrom: canvas.drawFrom,
   });
   const timelineProps = {
     ...timeline,
+    captionTruncated,
     editScope: getTimelineEditScope({
       mode: canvas.mode,
       currentFrame: timeline.currentFrame,
@@ -459,11 +488,12 @@ const GraphStudioLayout = ({
             type="button"
             className="min-w-0 rounded border border-slate-400 px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2"
             aria-label={canvasFocused ? 'Show timeline' : 'Focus canvas'}
+            title="Fit the graph to the available screen space"
             aria-pressed={canvasFocused}
             onClick={() => {
               setCanvasFocused(value => !value);
               requestAnimationFrame(() =>
-                requestAnimationFrame(() => sidebar.onCenterView?.())
+                requestAnimationFrame(() => sidebar.onFitForReview?.())
               );
             }}
           >
@@ -516,7 +546,8 @@ const GraphStudioLayout = ({
 
         <div className="relative min-h-0 flex-1">
           <CanvasStage
-            canvas={canvas}
+            canvas={canvasProps}
+            legendTruncated={legendTruncated}
             presenceRecovery={presenceRecovery}
             status={status}
           />
@@ -548,7 +579,8 @@ const GraphStudioLayout = ({
             <PanelResizeHandle className={RESIZE_HANDLE_CLASS} />
             <Panel minSize="40%" defaultSize="60%">
               <CanvasStage
-                canvas={canvas}
+                canvas={canvasProps}
+                legendTruncated={legendTruncated}
                 presenceRecovery={presenceRecovery}
                 status={status}
               />

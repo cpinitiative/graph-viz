@@ -150,6 +150,9 @@ export const useGraphAnimation = (
             ...cloneStep(next[frameIndex]),
             id: createStepId(),
             description: '',
+            ...(typeof next[frameIndex].captionText === 'string'
+              ? { captionText: '' }
+              : {}),
           },
           insertAt
         );

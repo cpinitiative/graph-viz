@@ -57,8 +57,8 @@ such as:
 Presets include compact legends, larger labels, captions, and 1.8–3 second holds
 for video. BFS and DFS expose queue/stack progress; Dijkstra shows
 `node:distance`; topological sort shows `node:indegree`; DSU and components show
-`node:root` or `node:group`. The inspector's **Frame text** field edits these
-annotations independently of the project-wide node name.
+`node:root` or `node:group`. The inspector's **Frame annotation** field edits
+these annotations independently of the project-wide node name.
 
 Loading a preset applies its presentation sizes, enables its legend and caption,
 and hides the grid. These settings remain editable. Authors can adjust the graph
@@ -78,6 +78,46 @@ primary support target.
 4. Adjust frame-specific appearance and visibility to show what changes.
 5. Review the animation, then export the format your lesson needs.
 6. Export the project JSON when you want a durable, shareable source file.
+
+### Precise diagrams and contest input
+
+Select a node to edit its **X** and **Y** coordinates in Project details.
+Shift-click several nodes, then use **Align** or **Distribute** in the
+inspector; each arrangement is one undo action and applies across frames. Nodes
+can be circles, squares, rectangles, diamonds, or text anchors. Text anchors are
+useful for coordinate labels and explanatory notes and remain selectable like
+nodes.
+
+New nodes keep their name inside the shape and show **Frame annotation** below
+it. Older projects keep their existing appearance. Change **Annotation
+placement** in Project details to switch between the existing replacement text
+and a separate annotation; edit the annotation itself under Frame appearance.
+
+Use **Import → Paste / Import ASCII Grid** for maze maps containing `#`, `.`,
+`A`, `B`, and `M`. An optional first line can give the row and column counts, so
+CSES sample inputs can be pasted directly. Walls remain visible square cells;
+edges connect traversable horizontal and vertical neighbors. The 1,000-node
+authoring limit includes walls.
+
+**Paste / Import Edge List** accepts zero-based or one-based IDs. Choose **Text
+labels** for letter-labeled inputs such as AtCoder ABC197 F, or keep **Numeric
+weights** for weighted graphs. Invalid input leaves the current project intact.
+Project JSON preserves labels, shapes, annotations, and frames; the simpler Edge
+List export retains its numeric, zero-based contract.
+
+### Notes and display captions
+
+The frame description can contain the full explanation. Enable **Separate
+caption text** to write a shorter caption for the canvas, images, slides, and
+video while retaining those notes. A new keyframe starts with empty text;
+Duplicate copies both fields. The editor warns when the current viewport
+shortens a caption or legend. Use shorter display text, a smaller caption font,
+or a wider canvas before exporting.
+
+Blank projects start at a readable 100% zoom. Reload fits the graph only after
+the caption and legend have been measured, and canvas notices occupy their own
+space. On a phone, **Focus canvas** refits the graph to the available area,
+including when panning is locked.
 
 Presets are ready-made teaching examples rather than unlabeled graph shapes.
 They include a labeled graph, explanatory frame sequence, and algorithm-specific

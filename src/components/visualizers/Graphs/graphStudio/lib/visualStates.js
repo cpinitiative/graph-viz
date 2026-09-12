@@ -375,7 +375,15 @@ export const migrateLegacyVisualStates = ({ graph, steps, visualStates }) => {
 
   const migrateObject = (object, kind) => {
     const nextObject = cloneJson(object);
-    if (String(nextObject?.stateId ?? '').trim()) return nextObject;
+    // An explicit empty ID is the current editor's "no semantic state" choice.
+    // Only an absent/null reference needs the historical status migration; new
+    // raw Script styling must not acquire a state or a different palette here.
+    if (
+      nextObject?.stateId === '' ||
+      String(nextObject?.stateId ?? '').trim()
+    ) {
+      return nextObject;
+    }
     const status = String(nextObject?.status ?? '')
       .trim()
       .toLowerCase();

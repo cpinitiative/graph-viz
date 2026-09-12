@@ -106,3 +106,10 @@ export const resolveStepCaptionEnabled = (step, captionOverlay) => {
   if (typeof step?.captionVisible === 'boolean') return step.captionVisible;
   return normalizeCaptionOverlay(captionOverlay).enabled;
 };
+
+// Existing projects use the description as their caption. Authors can opt into
+// a shorter display caption without losing the full explanation in the timeline.
+export const resolveStepCaptionText = step =>
+  typeof step?.captionText === 'string'
+    ? step.captionText
+    : String(step?.description ?? '');

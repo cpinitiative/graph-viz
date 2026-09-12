@@ -80,7 +80,11 @@ export const useGraphStudioUndo = ({
       historyMetaRef.current = { signature, snapshot: currentSnapshot };
       if (transaction.ended) {
         historyTransactionRef.current = null;
-        if (signature !== transaction.startSignature) {
+        if (
+          signature.some(
+            (value, index) => value !== transaction.startSignature[index]
+          )
+        ) {
           undoHistoryRef.current.push(transaction.startSnapshot);
           if (undoHistoryRef.current.length > HISTORY_LIMIT) {
             undoHistoryRef.current.shift();

@@ -6,6 +6,7 @@ import {
   parseEdgeListText,
   runScriptTrace,
 } from '../graphStudioUtils';
+import { parseAsciiGridText } from '../lib/asciiGrid';
 import { normalizeCaptionOverlay } from '../lib/captionOverlay';
 import { normalizeCustomLegend } from '../lib/customLegend';
 import {
@@ -115,6 +116,7 @@ export const useGraphStudioImportExport = ({
   const [isParserOpen, setIsParserOpen] = useState(false);
   const [parserText, setParserText] = useState('');
   const [parserError, setParserError] = useState('');
+  const [parserMode, setParserModeState] = useState('edge-list');
   const [isProjectJsonPasteOpen, setIsProjectJsonPasteOpen] = useState(false);
   const [projectJsonPasteText, setProjectJsonPasteText] = useState('');
   const [projectJsonPasteError, setProjectJsonPasteError] = useState('');
@@ -319,52 +321,17 @@ export const useGraphStudioImportExport = ({
     ? Math.min(exportFrameIndex, steps.length - 1)
     : 0;
 
-  const applyParserText = useCallback(() => {
+  const setParserMode = useCallback(mode => {
+    setParserModeState(mode === 'grid' ? 'grid' : 'edge-list');
     setParserError('');
-    try {
-      const { graph, meta } = parseEdgeListText(parserText);
-      replaceTimeline(graph, [
-        {
-          id: 'step-0',
-          description: 'Parsed input',
-          durationMs: DEFAULT_FRAME_DURATION_MS,
-          nodeOverrides: {},
-          edgeOverrides: {},
-        },
-      ]);
-      bumpContentEpoch?.();
-      if (!lockCanvas) {
-        bumpViewReset?.();
-      }
-      setMode('select');
-      clearSelection?.();
-      clearDrawState?.();
-      setIsParserOpen(false);
-      setStatus(
-        `Graph parsed: ${meta}${lockCanvas ? ' · view preserved' : ''}`
-      );
-      onProjectGenerated?.('parser', { hasTimeline: false });
-    } catch (error) {
-      const message = `Parse failed: ${error.message}`;
-      setParserError(message);
-      setStatus(message);
-    }
-  }, [
-    clearDrawState,
-    clearSelection,
-    bumpViewReset,
-    bumpContentEpoch,
-    lockCanvas,
-    onProjectGenerated,
-    parserText,
-    replaceTimeline,
-    setMode,
-    setStatus,
-  ]);
+  }, []);
 
-  const setParserModalOpen = useCallback(open => {
+  const setParserModalOpen = useCallback((open, mode = 'edge-list') => {
     setIsParserOpen(open);
-    if (open) setParserError('');
+    if (open) {
+      setParserModeState(mode === 'grid' ? 'grid' : 'edge-list');
+      setParserError('');
+    }
   }, []);
 
   const updateParserText = useCallback(value => {
@@ -559,6 +526,78 @@ export const useGraphStudioImportExport = ({
       setSnapEnabled,
       setStatus,
       setViewState,
+    ]
+  );
+
+  const applyParserText = useCallback(
+    (options = {}) => {
+      setParserError('');
+      try {
+        if (parserMode === 'grid') {
+          const { graph, meta, settings } = parseAsciiGridText(parserText);
+          // Reuse the complete project path so settings and topology undo together.
+          const project = parseProjectJson(
+            JSON.stringify(
+              exportProjectJson({
+                baseGraph: graph,
+                steps: [
+                  {
+                    id: 'step-0',
+                    description: `Imported ${meta}. Edges connect orthogonally adjacent open cells.`,
+                    durationMs: DEFAULT_FRAME_DURATION_MS,
+                    nodeOverrides: {},
+                    edgeOverrides: {},
+                  },
+                ],
+                currentFrame: 0,
+                settings,
+              })
+            )
+          );
+          applyProjectPayload(project);
+          setIsParserOpen(false);
+          setStatus(`Grid imported: ${meta}`);
+          return;
+        }
+        const { graph, meta } = parseEdgeListText(parserText, options);
+        replaceTimeline(graph, [
+          {
+            id: 'step-0',
+            description: 'Parsed input',
+            durationMs: DEFAULT_FRAME_DURATION_MS,
+            nodeOverrides: {},
+            edgeOverrides: {},
+          },
+        ]);
+        bumpContentEpoch?.();
+        if (!lockCanvas) bumpViewReset?.();
+        setMode('select');
+        clearSelection?.();
+        clearDrawState?.();
+        setIsParserOpen(false);
+        setStatus(
+          `Graph parsed: ${meta}${lockCanvas ? ' · view preserved' : ''}`
+        );
+        onProjectGenerated?.('parser', { hasTimeline: false });
+      } catch (error) {
+        const message = `Parse failed: ${error.message}`;
+        setParserError(message);
+        setStatus(message);
+      }
+    },
+    [
+      applyProjectPayload,
+      bumpContentEpoch,
+      bumpViewReset,
+      clearDrawState,
+      clearSelection,
+      lockCanvas,
+      onProjectGenerated,
+      parserMode,
+      parserText,
+      replaceTimeline,
+      setMode,
+      setStatus,
     ]
   );
 
@@ -823,6 +862,8 @@ export const useGraphStudioImportExport = ({
     setIsParserOpen: setParserModalOpen,
     parserText,
     parserError,
+    parserMode,
+    setParserMode,
     setParserText: updateParserText,
     applyParserText,
     isProjectJsonPasteOpen,

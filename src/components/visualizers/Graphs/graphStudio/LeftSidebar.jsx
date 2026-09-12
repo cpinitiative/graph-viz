@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { useCommittedNumberInput } from './hooks/useCommittedNumberInput.js';
 import { DEFAULT_CUSTOM_LEGEND } from './lib/customLegend';
 import NativeSelect from './NativeSelect';
 
@@ -201,43 +202,14 @@ const SidebarRangeControl = ({
 }) => {
   const labelId = useId();
   const helpId = useId();
-  const [draftValue, setDraftValue] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const displayValue = isEditing ? draftValue : String(value);
-  const numericMin = Number(min);
-  const numericMax = Number(max);
-  const numericStep = Number(step);
-  const decimalPlaces = String(step).includes('.')
-    ? String(step).split('.')[1].length
-    : 0;
-
-  const normalizeValue = rawValue => {
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed)) return null;
-    const clamped = Math.max(numericMin, Math.min(numericMax, parsed));
-    if (!Number.isFinite(numericStep) || numericStep <= 0) {
-      return Number(clamped.toFixed(decimalPlaces));
-    }
-    const stepped =
-      numericMin +
-      Math.round((clamped - numericMin) / numericStep) * numericStep;
-    return Number(
-      Math.max(numericMin, Math.min(numericMax, stepped)).toFixed(decimalPlaces)
-    );
-  };
-
-  const commitDraftValue = () => {
-    const nextValue = normalizeValue(displayValue);
-    if (nextValue === null) {
-      setDraftValue('');
-      setIsEditing(false);
-      return;
-    }
-    setDraftValue('');
-    setIsEditing(false);
-    onChange?.(nextValue);
-  };
+  const numberInput = useCommittedNumberInput({
+    value,
+    min,
+    max,
+    step,
+    onCommit: onChange,
+  });
 
   return (
     <div
@@ -301,48 +273,21 @@ const SidebarRangeControl = ({
         className={compactNumberInputClass}
         disabled={disabled}
         inputMode="decimal"
-        onBlur={commitDraftValue}
-        onChange={event => {
-          setIsEditing(true);
-          setDraftValue(event.target.value);
-        }}
-        onFocus={() => {
-          setIsEditing(true);
-          setDraftValue(String(value));
-        }}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          } else if (event.key === 'Escape') {
-            setDraftValue('');
-            setIsEditing(false);
-            event.currentTarget.blur();
-          }
-        }}
+        {...numberInput}
         type="text"
-        value={displayValue}
       />
     </div>
   );
 };
 
 const ZoomValueInput = ({ value, disabled, onCommit }) => {
-  const [draft, setDraft] = useState(null);
-  const displayValue = draft ?? String(value);
-
-  const reset = () => {
-    setDraft(null);
-  };
-  const commit = rawValue => {
-    const parsed = Number(String(rawValue).replace(/%/g, '').trim());
-    if (!Number.isFinite(parsed)) {
-      reset();
-      return;
-    }
-    const nextValue = Math.round(Math.max(5, Math.min(260, parsed)));
-    setDraft(null);
-    onCommit?.(nextValue);
-  };
+  const numberInput = useCommittedNumberInput({
+    value,
+    min: 5,
+    max: 260,
+    step: 1,
+    onCommit,
+  });
 
   return (
     <span
@@ -358,22 +303,15 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
         className="peer h-full w-full bg-transparent text-center font-mono text-xs font-semibold tabular-nums leading-none text-transparent focus:text-inherit focus:outline-none disabled:cursor-not-allowed"
         disabled={disabled}
         inputMode="numeric"
-        onBlur={event => commit(event.currentTarget.value)}
-        onChange={event => {
-          setDraft(event.target.value);
-        }}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.currentTarget.blur();
-          } else if (event.key === 'Escape') {
-            reset();
-            event.currentTarget.blur();
-          }
-        }}
+        {...numberInput}
+        onChange={event =>
+          numberInput.onChange({
+            target: { value: event.target.value.replace(/%/g, '') },
+          })
+        }
         type="text"
-        value={displayValue}
       />
-      {draft === null && (
+      {
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-xs font-semibold tabular-nums leading-none text-inherit peer-focus:hidden"
@@ -381,7 +319,7 @@ const ZoomValueInput = ({ value, disabled, onCommit }) => {
         >
           {value}%
         </span>
-      )}
+      }
     </span>
   );
 };

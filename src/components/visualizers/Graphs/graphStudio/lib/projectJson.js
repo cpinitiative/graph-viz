@@ -19,6 +19,7 @@ import {
   DEFAULT_FRAME_DURATION_MS,
   normalizeFrameDuration,
 } from './frameDuration.js';
+import { NODE_ANNOTATION_PLACEMENTS, NODE_SHAPES } from './nodeGeometry.js';
 import {
   PROJECT_LIMITS,
   requireLimit,
@@ -97,6 +98,15 @@ const sanitizeNode = (node, index) => {
     throw new Error(`Node "${node.id}" must have numeric x and y`);
   }
   validateVisualProperties('node', node, `Node ${node.id}`);
+  if (node.shape !== undefined && !NODE_SHAPES.includes(node.shape)) {
+    throw new Error(`Node ${node.id}: invalid shape`);
+  }
+  if (
+    node.annotationPlacement !== undefined &&
+    !NODE_ANNOTATION_PLACEMENTS.includes(node.annotationPlacement)
+  ) {
+    throw new Error(`Node ${node.id}: invalid annotation placement`);
+  }
   requireLimit(
     String(node.label ?? node.id).length,
     PROJECT_LIMITS.label,
@@ -186,6 +196,15 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
     PROJECT_LIMITS.description,
     'Frame description'
   );
+  if (step.captionText !== undefined) {
+    if (typeof step.captionText !== 'string')
+      throw new Error('Frame caption text must be a string');
+    requireLimit(
+      step.captionText.length,
+      PROJECT_LIMITS.description,
+      'Frame caption text'
+    );
+  }
   const captionVisible =
     typeof step.captionVisible === 'boolean'
       ? step.captionVisible
@@ -193,6 +212,9 @@ const sanitizeStep = (step, index, nodeIds, edgeIds) => {
   const sanitized = {
     id: String(step.id ?? `step-${index}`),
     description: String(step.description ?? `Step ${index + 1}`),
+    ...(step.captionText !== undefined
+      ? { captionText: step.captionText }
+      : {}),
     durationMs: normalizeFrameDuration(step.durationMs),
     nodeOverrides: sanitizeOverrideMap(
       step.nodeOverrides,
@@ -329,6 +351,15 @@ const sanitizeSettings = settings => {
 
 const normalizeStepForExport = step => {
   const cloned = isRecord(step) ? cloneJson(step) : {};
+  if (cloned.captionText !== undefined) {
+    if (typeof cloned.captionText !== 'string')
+      throw new Error('Frame caption text must be a string');
+    requireLimit(
+      cloned.captionText.length,
+      PROJECT_LIMITS.description,
+      'Frame caption text'
+    );
+  }
   const captionVisible =
     typeof cloned.captionVisible === 'boolean'
       ? cloned.captionVisible

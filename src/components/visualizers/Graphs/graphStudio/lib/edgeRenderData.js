@@ -1,13 +1,155 @@
 import {
   buildEdgePath,
   chooseBestLabelPosition,
+  cubicBezierPoint,
+  cubicBezierTangent,
   insetSegment,
   measureLabelRect,
+  offsetFromTangent,
+  rectOverlapArea,
+  scoreLabelCandidate,
 } from '../graphCanvasUtils.js';
 import {
   getVisibleNodes,
   isEdgeEffectivelyVisible,
 } from './effectiveVisibility.js';
+import {
+  estimateNodeTextWidth,
+  getNodeBoundaryPoint,
+  getNodeDisplayText,
+  getNodeShape,
+  getNodeShapeBounds,
+} from './nodeGeometry.js';
+
+const getClippedLabelOptions = (geometry, points, pairMetadata = {}) => {
+  const curved = geometry.pathType === 'cubic';
+  const { edgeIndex = 0, edgeCount = 1 } = pairMetadata;
+  const preferredT =
+    curved && edgeCount > 1 ? 0.32 + (edgeIndex / (edgeCount - 1)) * 0.36 : 0.5;
+  const tValues = curved
+    ? [...new Set([preferredT, 0.5, 0.38, 0.62, 0.28, 0.72])]
+    : [0.5];
+  const pointAt = (path, t) =>
+    curved
+      ? cubicBezierPoint(...path, t)
+      : {
+          x: path[0].x + (path[1].x - path[0].x) * t,
+          y: path[0].y + (path[1].y - path[0].y) * t,
+        };
+  const tangentAt = (path, t) =>
+    curved
+      ? cubicBezierTangent(...path, t)
+      : { x: path[1].x - path[0].x, y: path[1].y - path[0].y };
+  const originalPoint = pointAt(geometry.pathPoints, preferredT);
+  const originalTangent = tangentAt(geometry.pathPoints, preferredT);
+  const firstLabel = geometry.labelOptions?.[0] ?? originalPoint;
+  const preferredSide =
+    Math.sign(
+      -(firstLabel.x - originalPoint.x) * originalTangent.y +
+        (firstLabel.y - originalPoint.y) * originalTangent.x
+    ) || 1;
+  return tValues.flatMap(t => {
+    const point = pointAt(points, t);
+    const tangent = tangentAt(points, t);
+    return [
+      offsetFromTangent(point, tangent, 14, preferredSide),
+      offsetFromTangent(point, tangent, 14, -preferredSide),
+    ];
+  });
+};
+
+// Additional occupied rectangles apply only to new geometry/separated text;
+// the existing circle-only label layout remains unchanged.
+const getAdditionalLabelObstacles = (nodes, nodeRadius, nodeLabelSize) =>
+  nodes.flatMap(node => {
+    const bounds = getNodeShapeBounds(node, nodeRadius, nodeLabelSize);
+    const obstacles = [];
+    if (getNodeShape(node) !== 'circle') {
+      obstacles.push({
+        left: bounds.x - 4,
+        right: bounds.x + bounds.width + 4,
+        top: bounds.y - 4,
+        bottom: bounds.y + bounds.height + 4,
+      });
+    }
+    const annotation = getNodeDisplayText(node).annotation;
+    if (annotation) {
+      const fontSize = Math.max(10, Math.min(14, nodeLabelSize || 14));
+      const width = estimateNodeTextWidth(annotation, fontSize);
+      const baseline = bounds.y + bounds.height + fontSize + 7;
+      obstacles.push({
+        left: node.x - width / 2 - 3,
+        right: node.x + width / 2 + 3,
+        top: baseline - fontSize - 3,
+        bottom: baseline + 5,
+      });
+    }
+    return obstacles;
+  });
+
+const chooseShapeAwareLabelPosition = (options, obstacles) => {
+  if (!obstacles.length) return chooseBestLabelPosition(options);
+  let best = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  options.labelOptions.forEach((candidate, labelIndex) => {
+    let score = scoreLabelCandidate({ ...options, candidate, labelIndex });
+    const rect = measureLabelRect(
+      candidate,
+      options.labelText,
+      options.labelFontSize
+    );
+    obstacles.forEach(obstacle => {
+      const overlap = rectOverlapArea(rect, obstacle);
+      if (overlap > 0) score -= 900 + overlap * 2.2;
+    });
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  });
+  return best;
+};
+
+// Preserve legacy circle paths exactly. New shapes use the first/last curve
+// tangent to choose an edge port on their actual outline, including self-loops.
+export const clipEdgeGeometryToNodeShapes = (
+  geometry,
+  from,
+  to,
+  nodeRadius,
+  nodeLabelSize,
+  pairMetadata
+) => {
+  if (getNodeShape(from) === 'circle' && getNodeShape(to) === 'circle')
+    return geometry;
+  const points = geometry.pathPoints.map(point => ({ ...point }));
+  if (getNodeShape(from) !== 'circle') {
+    points[0] = getNodeBoundaryPoint(
+      from,
+      points[1],
+      nodeRadius,
+      nodeLabelSize
+    );
+  }
+  if (getNodeShape(to) !== 'circle') {
+    points[points.length - 1] = getNodeBoundaryPoint(
+      to,
+      points[points.length - 2],
+      nodeRadius,
+      nodeLabelSize
+    );
+  }
+  const d =
+    geometry.pathType === 'cubic'
+      ? `M ${points[0].x} ${points[0].y} C ${points[1].x} ${points[1].y}, ${points[2].x} ${points[2].y}, ${points[3].x} ${points[3].y}`
+      : `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  return {
+    ...geometry,
+    d,
+    pathPoints: points,
+    labelOptions: getClippedLabelOptions(geometry, points, pairMetadata),
+  };
+};
 
 const compareStableStrings = (left, right) => {
   if (left === right) return 0;
@@ -130,6 +272,7 @@ export const getEdgeRenderData = ({
   edgeRouting,
   edgeCurvature,
   nodeRadius,
+  nodeLabelSize,
   edgeLabelSize = 12,
 }) => {
   const visibleNodes = getVisibleNodes(nodes);
@@ -139,16 +282,29 @@ export const getEdgeRenderData = ({
   const segmentsById = new Map();
   const placedLabelRects = [];
   const edgePairMetadata = buildEdgePairMetadata(visibleEdges);
+  const additionalLabelObstacles = getAdditionalLabelObstacles(
+    visibleNodes,
+    nodeRadius,
+    nodeLabelSize
+  );
 
   visibleEdges.forEach(edge => {
     const from = nodeMap.get(String(edge.from));
     const to = nodeMap.get(String(edge.to));
     if (!from || !to) return;
     if (String(from.id) !== String(to.id)) {
-      segmentsById.set(
-        String(edge.id),
-        insetSegment(from, to, edge.directed, nodeRadius)
-      );
+      const segment = insetSegment(from, to, edge.directed, nodeRadius);
+      if (getNodeShape(from) !== 'circle') {
+        const point = getNodeBoundaryPoint(from, to, nodeRadius, nodeLabelSize);
+        segment.x1 = point.x;
+        segment.y1 = point.y;
+      }
+      if (getNodeShape(to) !== 'circle') {
+        const point = getNodeBoundaryPoint(to, from, nodeRadius, nodeLabelSize);
+        segment.x2 = point.x;
+        segment.y2 = point.y;
+      }
+      segmentsById.set(String(edge.id), segment);
     }
   });
 
@@ -159,28 +315,38 @@ export const getEdgeRenderData = ({
       if (!from || !to) return null;
 
       const pairMetadata = edgePairMetadata.get(String(edge.id));
-      const geometry = buildEdgePath({
-        edge,
+      const geometry = clipEdgeGeometryToNodeShapes(
+        buildEdgePath({
+          edge,
+          from,
+          to,
+          routing: edgeRouting,
+          nodes: visibleNodes,
+          edgeCurvature,
+          nodeRadius,
+          ...pairMetadata,
+        }),
         from,
         to,
-        routing: edgeRouting,
-        nodes: visibleNodes,
-        edgeCurvature,
         nodeRadius,
-        ...pairMetadata,
-      });
+        nodeLabelSize,
+        pairMetadata
+      );
       const labelText = String(edge.label ?? '');
       const labelPosition = labelText
-        ? chooseBestLabelPosition({
-            edge,
-            labelText,
-            labelOptions: geometry.labelOptions,
-            nodes: visibleNodes,
-            segmentsById,
-            placedLabelRects,
-            nodeRadius,
-            labelFontSize: edgeLabelSize,
-          })
+        ? chooseShapeAwareLabelPosition(
+            {
+              edge,
+              labelText,
+              labelOptions: geometry.labelOptions,
+              nodes: visibleNodes,
+              segmentsById,
+              placedLabelRects,
+              nodeRadius,
+              labelFontSize: edgeLabelSize,
+            },
+            additionalLabelObstacles
+          )
         : null;
 
       if (labelPosition && labelText) {

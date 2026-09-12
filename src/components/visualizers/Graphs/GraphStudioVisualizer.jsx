@@ -27,6 +27,7 @@ import {
   getCaptionPresetFontSize,
   normalizeCaptionOverlay,
   resolveStepCaptionEnabled,
+  resolveStepCaptionText,
 } from './graphStudio/lib/captionOverlay';
 import {
   DEFAULT_CUSTOM_LEGEND,
@@ -39,12 +40,14 @@ import {
   getDefaultEdgeLabelFontSize,
   getDefaultNodeLabelFontSize,
 } from './graphStudio/lib/fontSizing';
+import { clampAuthoredNodePosition } from './graphStudio/lib/graphGeometry';
 import { normalizeForceStrength } from './graphStudio/lib/graphLayouts';
 import {
   hasOpenModal,
   isEditableKeyboardTarget,
 } from './graphStudio/lib/keyboardTargets';
 import { readBrowserLocalDraft } from './graphStudio/lib/localDraft';
+import { getNodeArrangementPatches } from './graphStudio/lib/nodeArrangement';
 import { exportProjectJson } from './graphStudio/lib/projectJson';
 import { getFrameOverrideState } from './graphStudio/lib/temporalGraphState';
 import { cloneJson } from './graphStudio/lib/undoUtils';
@@ -556,6 +559,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
     setIsParserOpen,
     parserText,
     parserError,
+    parserMode,
+    setParserMode,
     setParserText,
     applyParserText,
     isProjectJsonPasteOpen,
@@ -1038,7 +1043,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onCancelLayout: cancelLayout,
       forceStrength: globalSettings.forceStrength,
       onForceStrengthChange: updateForceStrength,
-      onOpenParser: () => setIsParserOpen(true),
+      onOpenParser: mode => setIsParserOpen(true, mode),
       onExportText: exportText,
       onExportProject: exportProject,
       onExportSvg: exportSvg,
@@ -1069,6 +1074,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       steps,
       getFrameGraph,
       onCenterView: handleCenterView,
+      onFitForReview: bumpViewReset,
       zoomPercent,
       onZoomIn: zoomIn,
       onZoomOut: zoomOut,
@@ -1112,7 +1118,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
           item => String(item.id) === String(id)
         );
         if (node)
-          updateBaseNode(id, { x: node.x + delta.x, y: node.y + delta.y });
+          updateBaseNode(
+            id,
+            clampAuthoredNodePosition({
+              x: node.x + delta.x,
+              y: node.y + delta.y,
+            })
+          );
       },
       onNodePointerUp,
       onNodeClickForDraw,
@@ -1121,7 +1133,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       captionOverlay: currentCaptionOverlay,
       baseCaptionOverlay: normalizedCaptionOverlay,
       setCaptionOverlay,
-      captionText: steps[currentFrame]?.description ?? '',
+      captionText: resolveStepCaptionText(steps[currentFrame]),
     },
     property: {
       selectedNode,
@@ -1152,6 +1164,30 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       onSelectEdge: edgeId => onSelectEdge(edgeId),
       onSelectNode: nodeId => onSelectNode(nodeId, false),
       onApplyToSelection: applyPatchToSelectedNodes,
+      onArrangeSelection: operation => {
+        const patches = getNodeArrangementPatches(
+          computedGraph.nodes,
+          selectedNodeIds,
+          operation,
+          globalSettings.nodeSize,
+          globalSettings.nodeLabelFontSize
+        );
+        const changed = Object.fromEntries(
+          Object.entries(patches).filter(([id, patch]) => {
+            const node = baseGraph.nodes.find(item => String(item.id) === id);
+            return (
+              node &&
+              Object.entries(patch).some(([key, value]) => node[key] !== value)
+            );
+          })
+        );
+        if (Object.keys(changed).length) {
+          updateBaseNodesBulk(changed);
+          setStatus(
+            `Arranged ${selectedNodeIds.length} nodes across every frame`
+          );
+        }
+      },
       onDeleteSelection: deleteSelection,
       onClearSelection: clearSelection,
       onUpdateGlobal: updateGlobalSettings,
@@ -1165,6 +1201,15 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateStep(index, 'durationMs', value),
       onDescriptionChange: (index, value) =>
         updateStep(index, 'description', value),
+      onCaptionTextChange: (index, value) =>
+        updateStep(index, 'captionText', value),
+      onSeparateCaptionChange: enabled =>
+        updateStep(currentFrame, step => {
+          const next = { ...step };
+          if (enabled) next.captionText = resolveStepCaptionText(step);
+          else delete next.captionText;
+          return next;
+        }),
       captionEnabled: currentCaptionOverlay.enabled,
       captionStyle: normalizedCaptionOverlay.style,
       captionSize: normalizedCaptionOverlay.size,
@@ -1172,6 +1217,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       hasCaptionVisibleOverride,
       onCaptionEnabledChange: enabled => {
         updateStep(currentFrame, 'captionVisible', enabled);
+        if (enabled && !lockCanvas) bumpViewReset();
         setStatus(`Caption visibility updated for Frame ${currentFrame + 1}`);
       },
       onResetCaptionVisibleOverride: resetCaptionVisibleOverride,
@@ -1238,6 +1284,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         open: isParserOpen,
         text: parserText,
         error: parserError,
+        mode: parserMode,
+        onModeChange: setParserMode,
         onTextChange: setParserText,
         onClose: () => setIsParserOpen(false),
         onSubmit: applyParserText,

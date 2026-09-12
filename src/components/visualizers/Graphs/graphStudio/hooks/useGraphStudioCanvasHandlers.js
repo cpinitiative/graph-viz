@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clamp, clampNodePosition, snapToGrid } from '../graphStudioUtils';
+import { clamp, snapToGrid } from '../graphStudioUtils';
 import { isNodeVisible } from '../lib/effectiveVisibility';
+import { clampAuthoredNodePosition } from '../lib/graphGeometry';
 import { resolveNodeSelection } from '../lib/selectionState';
 
-const MIN_NODE_POSITION = clampNodePosition({
+const MIN_NODE_POSITION = clampAuthoredNodePosition({
   x: Number.NEGATIVE_INFINITY,
   y: Number.NEGATIVE_INFINITY,
 });
-const MAX_NODE_POSITION = clampNodePosition({
+const MAX_NODE_POSITION = clampAuthoredNodePosition({
   x: Number.POSITIVE_INFINITY,
   y: Number.POSITIVE_INFINITY,
 });

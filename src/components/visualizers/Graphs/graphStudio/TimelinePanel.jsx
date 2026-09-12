@@ -1,10 +1,13 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCommittedNumberInput } from './hooks/useCommittedNumberInput.js';
 import {
   CAPTION_FONT_SIZE_RANGE,
   CAPTION_STYLE_OPTIONS,
 } from './lib/captionOverlay';
 import {
   DEFAULT_FRAME_DURATION_MS,
+  MAX_FRAME_DURATION_MS,
+  MIN_FRAME_DURATION_MS,
   normalizeFrameDuration,
 } from './lib/frameDuration';
 import NativeSelect from './NativeSelect';
@@ -172,24 +175,13 @@ const CaptionScopeHelp = () => (
 );
 
 const DurationInput = ({ durationMs, onCommit }) => {
-  const normalizedDuration = normalizeFrameDuration(durationMs);
-  const [draft, setDraft] = useState(String(normalizedDuration));
-
-  const reset = () => setDraft(String(normalizedDuration));
-  const commit = () => {
-    if (!draft.trim()) {
-      reset();
-      return;
-    }
-    const parsed = Number(draft);
-    if (!Number.isFinite(parsed)) {
-      reset();
-      return;
-    }
-    const nextDuration = Math.round(normalizeFrameDuration(parsed));
-    setDraft(String(nextDuration));
-    onCommit(nextDuration);
-  };
+  const numberInput = useCommittedNumberInput({
+    value: normalizeFrameDuration(durationMs),
+    min: MIN_FRAME_DURATION_MS,
+    max: MAX_FRAME_DURATION_MS,
+    step: 1,
+    onCommit,
+  });
 
   return (
     <input
@@ -197,47 +189,21 @@ const DurationInput = ({ durationMs, onCommit }) => {
       className="h-8 w-[68px] rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-0 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
       data-testid="frame-duration-input"
       inputMode="numeric"
-      onBlur={commit}
-      onChange={event => setDraft(event.target.value)}
-      onKeyDown={event => {
-        if (event.key === 'Enter') {
-          event.currentTarget.blur();
-        } else if (event.key === 'Escape') {
-          reset();
-          event.currentTarget.blur();
-        }
-      }}
+      {...numberInput}
       pattern="[0-9]*"
       type="text"
-      value={draft}
     />
   );
 };
 
 const CaptionFontSizeInput = ({ value, onCommit }) => {
-  const normalizedValue = Number.isFinite(Number(value)) ? Number(value) : 12;
-  const [draft, setDraft] = useState(String(normalizedValue));
-
-  const reset = () => setDraft(String(normalizedValue));
-  const commit = () => {
-    if (!draft.trim()) {
-      reset();
-      return;
-    }
-    const parsed = Number(draft);
-    if (!Number.isFinite(parsed)) {
-      reset();
-      return;
-    }
-    const nextValue = Math.round(
-      Math.max(
-        CAPTION_FONT_SIZE_RANGE.min,
-        Math.min(CAPTION_FONT_SIZE_RANGE.max, parsed)
-      )
-    );
-    setDraft(String(nextValue));
-    onCommit?.(nextValue);
-  };
+  const numberInput = useCommittedNumberInput({
+    value: Number.isFinite(Number(value)) ? Number(value) : 12,
+    min: CAPTION_FONT_SIZE_RANGE.min,
+    max: CAPTION_FONT_SIZE_RANGE.max,
+    step: 1,
+    onCommit,
+  });
 
   return (
     <input
@@ -245,20 +211,9 @@ const CaptionFontSizeInput = ({ value, onCommit }) => {
       className="h-8 w-14 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-1 text-center font-mono text-xs tabular-nums leading-8 text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
       data-testid="caption-font-size-input"
       inputMode="numeric"
-      onBlur={commit}
-      onChange={event => setDraft(event.target.value)}
-      onFocus={() => setDraft(String(normalizedValue))}
-      onKeyDown={event => {
-        if (event.key === 'Enter') {
-          event.currentTarget.blur();
-        } else if (event.key === 'Escape') {
-          reset();
-          event.currentTarget.blur();
-        }
-      }}
+      {...numberInput}
       pattern="[0-9]*"
       type="text"
-      value={draft}
     />
   );
 };
@@ -270,7 +225,10 @@ const TimelinePanel = ({
   onFrameChange,
   onStepDurationChange,
   onDescriptionChange,
+  onCaptionTextChange,
+  onSeparateCaptionChange,
   captionEnabled,
+  captionTruncated,
   captionStyle,
   captionFontSize,
   hasCaptionVisibleOverride,
@@ -311,12 +269,12 @@ const TimelinePanel = ({
   return (
     <div
       aria-label="Animation timeline"
-      className="flex h-full min-h-[208px] min-w-0 flex-col bg-[#F8F9FA] text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:bg-[#111827] dark:focus-visible:ring-[#60A5FA]"
+      className="flex h-full min-h-[208px] min-w-0 flex-col overflow-y-auto bg-[#F8F9FA] text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0F2747] dark:bg-[#111827] dark:focus-visible:ring-[#60A5FA]"
       data-frame-navigation-surface="true"
       data-testid="timeline-panel"
       tabIndex="0"
     >
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
+      <div className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-1.5 border-b border-[#D7DEE8] bg-[#F8F9FA] px-2.5 py-1.5 dark:border-[#334155] dark:bg-[#111827]">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <div className="font-manrope text-xs font-bold uppercase tracking-wider text-[#0F2747] dark:text-[#F8FAFC]">
             Timeline
@@ -511,14 +469,16 @@ const TimelinePanel = ({
         <div className="grid min-w-0 gap-1.5">
           <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <span className={detailLabelClass}>Description</span>
-            <input
+            <textarea
               aria-label="Frame Description"
+              rows={1}
+              title="Full frame notes; also used on the canvas unless Separate caption text is enabled."
               maxLength={10000}
               value={steps[currentFrame]?.description ?? ''}
               onChange={event =>
                 onDescriptionChange(currentFrame, event.target.value)
               }
-              className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+              className="h-8 min-h-8 min-w-0 resize-y rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 py-1.5 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
               placeholder="Describe what happens on this frame..."
             />
           </label>
@@ -550,6 +510,17 @@ const TimelinePanel = ({
                   type="checkbox"
                 />
                 <span>Show caption</span>
+              </label>
+              <label className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold text-[#334155] dark:text-[#CBD5E1]">
+                <input
+                  type="checkbox"
+                  checked={typeof steps[currentFrame]?.captionText === 'string'}
+                  onChange={event =>
+                    onSeparateCaptionChange?.(event.target.checked)
+                  }
+                  className="h-3.5 w-3.5 accent-[#B45309] dark:accent-[#60A5FA]"
+                />
+                Separate caption text
               </label>
               {hasCaptionVisibleOverride && (
                 <span className="flex shrink-0 items-center gap-2">
@@ -592,6 +563,31 @@ const TimelinePanel = ({
               </label>
             </div>
           </div>
+          {typeof steps[currentFrame]?.captionText === 'string' && (
+            <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
+              <span className={detailLabelClass}>Display caption</span>
+              <input
+                aria-label="Display caption"
+                maxLength={10000}
+                value={steps[currentFrame].captionText}
+                onChange={event =>
+                  onCaptionTextChange?.(currentFrame, event.target.value)
+                }
+                placeholder="Short text shown on the canvas and in exports"
+                className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC]"
+              />
+            </label>
+          )}
+          {captionEnabled && captionTruncated && (
+            <p
+              role="status"
+              data-testid="caption-overflow-warning"
+              className="text-[11px] text-[#92400E] dark:text-[#FCD34D]"
+            >
+              Caption is shortened in this viewport. Use shorter display text or
+              a smaller font; the full description stays in the timeline.
+            </p>
+          )}
         </div>
       </div>
     </div>
