@@ -9,12 +9,13 @@ import {
 } from '../../src/analytics.js';
 
 test('enables analytics only on the public production hostname', () => {
-  assert.equal(shouldEnableWebAnalytics('graph-viz.usaco.guide'), true);
+  assert.equal(shouldEnableWebAnalytics('graph.usaco.guide'), true);
+  assert.equal(shouldEnableWebAnalytics('graph-viz.usaco.guide'), false);
   assert.equal(shouldEnableWebAnalytics('preview-name.vercel.app'), false);
   assert.equal(shouldEnableWebAnalytics('localhost'), false);
   assert.equal(shouldEnableWebAnalytics('127.0.0.1'), false);
   assert.equal(
-    shouldEnableWebAnalytics('graph-viz.usaco.guide.example.com'),
+    shouldEnableWebAnalytics('graph.usaco.guide.example.com'),
     false
   );
 });
@@ -23,11 +24,11 @@ test('removes query strings and fragments before analytics events are sent', () 
   assert.deepEqual(
     stripAnalyticsUrlDetails({
       type: 'pageview',
-      url: 'https://graph-viz.usaco.guide/?token=private#frame-4',
+      url: 'https://graph.usaco.guide/?token=private#frame-4',
     }),
     {
       type: 'pageview',
-      url: 'https://graph-viz.usaco.guide/',
+      url: 'https://graph.usaco.guide/',
     }
   );
   assert.equal(

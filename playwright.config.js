@@ -25,6 +25,11 @@ export default defineConfig({
     : undefined,
   projects: [
     {
+      name: 'domain-chromium',
+      testMatch: /domains\.spec\.js/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'chromium',
       testMatch: /graph-viz\.spec\.js/,
       use: { ...devices['Desktop Chrome'] },

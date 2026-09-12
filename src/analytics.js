@@ -61,7 +61,7 @@ const EVENT_SCHEMAS = Object.freeze({
 
 export const shouldEnableWebAnalytics = hostname => {
   const normalizedHostname = String(hostname ?? '').toLowerCase();
-  return normalizedHostname === 'graph-viz.usaco.guide';
+  return normalizedHostname === 'graph.usaco.guide';
 };
 
 export const stripAnalyticsUrlDetails = event => {

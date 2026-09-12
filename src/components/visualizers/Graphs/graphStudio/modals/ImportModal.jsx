@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { LEGACY_ORIGIN } from '../../../../../siteDomain';
 import { isEditableKeyboardTarget } from '../lib/keyboardTargets';
 import ModalFrame, {
   modalActionButtonClass,
@@ -55,6 +56,17 @@ const ImportModal = ({
         </button>
       }
     >
+      <p className={modalBodyTextClass}>
+        Missing a project saved at the old address?{' '}
+        <a
+          className="font-semibold underline focus-visible:outline focus-visible:outline-2"
+          href={LEGACY_ORIGIN}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Recover a saved project from graph-viz.usaco.guide
+        </a>
+      </p>
       <section className={modalSectionClass}>
         <div>
           <h3 className={modalEyebrowClass}>Project Data</h3>
