@@ -243,6 +243,14 @@ test('enabling a grid caption keeps nodes and overlays clear in the editor and e
       );
     });
   await expect.poll(() => hasOverlap(canvas(page))).toBe(false);
+  await page.getByLabel('Caption Style', { exact: true }).selectOption('dark');
+  await page
+    .getByRole('textbox', { name: 'Caption Font Size', exact: true })
+    .fill('16');
+  await page
+    .getByRole('textbox', { name: 'Caption Font Size', exact: true })
+    .press('Enter');
+  await expect.poll(() => hasOverlap(canvas(page))).toBe(false);
   await page.getByTestId('open-export-menu').click();
   await page.getByTestId('image-framing-select').selectOption('presentation');
   await expect(page.getByTestId('png-export-button')).toBeEnabled();

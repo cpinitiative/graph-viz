@@ -269,6 +269,13 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       didFit ? 'View fit to graph' : 'Unlock view to change the viewport'
     );
   }, [centerViewOnContent, lockCanvas, setStatus]);
+  const updateCaptionAppearance = useCallback(
+    updater => {
+      setCaptionOverlay(updater);
+      if (currentCaptionOverlay.enabled && !lockCanvas) bumpViewReset();
+    },
+    [bumpViewReset, currentCaptionOverlay.enabled, lockCanvas]
+  );
   const [globalSettings, setGlobalSettings] = useState(
     initialSettings?.globalSettings ?? DEFAULT_GLOBAL_SETTINGS
   );
@@ -1222,12 +1229,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       },
       onResetCaptionVisibleOverride: resetCaptionVisibleOverride,
       onCaptionStyleChange: style =>
-        setCaptionOverlay(prev => ({
+        updateCaptionAppearance(prev => ({
           ...normalizeCaptionOverlay(prev),
           style,
         })),
       onCaptionSizeChange: size =>
-        setCaptionOverlay(prev => {
+        updateCaptionAppearance(prev => {
           const normalized = normalizeCaptionOverlay(prev);
           const isPresetFontSize =
             normalized.fontSize === getCaptionPresetFontSize(normalized.size);
@@ -1240,7 +1247,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
           };
         }),
       onCaptionFontSizeChange: fontSize =>
-        setCaptionOverlay(prev => ({
+        updateCaptionAppearance(prev => ({
           ...normalizeCaptionOverlay(prev),
           fontSize,
         })),
