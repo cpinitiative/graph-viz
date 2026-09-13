@@ -100,6 +100,7 @@ export const useGraphStudioImportExport = ({
       edgeLabelFontSize: globalSettings?.edgeLabelFontSize,
       theme,
       baseCaptionOverlay: normalizeCaptionOverlay(captionOverlay),
+      captionFrameCount: steps.length,
       customLegend: normalizeCustomLegend(renderLegend ?? customLegend),
     }),
     [
@@ -109,6 +110,7 @@ export const useGraphStudioImportExport = ({
       getZoomViewportSize,
       globalSettings,
       renderLegend,
+      steps.length,
       theme,
       viewState,
     ]

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  buildEdgePath,
   clampFitZoom,
   clampZoom,
   computeMinZoom,
   createFitViewState,
+  cubicBezierPoint,
+  getAvoidanceShift,
   getWheelZoomFactor,
   recenterViewStateForViewportResize,
 } from '../../src/components/visualizers/Graphs/graphStudio/graphCanvasUtils.js';
@@ -150,4 +153,69 @@ test('wheel zoom scales smoothly with trackpad delta magnitude', () => {
     getWheelZoomFactor({ deltaY: -10000 }),
     getWheelZoomFactor({ deltaY: -240 })
   );
+});
+
+test('Bezier avoidance preserves both bend directions and clears a middle node', () => {
+  const from = { id: 'A', x: 0, y: 0 };
+  const to = { id: 'B', x: 400, y: 0 };
+  const blocker = { id: 'C', x: 200, y: 0 };
+  for (const [id, side] of [
+    ['e0', -1],
+    ['e1', 1],
+  ]) {
+    const options = {
+      edge: { id, from: from.id, to: to.id, directed: true },
+      from,
+      to,
+      routing: 'bezier',
+      edgeCurvature: 46,
+      nodeRadius: 32,
+    };
+    const original = buildEdgePath({ ...options, nodes: [from, to] });
+    const avoided = buildEdgePath({ ...options, nodes: [from, to, blocker] });
+    assert.deepEqual(avoided.pathPoints[0], original.pathPoints[0]);
+    assert.deepEqual(avoided.pathPoints.at(-1), original.pathPoints.at(-1));
+    const originalMiddle = cubicBezierPoint(...original.pathPoints, 0.5);
+    const avoidedMiddle = cubicBezierPoint(...avoided.pathPoints, 0.5);
+    assert.equal(Math.sign(avoidedMiddle.y), side);
+    assert.ok(Math.abs(avoidedMiddle.y) > Math.abs(originalMiddle.y));
+    for (let sample = 0; sample <= 200; sample += 1) {
+      const point = cubicBezierPoint(...avoided.pathPoints, sample / 200);
+      assert.ok(
+        Math.hypot(point.x - blocker.x, point.y - blocker.y) >
+          options.nodeRadius + 4,
+        `${id} must clear the intermediate node on its chosen side`
+      );
+    }
+  }
+});
+
+test('avoidance retains unobstructed shifts and does not change straight edges or loops', () => {
+  const from = { id: 'A', x: 0, y: 0 };
+  const to = { id: 'B', x: 400, y: 0 };
+  const edge = { id: 'e0', from: from.id, to: to.id, directed: true };
+  const segment = { x1: 30, y1: 0, x2: 368, y2: 0 };
+  for (const shift of [-46, 0, 46]) {
+    assert.equal(
+      getAvoidanceShift(segment, edge, [from, to], shift, 32),
+      shift
+    );
+  }
+  for (const target of [to, from]) {
+    const options = {
+      edge: { ...edge, to: target.id },
+      from,
+      to: target,
+      routing: 'straight',
+      edgeCurvature: 46,
+      nodeRadius: 32,
+    };
+    assert.deepEqual(
+      buildEdgePath({
+        ...options,
+        nodes: [from, to, { id: 'C', x: 200, y: 0 }],
+      }),
+      buildEdgePath({ ...options, nodes: [from, to] })
+    );
+  }
 });

@@ -7,8 +7,10 @@ export const LEGEND_MODES = Object.freeze(['smart', 'custom']);
 export const CUSTOM_LEGEND_POSITIONS = [
   'auto',
   'top-left',
+  'top-center',
   'top-right',
   'bottom-left',
+  'bottom-center',
   'bottom-right',
   'custom',
 ];
@@ -16,8 +18,10 @@ export const CUSTOM_LEGEND_POSITIONS = [
 export const CUSTOM_LEGEND_POSITION_LABELS = {
   auto: 'Auto',
   'top-left': 'Top Left',
+  'top-center': 'Top Center',
   'top-right': 'Top Right',
   'bottom-left': 'Bottom Left',
+  'bottom-center': 'Bottom Center',
   'bottom-right': 'Bottom Right',
   custom: 'Custom',
 };

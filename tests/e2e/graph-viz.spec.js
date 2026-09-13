@@ -523,6 +523,21 @@ const closeExportMenu = async page => {
 const fixturePath = name =>
   fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
+// Exercise legacy description-only captions independently of the curated
+// presets, which now carry separate presenter notes and display captions.
+const legacyCaptionSteps = GRAPH_PRESETS.bfs.steps.map((step, index) => {
+  const { captionText, ...legacy } = step;
+  return {
+    ...legacy,
+    description:
+      index === 0
+        ? 'BFS · Queue: A'
+        : index === 1
+          ? 'Visit A · Queue: empty'
+          : captionText,
+  };
+});
+
 const educationalPresets = Object.entries(GRAPH_PRESETS).map(
   ([value, preset]) => ({
     value,
@@ -1533,7 +1548,7 @@ while (true) {}
           format: 'graph-viz-project',
           version: 1,
           graph: GRAPH_PRESETS.bfs.graph,
-          timeline: { steps: GRAPH_PRESETS.bfs.steps },
+          timeline: { steps: legacyCaptionSteps },
           settings: {
             captionOverlay: { enabled: false, size: 'medium', fontSize: 12 },
           },
@@ -1728,9 +1743,9 @@ while (true) {}
     await expect(durationInput).toHaveClass(/text-center/);
     await expect(durationInput).toHaveClass(/leading-8/);
     await expect(captionStyleSelect.locator('xpath=..')).toHaveClass(
-      /w-\[108px\]/
+      /w-\[128px\]/
     );
-    expect((await captionStyleSelect.boundingBox())?.width).toBeLessThan(120);
+    expect((await captionStyleSelect.boundingBox())?.width).toBeLessThan(144);
     expect((await captionFontSizeInput.boundingBox())?.width).toBeLessThan(68);
     await expect(descriptionRow.getByText(/Frame \d+ \/ \d+/)).toHaveCount(0);
     await expect(frameCounter).toHaveText(
@@ -2182,7 +2197,7 @@ while (true) {}
           format: 'graph-viz-project',
           version: 1,
           graph: GRAPH_PRESETS.bfs.graph,
-          timeline: { steps: GRAPH_PRESETS.bfs.steps },
+          timeline: { steps: legacyCaptionSteps },
           settings: {
             captionOverlay: { enabled: false, size: 'medium', fontSize: 12 },
           },
@@ -2513,8 +2528,8 @@ while (true) {}
     await expect(edgeLabelFontSizeInput).toBeVisible();
     await expect(firstNodeLabel).toBeVisible();
     await expect(firstEdgeLabel).toBeVisible();
-    await expect(nodeLabelFontSizeInput).toHaveValue('18');
-    await expect(edgeLabelFontSizeInput).toHaveValue('18');
+    await expect(nodeLabelFontSizeInput).toHaveValue('24');
+    await expect(edgeLabelFontSizeInput).toHaveValue('20');
     await expect(
       propertyPanel(page).getByText('px', { exact: true })
     ).toHaveCount(0);
@@ -2531,6 +2546,9 @@ while (true) {}
       expect(box.height).toBeLessThanOrEqual(30);
     }
 
+    // Restore automatic sizes before checking their coupling to geometry;
+    // teaching presets deliberately use larger explicit text sizes.
+    await commitInputValue(nodeLabelFontSizeInput, 18);
     await setRangeValue(page, 'Node size', 40);
     await expect(nodeLabelFontSizeInput).toHaveValue('22');
     await expect(firstNodeLabel).toHaveCSS('font-size', '22px');
@@ -2540,6 +2558,7 @@ while (true) {}
     await expect(nodeLabelFontSizeInput).toHaveValue('24');
     await expect(firstNodeLabel).toHaveCSS('font-size', '24px');
 
+    await commitInputValue(edgeLabelFontSizeInput, 18);
     await setRangeValue(page, 'Edge width', 6);
     await expect(edgeLabelFontSizeInput).toHaveValue('22');
     await expect(firstEdgeLabel).toHaveAttribute('font-size', '22');
@@ -2859,7 +2878,7 @@ while (true) {}
       await expect(legendPreview).toBeVisible();
       await expect(legendPreview).toHaveAttribute(
         'data-legend-position',
-        'top-left'
+        'top-center'
       );
 
       for (const entry of preset.entries) {
@@ -4948,7 +4967,7 @@ while (true) {}
     expectSlideFramedSvg(previewSvgText);
     expect(previewSvgText).toContain('data-export-frame-index="2"');
     expect(previewSvgText).toContain('data-edge-path-id=');
-    expect(previewSvgText).toContain('data-edge-arrowhead-id=');
+    expect(previewSvgText).not.toContain('data-edge-arrowhead-id=');
     expect(previewSvgText).toContain('data-node-label-id=');
     expect(
       (await getSvgPresentationState(page, previewSvgText)).firstNode.r
@@ -5886,7 +5905,7 @@ api.edge('loop', '#3b82f6');
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
-    await choosePreset(page, 'dfs');
+    await choosePreset(page, 'dijkstra');
 
     const directedEdge = graphCanvas(page).locator('[data-edge-path-id="e0"]');
     const arrowhead = graphCanvas(page).locator(
@@ -5962,7 +5981,7 @@ api.edge('loop', '#3b82f6');
     expect(defaultExportedSvg).not.toContain('marker-end=');
     await closeExportMenu(page);
 
-    await page.getByText('Frame 2').click();
+    await page.getByText('Frame 3').click();
     await expect(directedEdge).toHaveAttribute('stroke', /#3b82f6/i);
     await expect(arrowhead).toHaveAttribute('fill', /#3b82f6/i);
     await expectBodyOverlapsArrowBase();
@@ -6040,7 +6059,7 @@ api.edge('e0', '#f59e0b');
     await page.goto('/');
     await expect(graphCanvas(page)).toBeVisible();
 
-    await choosePreset(page, 'dfs');
+    await choosePreset(page, 'dijkstra');
     await expectDirectedEdgesAnchored(page);
 
     await page.getByLabel('Edge routing').selectOption('bezier');
@@ -6321,13 +6340,13 @@ api.edge('e0', '#f59e0b');
     expect(rangeSlides).toEqual([
       expect.objectContaining({
         description: expect.stringContaining(
-          'Graph Studio Frame 1: BFS · Queue: A'
+          `Graph Studio Frame 1: ${GRAPH_PRESETS.bfs.steps[0].description}`
         ),
         image: { width: 1040, height: 585 },
       }),
       expect.objectContaining({
         description: expect.stringContaining(
-          'Graph Studio Frame 2: Visit A · Queue: empty'
+          `Graph Studio Frame 2: ${GRAPH_PRESETS.bfs.steps[1].description}`
         ),
         image: { width: 1040, height: 585 },
       }),
@@ -6537,9 +6556,7 @@ test.describe('Preset presentation and export fidelity', () => {
       for (const n of preset.graph.nodes) {
         await expect(
           graphCanvas(page).locator(`[data-node-label-id="${n.id}"]`)
-        ).toHaveText(
-          preset.steps.at(-1).nodeOverrides[n.id].annotation || n.label
-        );
+        ).toHaveText(n.label);
       }
       await expect
         .poll(

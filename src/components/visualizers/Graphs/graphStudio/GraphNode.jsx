@@ -7,6 +7,7 @@ import {
 } from './lib/fontSizing';
 import {
   getNodeAccessibleName,
+  getNodeAnnotationFontSize,
   getNodeDisplayText,
   getNodeShape,
   getNodeShapeBounds,
@@ -126,7 +127,7 @@ const GraphNode = ({
     nodeRadius,
     effectiveLabelFontSize
   );
-  const annotationFontSize = Math.max(10, Math.min(14, effectiveLabelFontSize));
+  const annotationFontSize = getNodeAnnotationFontSize(effectiveLabelFontSize);
   const annotationColor = theme === 'dark' ? '#CBD5E1' : '#334155';
 
   return (

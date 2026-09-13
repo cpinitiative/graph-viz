@@ -267,6 +267,7 @@ export const getAvoidanceShift = (
 ) => {
   const midX = (segment.x1 + segment.x2) / 2;
   const midY = (segment.y1 + segment.y2) / 2;
+  const side = Math.sign(baseShift) || 1;
   let shift = baseShift;
   nodes.forEach(node => {
     const sameEndpoint =
@@ -278,7 +279,7 @@ export const getAvoidanceShift = (
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < nodeRadius * 2.2) {
       const bump = (nodeRadius * 2.2 - distance) * 0.7;
-      shift += bump;
+      shift += side * bump;
     }
   });
   return shift;
