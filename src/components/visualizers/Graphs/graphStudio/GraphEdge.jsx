@@ -253,6 +253,12 @@ const GraphEdge = ({
       }),
     [edge, pathD, pathPoints, pathType, strokeWidth]
   );
+  const pathTransition = shouldAnimate
+    ? {
+        duration: Math.max((edge.duration ?? 450) / 1000, 0.1),
+        ease: 'easeInOut',
+      }
+    : { duration: 0 };
 
   return (
     <g
@@ -280,6 +286,23 @@ const GraphEdge = ({
           onClick={onClick}
         />
       )}
+      {!isExporting && (
+        <motion.path
+          data-editor-decoration="true"
+          data-interaction-indicator="true"
+          data-interaction-active={Boolean(isHighlighted)}
+          data-edge-selection-underlay-id={isHighlighted ? edge.id : undefined}
+          d={bodyPathD}
+          fill="none"
+          stroke={theme === 'dark' ? '#38BDF8' : '#2F6FD6'}
+          strokeWidth={strokeWidth + 4}
+          strokeLinecap="round"
+          pointerEvents="none"
+          initial={false}
+          animate={{ d: bodyPathD }}
+          transition={pathTransition}
+        />
+      )}
       <motion.path
         data-edge-path-id={edge.id}
         d={bodyPathD}
@@ -291,21 +314,9 @@ const GraphEdge = ({
         layoutId={`${layoutIdPrefix}edge-${edge.id}`}
         initial={false}
         animate={{ d: bodyPathD }}
-        transition={
-          shouldAnimate
-            ? {
-                duration: Math.max((edge.duration ?? 450) / 1000, 0.1),
-                ease: 'easeInOut',
-              }
-            : { duration: 0 }
-        }
+        transition={pathTransition}
         pointerEvents="none"
         className="transition-colors duration-200"
-        style={{
-          filter: isHighlighted
-            ? 'drop-shadow(0 8px 32px rgba(27, 27, 27, 0.04))'
-            : 'none',
-        }}
       />
       {arrow && (
         <motion.polygon

@@ -87,3 +87,43 @@ export const getGraphContentViewport = (svg, viewport) => {
   });
   return getUnobscuredViewport(viewport, obstacles);
 };
+
+const isUsableSvgBounds = bounds =>
+  Boolean(
+    bounds &&
+    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
+    bounds.width >= 0 &&
+    bounds.height >= 0 &&
+    (bounds.width > 0 || bounds.height > 0)
+  );
+
+export const mergeSvgBounds = (...boundsList) => {
+  const validBounds = boundsList.filter(isUsableSvgBounds);
+  if (!validBounds.length) return null;
+  const minX = Math.min(...validBounds.map(bounds => bounds.x));
+  const minY = Math.min(...validBounds.map(bounds => bounds.y));
+  const maxX = Math.max(...validBounds.map(bounds => bounds.x + bounds.width));
+  const maxY = Math.max(...validBounds.map(bounds => bounds.y + bounds.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+};
+
+export const measureRenderedContentBounds = content => {
+  if (!content) return null;
+  // Editor indicators must not change the graph's fitted size or position.
+  return mergeSvgBounds(
+    ...Array.from(content.querySelectorAll('circle, path, polygon, rect, text'))
+      .filter(
+        element =>
+          !element.matches(
+            '[data-editor-decoration], [data-edge-hit-target-id]'
+          )
+      )
+      .map(element => {
+        try {
+          return element.getBBox?.() ?? null;
+        } catch {
+          return null;
+        }
+      })
+  );
+};

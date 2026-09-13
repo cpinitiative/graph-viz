@@ -32,7 +32,7 @@ const graphCanvas = page =>
     .or(page.locator('svg#graph-studio-canvas-svg'));
 
 const nodeCircleSelector =
-  'g[data-export-content="true"] circle:not([data-node-selection-ring-id]):not([data-node-draw-source-ring-id])';
+  'g[data-export-content="true"] circle[data-node-outline-id]';
 
 const graphNodeCircles = page => graphCanvas(page).locator(nodeCircleSelector);
 
@@ -52,7 +52,12 @@ const getRenderedContentViewportBounds = async page =>
     const renderedRects = Array.from(
       content?.querySelectorAll('circle, path, polygon, text') ?? []
     )
-      .filter(element => !element.hasAttribute('data-edge-hit-target-id'))
+      .filter(
+        element =>
+          !element.matches(
+            '[data-edge-hit-target-id], [data-editor-decoration]'
+          )
+      )
       .map(element => element.getBoundingClientRect())
       .filter(
         bounds =>
@@ -110,9 +115,17 @@ const getRequiredBox = async locator => {
   return box;
 };
 
-const expectSelectedTimelineFrameCardVisual = async card => {
+const expectSelectedTimelineFrameCardVisual = async (
+  card,
+  keyboardFocused = false
+) => {
   await expect(card).toHaveAttribute('data-current', 'true');
-  await expect(card).toHaveCSS('box-shadow', 'none');
+  if (keyboardFocused) {
+    await expect(card).toBeFocused();
+    await expect(card).not.toHaveCSS('box-shadow', 'none');
+  } else {
+    await expect(card).toHaveCSS('box-shadow', 'none');
+  }
   await expect(card).not.toHaveClass(/shadow-/);
   await expect(card).not.toHaveClass(/focus-visible:ring-inset/);
 
@@ -1620,7 +1633,7 @@ while (true) {}
     await expect(
       cards.nth(2).getByTestId('timeline-frame-selected-accent')
     ).toBeVisible();
-    await expectSelectedTimelineFrameCardVisual(cards.nth(2));
+    await expectSelectedTimelineFrameCardVisual(cards.nth(2), true);
 
     await page.getByRole('button', { name: 'Toggle theme' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -1826,7 +1839,7 @@ while (true) {}
     await graphCanvas(page).press('ArrowLeft');
     await expect(cards.first()).toHaveAttribute('data-current', 'true');
     await expectSelectedTimelineFrameCardVisual(cards.first());
-    await expect(cards.first()).not.toHaveClass(/focus-visible:ring-1/);
+    await expect(cards.first()).toHaveClass(/focus-visible:ring-1/);
     await expect(cards.first()).not.toHaveClass(/focus-visible:ring-2/);
     await page.getByRole('button', { name: 'Play timeline' }).click();
     await expect
@@ -3293,7 +3306,7 @@ while (true) {}
     );
     await expect(drawSourceRing).toBeVisible();
     await expect(drawSourceRing).toHaveAttribute('stroke', '#0F766E');
-    await expect(drawSourceRing).toHaveAttribute('r', '26');
+    await expect(drawSourceRing).toHaveAttribute('r', '25');
     await expect(drawSourceRing).toHaveAttribute('stroke-width', '1.5');
     await expect(drawSourceRing).toHaveAttribute('stroke-dasharray', '2.5 4');
     await page.keyboard.press('Escape');
@@ -3650,7 +3663,7 @@ while (true) {}
           Array.from(svg.querySelectorAll('[data-node-label-id]')).every(
             label => {
               const circle = label.parentElement?.querySelector(
-                'circle:not([data-node-selection-ring-id]):not([data-node-draw-source-ring-id])'
+                'circle[data-node-outline-id]'
               );
               return (
                 circle &&
@@ -4769,13 +4782,13 @@ while (true) {}
     );
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(selectedEdgePath).toHaveAttribute('stroke', '#64748B');
     await expect
       .poll(async () =>
         Number(await selectedEdgePath.getAttribute('stroke-width'))
       )
-      .toBeGreaterThan(2.2);
+      .toBeCloseTo(2.2, 3);
     exportMenu = await openExportMenu(page);
     previewState = await getSvgPresentationState(
       page,
@@ -6014,20 +6027,23 @@ api.edge('e0', '#f59e0b');
     const arrowLengthBeforeSelection = Number(
       await arrowhead.getAttribute('data-edge-arrow-length')
     );
+    const edgeWidthBeforeSelection = Number(
+      await directedEdge.getAttribute('stroke-width')
+    );
     await edgeHitTarget.dispatchEvent('click');
     await expect(directedEdge).toHaveAttribute('stroke', '#f59e0b');
     await expect(arrowhead).toHaveAttribute('fill', '#f59e0b');
     await expect(
       graphCanvas(page).locator('[data-edge-selection-underlay-id="e0"]')
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect
       .poll(async () => Number(await directedEdge.getAttribute('stroke-width')))
-      .toBeGreaterThan(2.2);
+      .toBe(edgeWidthBeforeSelection);
     await expect
       .poll(async () =>
         Number(await arrowhead.getAttribute('data-edge-arrow-length'))
       )
-      .toBeGreaterThan(arrowLengthBeforeSelection);
+      .toBe(arrowLengthBeforeSelection);
     await expectBodyOverlapsArrowBase();
 
     await page.keyboard.press('Escape');

@@ -28,7 +28,11 @@ import {
   normalizeEdgeLabelFontSize,
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
-import { getGraphContentViewport } from './lib/graphFraming';
+import {
+  getGraphContentViewport,
+  measureRenderedContentBounds,
+  mergeSvgBounds,
+} from './lib/graphFraming';
 import { AUTHORING_VIEW_BOUNDS } from './lib/graphGeometry';
 import {
   getNodeAccessibleIdentity,
@@ -70,46 +74,6 @@ const GRID_PALETTES = {
   },
 };
 
-const isUsableSvgBounds = bounds =>
-  Boolean(
-    bounds &&
-    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
-    bounds.width >= 0 &&
-    bounds.height >= 0 &&
-    (bounds.width > 0 || bounds.height > 0)
-  );
-
-const mergeSvgBounds = (...boundsList) => {
-  const validBounds = boundsList.filter(isUsableSvgBounds);
-  if (!validBounds.length) return null;
-  const minX = Math.min(...validBounds.map(bounds => bounds.x));
-  const minY = Math.min(...validBounds.map(bounds => bounds.y));
-  const maxX = Math.max(...validBounds.map(bounds => bounds.x + bounds.width));
-  const maxY = Math.max(...validBounds.map(bounds => bounds.y + bounds.height));
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-};
-
-const measureRenderedContentBounds = content => {
-  if (!content) return null;
-  try {
-    const bounds = content.getBBox?.();
-    if (isUsableSvgBounds(bounds)) return bounds;
-  } catch {
-    // Fall through to per-element measurement for defensive browser support.
-  }
-
-  return mergeSvgBounds(
-    ...Array.from(
-      content.querySelectorAll('circle, path, polygon, rect, text')
-    ).map(element => {
-      try {
-        return element.getBBox?.() ?? null;
-      } catch {
-        return null;
-      }
-    })
-  );
-};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -205,9 +169,6 @@ const CAPTION_MAX_LINES = 3;
 const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
 
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const getSelectedEdgeStrokeWidth = edgeWidth =>
-  Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
 
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
@@ -1191,15 +1152,12 @@ const GraphCanvas = ({
           effectiveSelectedObject?.type === 'edge' &&
           String(effectiveSelectedObject.id) === String(edge.id);
         const strokeColor = getEffectiveEdgeColor(edge);
-        const strokeWidth = selected
-          ? getSelectedEdgeStrokeWidth(edgeWidth)
-          : edgeWidth;
         return {
           ...renderData,
           selected,
           multiSelected: false,
           strokeColor,
-          strokeWidth,
+          strokeWidth: edgeWidth,
         };
       }),
     [edgeRenderData, effectiveSelectedObject, edgeWidth]
@@ -1831,7 +1789,6 @@ const GraphCanvas = ({
                     themeOverride={themeOverride}
                     onPointerDown={event => {
                       event.stopPropagation();
-                      onSelectEdge(edge.id);
                     }}
                     onClick={event => {
                       event.stopPropagation();

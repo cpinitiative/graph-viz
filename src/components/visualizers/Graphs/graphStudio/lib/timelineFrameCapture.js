@@ -1,4 +1,7 @@
-import { getGraphContentViewport } from './graphFraming.js';
+import {
+  getGraphContentViewport,
+  measureRenderedContentBounds,
+} from './graphFraming.js';
 export const DEFAULT_SVG_ELEMENT_ID = 'graph-studio-canvas-svg';
 export const EXPORT_CAPTURE_SVG_ELEMENT_ID = 'graph-studio-export-capture-svg';
 export const DEFAULT_PNG_SCALE = 2;
@@ -104,7 +107,8 @@ const getViewportSize = svgEl => {
 };
 
 const getUntransformedBounds = element => {
-  const box = element.getBBox();
+  const box = measureRenderedContentBounds(element);
+  if (!box) return null;
   return {
     minX: box.x,
     minY: box.y,
@@ -210,6 +214,7 @@ const formatViewBox = viewBox =>
     .join(' ');
 
 const EDITOR_ONLY_SELECTORS = [
+  '[data-editor-decoration]',
   '[data-edge-hit-target-id]',
   '[data-node-selection-ring-id]',
   '[data-node-draw-source-ring-id]',
