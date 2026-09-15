@@ -15,6 +15,7 @@ import {
 } from './effectiveVisibility.js';
 import {
   estimateNodeTextWidth,
+  getNodeAnnotationFontSize,
   getNodeBoundaryPoint,
   getNodeDisplayText,
   getNodeShape,
@@ -74,7 +75,7 @@ const getAdditionalLabelObstacles = (nodes, nodeRadius, nodeLabelSize) =>
     }
     const annotation = getNodeDisplayText(node).annotation;
     if (annotation) {
-      const fontSize = Math.max(10, Math.min(14, nodeLabelSize || 14));
+      const fontSize = getNodeAnnotationFontSize(nodeLabelSize);
       const width = estimateNodeTextWidth(annotation, fontSize);
       const baseline = bounds.y + bounds.height + fontSize + 7;
       obstacles.push({

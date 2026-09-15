@@ -47,7 +47,11 @@ export const getLegendOrigin = ({
   }
 
   return {
-    x: resolvedPosition.includes('right') ? bounds.rightX : bounds.leftX,
+    x: resolvedPosition.includes('center')
+      ? (bounds.leftX + bounds.rightX) / 2
+      : resolvedPosition.includes('right')
+        ? bounds.rightX
+        : bounds.leftX,
     y: resolvedPosition.includes('bottom') ? bounds.bottomY : bounds.topY,
   };
 };

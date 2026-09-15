@@ -4,12 +4,20 @@
 @tailwind components;
 @tailwind utilities;
 
-.graphstudio-object:focus-visible {
-  outline: 3px dashed #2563eb;
-  outline-offset: 5px;
+.graphstudio-object {
+  /* SVG focus boxes do not follow node shapes or edge paths. */
+  outline: none;
 }
-.dark .graphstudio-object:focus-visible {
-  outline-color: #67e8f9;
+.graphstudio-object > [data-interaction-indicator] {
+  visibility: hidden;
+}
+.graphstudio-object > [data-interaction-active='true'],
+.graphstudio-object:focus-visible > [data-interaction-indicator] {
+  visibility: visible;
+}
+.graphstudio-object:focus-visible > [data-interaction-indicator] {
+  /* Reuse the selection indicator so keyboard focus never adds a second one. */
+  stroke-dasharray: 4 3;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

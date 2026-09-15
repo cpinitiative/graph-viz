@@ -7,6 +7,7 @@ import {
 } from './lib/fontSizing';
 import {
   getNodeAccessibleName,
+  getNodeAnnotationFontSize,
   getNodeDisplayText,
   getNodeShape,
   getNodeShapeBounds,
@@ -113,9 +114,12 @@ const GraphNode = ({
   const theme = themeOverride ?? contextTheme;
   const palette = getNodePalette(node, theme);
   const ringColors = EDITOR_RING_COLORS[theme] ?? EDITOR_RING_COLORS.light;
-  const selectionRingColor = selected
-    ? ringColors.selected
-    : ringColors.multiSelected;
+  const hasSelection = !drawAnchor && (selected || multiSelected);
+  const indicatorColor = drawAnchor
+    ? ringColors.drawAnchor
+    : multiSelected && !selected
+      ? ringColors.multiSelected
+      : ringColors.selected;
   const effectiveLabelFontSize = Number.isFinite(Number(labelFontSize))
     ? normalizeNodeLabelFontSize(labelFontSize)
     : getDefaultNodeLabelFontSize(nodeRadius);
@@ -126,7 +130,7 @@ const GraphNode = ({
     nodeRadius,
     effectiveLabelFontSize
   );
-  const annotationFontSize = Math.max(10, Math.min(14, effectiveLabelFontSize));
+  const annotationFontSize = getNodeAnnotationFontSize(effectiveLabelFontSize);
   const annotationColor = theme === 'dark' ? '#CBD5E1' : '#334155';
 
   return (
@@ -181,36 +185,24 @@ const GraphNode = ({
             : { duration: 0 }
         }
       />
-      {(selected || multiSelected) && (
+      {!isExporting && (
         <NodeOutline
           node={node}
           nodeRadius={nodeRadius}
           labelFontSize={effectiveLabelFontSize}
           padding={3}
-          data-node-selection-ring-id={node.id}
-          data-node-selection-ring-kind={selected ? 'primary' : 'multi'}
-          fill="none"
-          stroke={selectionRingColor}
-          strokeWidth={selected ? 1.5 : 1.25}
-          pointerEvents="none"
-          transition={
-            shouldAnimate
-              ? { duration: 0.32, ease: 'easeInOut' }
-              : { duration: 0 }
+          data-editor-decoration="true"
+          data-interaction-indicator="true"
+          data-interaction-active={Boolean(hasSelection || drawAnchor)}
+          data-node-selection-ring-id={hasSelection ? node.id : undefined}
+          data-node-selection-ring-kind={
+            hasSelection ? (selected ? 'primary' : 'multi') : undefined
           }
-        />
-      )}
-      {drawAnchor && (
-        <NodeOutline
-          node={node}
-          nodeRadius={nodeRadius}
-          labelFontSize={effectiveLabelFontSize}
-          padding={4}
-          data-node-draw-source-ring-id={node.id}
+          data-node-draw-source-ring-id={drawAnchor ? node.id : undefined}
           fill="none"
-          stroke={ringColors.drawAnchor}
+          stroke={indicatorColor}
           strokeWidth="1.5"
-          strokeDasharray="2.5 4"
+          strokeDasharray={drawAnchor ? '2.5 4' : undefined}
           pointerEvents="none"
           transition={
             shouldAnimate

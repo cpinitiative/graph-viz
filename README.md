@@ -54,11 +54,13 @@ such as:
 - shortest paths with non-negative weights
 - minimum spanning trees
 
-Presets include compact legends, larger labels, captions, and 1.8–3 second holds
-for video. BFS and DFS expose queue/stack progress; Dijkstra shows
-`node:distance`; topological sort shows `node:indegree`; DSU and components show
-`node:root` or `node:group`. The inspector's **Frame annotation** field edits
-these annotations independently of the project-wide node name.
+Presets include centered diagrams, compact legends, and 1.8–3 second holds for
+video. Each frame pairs a short action/state caption with fuller teaching notes.
+BFS and DFS walk the same undirected tree to compare queue and stack behavior.
+Dijkstra shows `d=distance`, topological sort shows `in=indegree`, and DSU and
+components show `root=representative` or `group=number` below persistent node
+names. The inspector's **Frame annotation** field edits these annotations
+independently of the project-wide node name.
 
 Loading a preset applies its presentation sizes, enables its legend and caption,
 and hides the grid. These settings remain editable. Authors can adjust the graph
@@ -113,6 +115,14 @@ video while retaining those notes. A new keyframe starts with empty text;
 Duplicate copies both fields. The editor warns when the current viewport
 shortens a caption or legend. Use shorter display text, a smaller caption font,
 or a wider canvas before exporting.
+
+The **Walkthrough** caption style uses a stable panel with an action heading,
+secondary state, and frame counter. Separate the two parts with `·`, for example
+`Visit B · Queue: C → D`. Presets use this style at the bottom center; the
+compact legend sits above the graph. Use **Position** to choose a caption
+anchor, or drag the caption for a custom position. Caption and notes fields sit
+side by side when separate text is enabled. The same composition appears in the
+export preview and downloaded images and slides.
 
 Blank projects start at a readable 100% zoom. Reload fits the graph only after
 the caption and legend have been measured, and canvas notices occupy their own

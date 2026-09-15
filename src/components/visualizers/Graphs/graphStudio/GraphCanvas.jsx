@@ -28,13 +28,21 @@ import {
   normalizeEdgeLabelFontSize,
   normalizeNodeLabelFontSize,
 } from './lib/fontSizing';
-import { getGraphContentViewport } from './lib/graphFraming';
+import {
+  getGraphContentViewport,
+  measureRenderedContentBounds,
+  mergeSvgBounds,
+} from './lib/graphFraming';
 import { AUTHORING_VIEW_BOUNDS } from './lib/graphGeometry';
 import {
   getNodeAccessibleIdentity,
   getNodeShapeBounds,
 } from './lib/nodeGeometry';
 import { NODE_STATES } from './lib/visualProperties';
+import {
+  getCompactLegendLayout,
+  splitWalkthroughCaption,
+} from './lib/walkthroughLayout';
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 
@@ -66,46 +74,6 @@ const GRID_PALETTES = {
   },
 };
 
-const isUsableSvgBounds = bounds =>
-  Boolean(
-    bounds &&
-    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
-    bounds.width >= 0 &&
-    bounds.height >= 0 &&
-    (bounds.width > 0 || bounds.height > 0)
-  );
-
-const mergeSvgBounds = (...boundsList) => {
-  const validBounds = boundsList.filter(isUsableSvgBounds);
-  if (!validBounds.length) return null;
-  const minX = Math.min(...validBounds.map(bounds => bounds.x));
-  const minY = Math.min(...validBounds.map(bounds => bounds.y));
-  const maxX = Math.max(...validBounds.map(bounds => bounds.x + bounds.width));
-  const maxY = Math.max(...validBounds.map(bounds => bounds.y + bounds.height));
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-};
-
-const measureRenderedContentBounds = content => {
-  if (!content) return null;
-  try {
-    const bounds = content.getBBox?.();
-    if (isUsableSvgBounds(bounds)) return bounds;
-  } catch {
-    // Fall through to per-element measurement for defensive browser support.
-  }
-
-  return mergeSvgBounds(
-    ...Array.from(
-      content.querySelectorAll('circle, path, polygon, rect, text')
-    ).map(element => {
-      try {
-        return element.getBBox?.() ?? null;
-      } catch {
-        return null;
-      }
-    })
-  );
-};
 const LEGEND_PALETTES = {
   light: {
     background: '#FFFFFF',
@@ -201,9 +169,6 @@ const CAPTION_MAX_LINES = 3;
 const getEffectiveEdgeColor = edge => edge.color ?? DEFAULT_EDGE_COLOR;
 
 const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const getSelectedEdgeStrokeWidth = edgeWidth =>
-  Math.min(10.5, Math.max(edgeWidth + 1.2, edgeWidth * 1.35));
 
 const truncateLegendText = (value, maxLength = 34) => {
   const text = String(value ?? '').trim();
@@ -323,20 +288,23 @@ const Legend = ({
   );
   const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
   const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
+  const compactLayout = getCompactLegendLayout(
+    title,
+    entries,
+    Math.min(maxBoxWidth, 820)
+  );
   const boxWidth = Math.min(
     maxBoxWidth,
-    compact ? 650 : 300,
+    compact ? compactLayout.width : 300,
     compact ? maxBoxWidth : Math.max(176, 56 + maxTextLength * 7)
   );
-  const columns = compact ? Math.max(1, Math.floor((boxWidth - 24) / 145)) : 1;
-  const cellWidth = (boxWidth - 24) / columns;
   const titleMaxLength = Math.max(4, Math.floor((boxWidth - 24) / 7));
   const rowMaxLength = Math.max(
     4,
-    Math.floor(((compact ? cellWidth : boxWidth) - 44) / 7)
+    Math.floor((boxWidth - (compact ? 60 : 44)) / (compact ? 6.6 : 7))
   );
   const fittedTitle = truncateLegendText(title, titleMaxLength);
-  const fittedEntries = legend.entries.map(entry => ({
+  const fittedEntries = (compact ? entries : legend.entries).map(entry => ({
     ...entry,
     label: truncateLegendText(entry.label, rowMaxLength),
   }));
@@ -357,7 +325,7 @@ const Legend = ({
   );
   const boxHeight = Math.min(
     maxBoxHeight,
-    42 + (compact ? Math.ceil(rows.length / columns) * 24 : rowsHeight)
+    compact ? compactLayout.height : 42 + rowsHeight
   );
   const availableRowsHeight = Math.max(0, boxHeight - 42);
   const visibleRows = [];
@@ -366,8 +334,7 @@ const Legend = ({
     const rowHeight = getLegendRowHeight(row);
     if (
       compact
-        ? Math.floor(visibleRows.length / columns) * 24 + 24 >
-          availableRowsHeight
+        ? compactLayout.positions[visibleRows.length].y + 10 > boxHeight
         : usedRowsHeight + rowHeight > availableRowsHeight
     )
       break;
@@ -438,6 +405,13 @@ const Legend = ({
     <g
       data-testid={isExporting ? undefined : 'custom-export-legend'}
       data-legend-position={legend.position}
+      data-overlay-dock={
+        compact && legend.position !== 'custom'
+          ? legend.position.includes('bottom') || legend.position === 'auto'
+            ? 'bottom'
+            : 'top'
+          : undefined
+      }
       data-custom-position-x={legend.customPosition.x}
       data-custom-position-y={legend.customPosition.y}
       data-legend-theme={theme}
@@ -488,32 +462,35 @@ const Legend = ({
         y="0"
         width={boxWidth}
         height={boxHeight}
-        fill={palette.background}
-        stroke={palette.border}
+        fill={compact ? 'none' : palette.background}
+        stroke={compact ? 'none' : palette.border}
         strokeWidth="1"
       />
       <text
-        x="12"
-        y="20"
+        x={compact ? compactLayout.titleX : 12}
+        y={compact ? compactLayout.titleY : 20}
+        textAnchor={compact ? compactLayout.titleAnchor : undefined}
         fill={palette.title}
         fontFamily="Arial, sans-serif"
-        fontSize="12"
+        fontSize={compact ? 14 : 12}
         fontWeight="700"
         letterSpacing="0"
       >
         {fittedTitle}
       </text>
-      <line
-        x1="12"
-        y1="28"
-        x2={boxWidth - 12}
-        y2="28"
-        stroke={palette.separator}
-        strokeWidth="1"
-      />
+      {!compact && (
+        <line
+          x1="12"
+          y1="28"
+          x2={boxWidth - 12}
+          y2="28"
+          stroke={palette.separator}
+          strokeWidth="1"
+        />
+      )}
       {visibleRows.map((row, index) => {
         const rowY = compact
-          ? 42 + Math.floor(index / columns) * 24
+          ? compactLayout.positions[index].y - 3
           : 42 +
             visibleRows
               .slice(0, index)
@@ -552,7 +529,7 @@ const Legend = ({
         return (
           <g
             key={row.key}
-            transform={`translate(${12 + (compact ? (index % columns) * cellWidth : 0)} ${rowY + 3})`}
+            transform={`translate(${compact ? compactLayout.positions[index].x : 12} ${rowY + 3})`}
           >
             <LegendSwatch entry={row.entry} nodeStroke={palette.nodeStroke} />
             <text
@@ -560,7 +537,7 @@ const Legend = ({
               y="4"
               fill={palette.text}
               fontFamily="Arial, sans-serif"
-              fontSize={compact ? 14 : 11}
+              fontSize={compact ? 12 : 11}
               fontWeight="500"
               letterSpacing="0"
             >
@@ -635,6 +612,8 @@ const wrapCaptionText = (
 const FrameCaption = ({
   captionOverlay,
   captionText,
+  captionFrame,
+  captionFrameCount,
   setCaptionOverlay,
   canvasSize,
   svgRef,
@@ -646,10 +625,18 @@ const FrameCaption = ({
   const { theme: contextTheme } = useTheme();
   const theme = themeOverride ?? contextTheme;
   const caption = normalizeCaptionOverlay(captionOverlay);
+  const walkthrough = caption.style === 'walkthrough';
   const baseStylePreset =
     CAPTION_STYLE_PRESETS[caption.style] ?? CAPTION_STYLE_PRESETS.subtle;
-  const stylePreset =
-    caption.style === 'subtle' && theme === 'dark'
+  const stylePreset = walkthrough
+    ? {
+        background: theme === 'dark' ? '#18212E' : '#F5F7FA',
+        border: theme === 'dark' ? '#344155' : '#DCE3EC',
+        text: theme === 'dark' ? '#F1F5F9' : '#17243A',
+        fillOpacity: 1,
+        showBox: true,
+      }
+    : caption.style === 'subtle' && theme === 'dark'
       ? {
           ...baseStylePreset,
           text: '#F8FAFC',
@@ -661,12 +648,14 @@ const FrameCaption = ({
   const fontSize = Number(caption.fontSize) || sizePreset.fontSize;
   const fontScale = fontSize / sizePreset.fontSize;
   const paddingScale = clampNumber(fontScale, 0.9, 1.6);
-  const horizontalPadding = Math.round(
-    clampNumber(sizePreset.horizontalPadding * paddingScale, 10, 28)
-  );
-  const verticalPadding = Math.round(
-    clampNumber(sizePreset.verticalPadding * paddingScale, 7, 22)
-  );
+  const horizontalPadding = walkthrough
+    ? 16
+    : Math.round(
+        clampNumber(sizePreset.horizontalPadding * paddingScale, 10, 28)
+      );
+  const verticalPadding = walkthrough
+    ? 12
+    : Math.round(clampNumber(sizePreset.verticalPadding * paddingScale, 7, 22));
   const lineHeight = Math.round(Math.max(fontSize + 4, fontSize * 1.35));
   const characterWidth = Math.max(5.8, fontSize * 0.56);
   const text = String(captionText ?? '').trim();
@@ -776,8 +765,8 @@ const FrameCaption = ({
   const maxBoxWidth = Math.max(1, canvasSize.width - margin * 2);
   const maxBoxHeight = Math.max(1, canvasSize.height - margin * 2);
   const presetMaxWidth = Math.min(
-    sizePreset.maxWidth,
-    canvasSize.width * sizePreset.maxWidthRatio
+    walkthrough ? 720 : sizePreset.maxWidth,
+    canvasSize.width * (walkthrough ? 1 : sizePreset.maxWidthRatio)
   );
   const contentMaxWidth = Math.max(
     1,
@@ -794,24 +783,79 @@ const FrameCaption = ({
       Math.floor((maxBoxHeight - verticalPadding * 2) / lineHeight)
     )
   );
-  const lines = wrapCaptionText(text, maxCharacters, maxVisibleLines);
+  const story = splitWalkthroughCaption(text);
+  const detailFontSize = Math.max(12, fontSize - 2);
+  const detailLineHeight = Math.round(detailFontSize * 1.4);
+  const detailMaxLines = Math.min(presetMaxWidth, maxBoxWidth) >= 520 ? 1 : 2;
+  const titleFits = maxBoxHeight >= verticalPadding * 2 + lineHeight;
+  const visibleDetailLines = Math.max(
+    0,
+    Math.min(
+      detailMaxLines,
+      Math.floor(
+        (maxBoxHeight - verticalPadding * 2 - lineHeight) / detailLineHeight
+      )
+    )
+  );
+  const hasFrameNumber =
+    walkthrough &&
+    titleFits &&
+    Number.isInteger(captionFrame) &&
+    captionFrameCount > 0;
+  const titleMaxCharacters = Math.max(
+    1,
+    Math.floor((contentMaxWidth - (hasFrameNumber ? 64 : 0)) / characterWidth)
+  );
+  const detailMaxCharacters = Math.max(
+    1,
+    Math.floor(contentMaxWidth / (detailFontSize * 0.56))
+  );
+  const titleLines = titleFits
+    ? wrapCaptionText(story.title, titleMaxCharacters, 1)
+    : [];
+  const detailLines =
+    visibleDetailLines > 0
+      ? wrapCaptionText(story.detail, detailMaxCharacters, visibleDetailLines)
+      : [];
+  const lines = walkthrough
+    ? [...titleLines, ...detailLines]
+    : wrapCaptionText(text, maxCharacters, maxVisibleLines);
   const unclampedLineCount = wrapCaptionText(
     text,
     maxCharacters,
     Number.MAX_SAFE_INTEGER
   ).length;
   const isTruncated =
-    unclampedLineCount > lines.length ||
+    (walkthrough
+      ? wrapCaptionText(
+          story.title,
+          titleMaxCharacters,
+          Number.MAX_SAFE_INTEGER
+        ).length > titleLines.length ||
+        wrapCaptionText(
+          story.detail,
+          detailMaxCharacters,
+          Number.MAX_SAFE_INTEGER
+        ).length > detailLines.length
+      : unclampedLineCount > lines.length) ||
     lines.some(line => line.endsWith('...'));
   const estimatedTextWidth =
     Math.max(...lines.map(line => line.length), 1) * characterWidth;
   const boxWidth = Math.min(
     maxBoxWidth,
-    Math.max(sizePreset.minWidth, estimatedTextWidth + horizontalPadding * 2)
+    walkthrough
+      ? presetMaxWidth
+      : Math.max(
+          sizePreset.minWidth,
+          estimatedTextWidth + horizontalPadding * 2
+        )
   );
   const boxHeight = Math.min(
     maxBoxHeight,
-    verticalPadding * 2 + lines.length * lineHeight
+    verticalPadding * 2 +
+      (walkthrough
+        ? lineHeight + detailMaxLines * detailLineHeight
+        : lines.length * lineHeight)
   );
   const overlayBounds = getOverlayPositionBounds({
     canvasSize,
@@ -829,6 +873,13 @@ const FrameCaption = ({
     <g
       aria-label="Frame caption"
       data-caption-overlay="true"
+      data-overlay-dock={
+        walkthrough && (caption.position.y === 0 || caption.position.y === 1)
+          ? caption.position.y === 0
+            ? 'top'
+            : 'bottom'
+          : undefined
+      }
       data-caption-position-x={caption.position.x}
       data-caption-position-y={caption.position.y}
       data-caption-size={caption.size}
@@ -892,6 +943,7 @@ const FrameCaption = ({
         y="0"
         width={boxWidth}
         height={boxHeight}
+        rx={walkthrough ? 10 : undefined}
         fill={stylePreset.background}
         fillOpacity={stylePreset.fillOpacity}
         stroke={stylePreset.showBox ? stylePreset.border : 'none'}
@@ -902,29 +954,77 @@ const FrameCaption = ({
             : undefined
         }
       />
-      <text
-        x={horizontalPadding}
-        y={verticalPadding + fontSize}
-        fill={stylePreset.text}
-        fontFamily="Arial, sans-serif"
-        fontSize={fontSize}
-        fontWeight="600"
-        letterSpacing="0"
-        paintOrder={stylePreset.textStroke ? 'stroke' : undefined}
-        stroke={stylePreset.textStroke}
-        strokeLinejoin={stylePreset.textStroke ? 'round' : undefined}
-        strokeWidth={stylePreset.textStrokeWidth}
-      >
-        {lines.map((line, index) => (
-          <tspan
-            key={`${line}-${index}`}
+      {walkthrough ? (
+        <>
+          <text
             x={horizontalPadding}
-            dy={index === 0 ? 0 : lineHeight}
+            y={verticalPadding + fontSize}
+            fill={stylePreset.text}
+            fontFamily="Arial, sans-serif"
+            fontSize={fontSize}
+            fontWeight="600"
           >
-            {line}
-          </tspan>
-        ))}
-      </text>
+            {titleLines[0]}
+          </text>
+          {hasFrameNumber && (
+            <text
+              x={boxWidth - horizontalPadding}
+              y={verticalPadding + fontSize - 1}
+              textAnchor="end"
+              fill={theme === 'dark' ? '#94A3B8' : '#64748B'}
+              fontFamily="Arial, sans-serif"
+              fontSize="11"
+              fontWeight="500"
+              data-caption-progress="true"
+            >
+              {String(captionFrame + 1).padStart(2, '0')} /{' '}
+              {String(captionFrameCount).padStart(2, '0')}
+            </text>
+          )}
+          <text
+            x={horizontalPadding}
+            y={verticalPadding + lineHeight + detailFontSize}
+            fill={theme === 'dark' ? '#A9B7CA' : '#526179'}
+            fontFamily="Arial, sans-serif"
+            fontSize={detailFontSize}
+            fontWeight="400"
+          >
+            {detailLines.map((line, index) => (
+              <tspan
+                key={`${line}-${index}`}
+                x={horizontalPadding}
+                dy={index === 0 ? 0 : detailLineHeight}
+              >
+                {line}
+              </tspan>
+            ))}
+          </text>
+        </>
+      ) : (
+        <text
+          x={horizontalPadding}
+          y={verticalPadding + fontSize}
+          fill={stylePreset.text}
+          fontFamily="Arial, sans-serif"
+          fontSize={fontSize}
+          fontWeight="600"
+          letterSpacing="0"
+          paintOrder={stylePreset.textStroke ? 'stroke' : undefined}
+          stroke={stylePreset.textStroke}
+          strokeLinejoin={stylePreset.textStroke ? 'round' : undefined}
+          strokeWidth={stylePreset.textStrokeWidth}
+        >
+          {lines.map((line, index) => (
+            <tspan
+              key={`${line}-${index}`}
+              x={horizontalPadding}
+              dy={index === 0 ? 0 : lineHeight}
+            >
+              {line}
+            </tspan>
+          ))}
+        </text>
+      )}
     </g>
   );
 };
@@ -941,6 +1041,8 @@ const GraphCanvas = ({
   showGrid,
   captionOverlay,
   captionText,
+  captionFrame,
+  captionFrameCount,
   setCaptionOverlay,
   customLegend,
   setCustomLegend,
@@ -1050,15 +1152,12 @@ const GraphCanvas = ({
           effectiveSelectedObject?.type === 'edge' &&
           String(effectiveSelectedObject.id) === String(edge.id);
         const strokeColor = getEffectiveEdgeColor(edge);
-        const strokeWidth = selected
-          ? getSelectedEdgeStrokeWidth(edgeWidth)
-          : edgeWidth;
         return {
           ...renderData,
           selected,
           multiSelected: false,
           strokeColor,
-          strokeWidth,
+          strokeWidth: edgeWidth,
         };
       }),
     [edgeRenderData, effectiveSelectedObject, edgeWidth]
@@ -1690,7 +1789,6 @@ const GraphCanvas = ({
                     themeOverride={themeOverride}
                     onPointerDown={event => {
                       event.stopPropagation();
-                      onSelectEdge(edge.id);
                     }}
                     onClick={event => {
                       event.stopPropagation();
@@ -1775,6 +1873,8 @@ const GraphCanvas = ({
         <FrameCaption
           captionOverlay={captionOverlay}
           captionText={captionText}
+          captionFrame={captionFrame}
+          captionFrameCount={captionFrameCount}
           setCaptionOverlay={setCaptionOverlay}
           canvasSize={overlayCanvasSize}
           svgRef={svgRef}

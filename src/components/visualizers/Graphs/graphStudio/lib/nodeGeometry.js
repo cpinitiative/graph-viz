@@ -16,6 +16,9 @@ export const getNodeShape = node =>
 export const getNodeAnnotationPlacement = node =>
   node?.annotationPlacement === 'below' ? 'below' : 'replace';
 
+export const getNodeAnnotationFontSize = labelFontSize =>
+  Math.max(10, (Number(labelFontSize) || 14) * 0.85);
+
 export const getNodeDisplayText = node => {
   const label = String(node?.label ?? node?.id ?? '');
   const annotation = String(node?.annotation ?? '');

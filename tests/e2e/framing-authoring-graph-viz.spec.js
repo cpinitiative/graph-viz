@@ -247,3 +247,92 @@ test('negative and extended coordinates remain stable when dragging and zooming'
     })
     .toBeLessThan(3);
 });
+
+test('compact custom legends keep long labels within their measured space', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.goto('/');
+  const value = project();
+  const longLabel =
+    'Unexplored vertices waiting for their outgoing connections to be processed in order';
+  value.settings.customLegend = {
+    enabled: true,
+    mode: 'custom',
+    layout: 'compact',
+    position: 'top-center',
+    title: 'Custom key',
+    entries: [
+      { label: longLabel, kind: 'node', color: '#2563EB' },
+      { label: 'Done', kind: 'node', color: '#059669' },
+    ],
+  };
+  await importProject(page, value);
+  const legend = page.getByTestId('custom-export-legend');
+  await expect(legend).toHaveAttribute('data-legend-truncated', 'true');
+  await expect(page.getByTestId('legend-overflow-warning')).toBeVisible();
+  const entries = legend.locator(':scope > g');
+  await expect(entries).toHaveCount(2);
+  await expect(entries.first().locator('text')).toHaveText(/\.\.\.$/);
+  const [first, second, box] = await Promise.all([
+    entries.first().boundingBox(),
+    entries.last().boundingBox(),
+    legend.locator(':scope > rect').boundingBox(),
+  ]);
+  expect(first.x + first.width).toBeLessThanOrEqual(second.x - 4);
+  for (const entry of [first, second]) {
+    expect(entry.x).toBeGreaterThanOrEqual(box.x);
+    expect(entry.x + entry.width).toBeLessThanOrEqual(box.x + box.width);
+    expect(entry.y + entry.height).toBeLessThanOrEqual(box.y + box.height);
+  }
+});
+
+test('large walkthrough captions respect a short canvas and report omitted detail', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const value = project();
+  value.settings.customLegend.enabled = false;
+  value.settings.captionOverlay = {
+    enabled: true,
+    style: 'walkthrough',
+    fontSize: 56,
+    position: { x: 0.5, y: 1 },
+  };
+  value.timeline.steps[0].captionText = 'Visit A · Queue: B, C, D';
+  await importProject(page, value);
+  // Resizing the drawing surface exercises the same ResizeObserver path as a
+  // small resizable editor panel, without depending on surrounding toolbar sizes.
+  await canvas(page).evaluate(svg => {
+    svg.style.width = '400px';
+    svg.style.height = '160px';
+  });
+  const caption = page.getByTestId('frame-caption-overlay');
+  await expect(caption).toHaveAttribute('data-caption-truncated', 'true');
+  await expect(page.getByTestId('caption-overflow-warning')).toBeVisible();
+  const overflow = await caption.evaluate(element => {
+    const box = element.querySelector('rect').getBoundingClientRect();
+    const viewport = element.ownerSVGElement.getBoundingClientRect();
+    return [...element.querySelectorAll('text')]
+      .filter(text => text.textContent.trim())
+      .flatMap(text => {
+        const bounds = text.getBoundingClientRect();
+        return [box, viewport].some(
+          limit =>
+            bounds.left < limit.left - 0.5 ||
+            bounds.right > limit.right + 0.5 ||
+            bounds.top < limit.top - 0.5 ||
+            bounds.bottom > limit.bottom + 0.5
+        )
+          ? [text.textContent]
+          : [];
+      });
+  });
+  expect(overflow).toEqual([]);
+  await expect(caption.locator(':scope > title')).toHaveText(
+    'Visit A · Queue: B, C, D'
+  );
+  await expect(
+    page.getByRole('textbox', { name: 'Display caption', exact: true })
+  ).toHaveValue('Visit A · Queue: B, C, D');
+});

@@ -8,13 +8,13 @@ export const modalSectionClass =
   'space-y-3 border border-[#CBD5E1] bg-[#FFFFFF] p-4 dark:border-[#334155] dark:bg-[#111827]';
 
 export const modalPrimaryButtonClass =
-  'min-h-[42px] rounded-sm border border-[#0F2747] bg-[#0F2747] px-4 py-2 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#0F172A]';
+  'min-h-[42px] rounded-sm border border-[#0F2747] bg-[#0F2747] px-4 py-2 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
 
 export const modalSecondaryButtonClass =
-  'min-h-[42px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-4 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] focus:ring-offset-1 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA] dark:focus:ring-offset-[#0F172A]';
+  'min-h-[42px] rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-4 py-2 text-xs font-semibold text-[#334155] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
 
 export const modalActionButtonClass =
-  'min-h-[42px] w-full rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 py-2.5 text-left text-sm font-semibold text-[#1E293B] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus:ring-2 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
+  'min-h-[42px] w-full rounded-sm border border-[#CBD5E1] bg-[#F8F9FA] px-3 py-2.5 text-left text-sm font-semibold text-[#1E293B] transition-colors hover:bg-[#EEF2F6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#F8FAFC] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
 
 export const modalTextareaClass =
   'w-full resize-none rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] px-3 py-2 font-mono text-sm text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#475569] dark:bg-[#111827] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]';

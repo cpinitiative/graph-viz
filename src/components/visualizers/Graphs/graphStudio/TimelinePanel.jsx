@@ -2,7 +2,9 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { useCommittedNumberInput } from './hooks/useCommittedNumberInput.js';
 import {
   CAPTION_FONT_SIZE_RANGE,
+  CAPTION_POSITIONS,
   CAPTION_STYLE_OPTIONS,
+  resolveStepCaptionText,
 } from './lib/captionOverlay';
 import {
   DEFAULT_FRAME_DURATION_MS,
@@ -17,9 +19,9 @@ const toolbarButtonClass =
 const addButtonClass =
   'min-h-[30px] whitespace-nowrap rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] hover:bg-[#173A68] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB]';
 const deleteButtonClass =
-  'min-h-[30px] whitespace-nowrap rounded-sm border border-[#B91C1C] bg-transparent px-2 py-1 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:bg-[#B91C1C] focus:text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#B91C1C] focus:ring-offset-1 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus:bg-[#DC2626] dark:focus:text-[#FFFFFF] dark:focus:ring-[#F87171] dark:focus:ring-offset-[#111827] dark:active:bg-[#B91C1C]';
+  'min-h-[30px] whitespace-nowrap rounded-sm border border-[#B91C1C] bg-transparent px-2 py-1 text-xs font-semibold text-[#B91C1C] transition-colors hover:bg-[#B91C1C] hover:text-[#FFFFFF] focus:outline-none focus-visible:bg-[#B91C1C] focus-visible:text-[#FFFFFF] focus-visible:ring-2 focus-visible:ring-[#B91C1C] focus-visible:ring-offset-1 active:bg-[#991B1B] active:text-[#FFFFFF] disabled:cursor-not-allowed disabled:border-[#FCA5A5] disabled:text-[#FCA5A5] dark:border-[#F87171] dark:text-[#FCA5A5] dark:hover:bg-[#DC2626] dark:hover:text-[#FFFFFF] dark:focus-visible:bg-[#DC2626] dark:focus-visible:text-[#FFFFFF] dark:focus-visible:ring-[#F87171] dark:focus-visible:ring-offset-[#111827] dark:active:bg-[#B91C1C]';
 const moveButtonClass =
-  'inline-flex min-h-[30px] min-w-[30px] items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] focus:outline-none focus:ring-2 focus:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus:ring-[#60A5FA]';
+  'inline-flex min-h-[30px] min-w-[30px] items-center justify-center rounded-sm border border-[#CBD5E1] bg-[#FFFFFF] p-1 text-[#334155] hover:bg-[#F8F9FA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2747] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[#475569] dark:bg-[#1E293B] dark:text-[#E2E8F0] dark:hover:bg-[#334155] dark:focus-visible:ring-[#60A5FA]';
 const playbackButtonClass =
   'flex min-h-[30px] items-center gap-1.5 rounded-sm border border-[#0F2747] bg-[#0F2747] px-2 py-1 text-xs font-semibold text-[#FFFFFF] transition-colors hover:bg-[#173A68] disabled:cursor-not-allowed disabled:border-[#94A3B8] disabled:bg-[#E2E8F0] disabled:text-[#64748B] dark:border-[#3B82F6] dark:bg-[#1D4ED8] dark:hover:bg-[#2563EB] dark:disabled:border-[#475569] dark:disabled:bg-[#334155] dark:disabled:text-[#94A3B8]';
 const PLAYBACK_EXPORT_LOCK_MESSAGE = 'Playback is unavailable while exporting.';
@@ -30,10 +32,10 @@ const detailControlLabelClass =
 const inlineActionButtonClass =
   'text-[10px] font-bold uppercase tracking-[0.04em] text-[#0F2747] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] dark:text-[#BFDBFE] dark:focus-visible:ring-[#60A5FA]';
 const frameCardBaseClass =
-  'relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none dark:bg-[#1E293B] md:min-w-[128px]';
+  'relative flex min-h-[46px] min-w-[116px] cursor-pointer flex-col overflow-hidden rounded-sm border bg-[#FFFFFF] text-left outline-none focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] dark:bg-[#1E293B] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A] md:min-w-[128px]';
 const selectedFrameCardClass = 'border-[#0F2747] dark:border-[#60A5FA]';
 const unselectedFrameCardClass =
-  'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] focus-visible:ring-1 focus-visible:ring-[#0F2747] focus-visible:ring-offset-1 focus-visible:ring-offset-[#FFFFFF] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044] dark:focus-visible:ring-[#60A5FA] dark:focus-visible:ring-offset-[#0F172A]';
+  'border-[#D7DEE8] hover:border-[#94A3B8] hover:bg-[#F8F9FA] dark:border-[#334155] dark:hover:border-[#64748B] dark:hover:bg-[#233044]';
 const DEFAULT_HELP_TOOLTIP_WIDTH = 276;
 const HELP_TOOLTIP_ESTIMATED_HEIGHT = 78;
 const HELP_TOOLTIP_GUTTER = 12;
@@ -230,11 +232,13 @@ const TimelinePanel = ({
   captionEnabled,
   captionTruncated,
   captionStyle,
+  captionPosition,
   captionFontSize,
   hasCaptionVisibleOverride,
   onCaptionEnabledChange,
   onResetCaptionVisibleOverride,
   onCaptionStyleChange,
+  onCaptionPositionChange,
   onCaptionFontSizeChange,
   onAddStep,
   onDuplicateStep,
@@ -452,7 +456,7 @@ const TimelinePanel = ({
                   className="leading-3.5 max-w-[96px] truncate text-[10px] text-[#475569] dark:text-[#CBD5E1] md:max-w-[108px]"
                   title={step.description || 'No description'}
                 >
-                  {step.description || (
+                  {resolveStepCaptionText(step).split(' · ')[0] || (
                     <span className="italic opacity-50">No description</span>
                   )}
                 </div>
@@ -467,21 +471,54 @@ const TimelinePanel = ({
         data-testid="frame-description-row"
       >
         <div className="grid min-w-0 gap-1.5">
-          <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
-            <span className={detailLabelClass}>Description</span>
-            <textarea
-              aria-label="Frame Description"
-              rows={1}
-              title="Full frame notes; also used on the canvas unless Separate caption text is enabled."
-              maxLength={10000}
-              value={steps[currentFrame]?.description ?? ''}
-              onChange={event =>
-                onDescriptionChange(currentFrame, event.target.value)
+          <div
+            className={
+              typeof steps[currentFrame]?.captionText === 'string'
+                ? 'grid min-w-0 gap-3 sm:grid-cols-2'
+                : ''
+            }
+          >
+            {typeof steps[currentFrame]?.captionText === 'string' && (
+              <label className="grid min-w-0 gap-1.5">
+                <span className={detailLabelClass}>Display caption</span>
+                <input
+                  aria-label="Display caption"
+                  maxLength={10000}
+                  value={steps[currentFrame].captionText}
+                  onChange={event =>
+                    onCaptionTextChange?.(currentFrame, event.target.value)
+                  }
+                  placeholder="Action · Queue, stack, or current state"
+                  className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC]"
+                />
+              </label>
+            )}
+            <label
+              className={
+                typeof steps[currentFrame]?.captionText === 'string'
+                  ? 'grid min-w-0 gap-1.5'
+                  : 'grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3'
               }
-              className="h-8 min-h-8 min-w-0 resize-y rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 py-1.5 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
-              placeholder="Describe what happens on this frame..."
-            />
-          </label>
+            >
+              <span className={detailLabelClass}>
+                {typeof steps[currentFrame]?.captionText === 'string'
+                  ? 'Frame notes'
+                  : 'Description'}
+              </span>
+              <textarea
+                aria-label="Frame Description"
+                rows={1}
+                title="Full frame notes; also used on the canvas unless Separate caption text is enabled."
+                maxLength={10000}
+                value={steps[currentFrame]?.description ?? ''}
+                onChange={event =>
+                  onDescriptionChange(currentFrame, event.target.value)
+                }
+                className="h-8 min-h-8 min-w-0 resize-y rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 py-1.5 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC] dark:focus:border-[#60A5FA] dark:focus:ring-[#60A5FA]"
+                placeholder="Describe what happens on this frame..."
+              />
+            </label>
+          </div>
           <div
             className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3"
             data-testid="frame-detail-controls"
@@ -544,7 +581,7 @@ const TimelinePanel = ({
                   onChange={event => onCaptionStyleChange?.(event.target.value)}
                   size="dense"
                   value={captionStyle}
-                  wrapperClassName="w-[108px]"
+                  wrapperClassName="w-[128px]"
                 >
                   {CAPTION_STYLE_OPTIONS.map(option => (
                     <option key={option.value} value={option.value}>
@@ -561,23 +598,42 @@ const TimelinePanel = ({
                   onCommit={onCaptionFontSizeChange}
                 />
               </label>
+              <label className={detailControlLabelClass}>
+                <span>Position</span>
+                <NativeSelect
+                  aria-label="Caption Position"
+                  onChange={event => {
+                    const position = CAPTION_POSITIONS.find(
+                      item => item.value === event.target.value
+                    );
+                    if (position)
+                      onCaptionPositionChange?.({
+                        x: position.x,
+                        y: position.y,
+                      });
+                  }}
+                  size="dense"
+                  value={
+                    CAPTION_POSITIONS.find(
+                      item =>
+                        item.x === captionPosition?.x &&
+                        item.y === captionPosition?.y
+                    )?.value ?? 'custom'
+                  }
+                  wrapperClassName="w-[132px]"
+                >
+                  {CAPTION_POSITIONS.map(position => (
+                    <option key={position.value} value={position.value}>
+                      {position.label}
+                    </option>
+                  ))}
+                  <option value="custom" disabled>
+                    Custom (drag)
+                  </option>
+                </NativeSelect>
+              </label>
             </div>
           </div>
-          {typeof steps[currentFrame]?.captionText === 'string' && (
-            <label className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
-              <span className={detailLabelClass}>Display caption</span>
-              <input
-                aria-label="Display caption"
-                maxLength={10000}
-                value={steps[currentFrame].captionText}
-                onChange={event =>
-                  onCaptionTextChange?.(currentFrame, event.target.value)
-                }
-                placeholder="Short text shown on the canvas and in exports"
-                className="h-8 min-w-0 rounded-sm border border-[#94A3B8] bg-[#FFFFFF] px-2 text-xs text-[#0F172A] focus:border-[#0F2747] focus:outline-none focus:ring-1 focus:ring-[#0F2747] dark:border-[#64748B] dark:bg-[#0F172A] dark:text-[#F8FAFC]"
-              />
-            </label>
-          )}
           {captionEnabled && captionTruncated && (
             <p
               role="status"

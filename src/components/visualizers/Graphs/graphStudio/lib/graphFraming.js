@@ -1,9 +1,57 @@
 // Reserve space for captions and legends when explicitly fitting the graph.
 // Keeping this independent of node bounds prevents a frame's text from moving
 // the camera during viewport-based timeline export.
-export const getUnobscuredViewport = (viewport, obstacles = []) => {
-  let area = { ...viewport };
+const OVERLAY_CLEARANCE = 12;
+const MIN_CONTENT_HEIGHT = 60;
+
+const isDockedOverlay = box => box.dock === 'top' || box.dock === 'bottom';
+
+const reserveDockedBands = (viewport, obstacles) => {
+  const viewportBottom = viewport.y + viewport.height;
+  let top = viewport.y;
+  let bottom = viewportBottom;
   for (const box of obstacles) {
+    if (
+      !isDockedOverlay(box) ||
+      box.x + box.width <= viewport.x ||
+      box.x >= viewport.x + viewport.width ||
+      box.y + box.height <= viewport.y ||
+      box.y >= viewportBottom
+    )
+      continue;
+    if (box.dock === 'top') {
+      top = Math.max(
+        top,
+        Math.min(viewportBottom, box.y + box.height + OVERLAY_CLEARANCE)
+      );
+    } else {
+      bottom = Math.min(
+        bottom,
+        Math.max(viewport.y, box.y - OVERLAY_CLEARANCE)
+      );
+    }
+  }
+
+  const minimumHeight = Math.min(MIN_CONTENT_HEIGHT, viewport.height);
+  if (bottom - top >= minimumHeight) {
+    return { ...viewport, y: top, height: bottom - top };
+  }
+
+  // Tiny panels cannot always contain both overlays and the graph. Keep the
+  // fallback usable and inside the viewport rather than fitting a negative gap.
+  const center = Math.max(
+    viewport.y + minimumHeight / 2,
+    Math.min(viewportBottom - minimumHeight / 2, (top + bottom) / 2)
+  );
+  return { ...viewport, y: center - minimumHeight / 2, height: minimumHeight };
+};
+
+export const getUnobscuredViewport = (viewport, obstacles = []) => {
+  // Explicit docks reserve horizontal bands together, so a short caption cannot
+  // shift the graph sideways and DOM order cannot change the reserved space.
+  // Unmarked/custom overlays retain the existing floating-overlay policy.
+  let area = reserveDockedBands(viewport, obstacles);
+  for (const box of obstacles.filter(box => !isDockedOverlay(box))) {
     const left = Math.max(area.x, box.x - 12),
       right = Math.min(area.x + area.width, box.x + box.width + 12);
     const top = Math.max(area.y, box.y - 12),
@@ -34,7 +82,48 @@ export const getGraphContentViewport = (svg, viewport) => {
       y: box.y + (matrix?.f ?? 0),
       width: box.width,
       height: box.height,
+      dock: el.getAttribute('data-overlay-dock'),
     };
   });
   return getUnobscuredViewport(viewport, obstacles);
+};
+
+const isUsableSvgBounds = bounds =>
+  Boolean(
+    bounds &&
+    [bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) &&
+    bounds.width >= 0 &&
+    bounds.height >= 0 &&
+    (bounds.width > 0 || bounds.height > 0)
+  );
+
+export const mergeSvgBounds = (...boundsList) => {
+  const validBounds = boundsList.filter(isUsableSvgBounds);
+  if (!validBounds.length) return null;
+  const minX = Math.min(...validBounds.map(bounds => bounds.x));
+  const minY = Math.min(...validBounds.map(bounds => bounds.y));
+  const maxX = Math.max(...validBounds.map(bounds => bounds.x + bounds.width));
+  const maxY = Math.max(...validBounds.map(bounds => bounds.y + bounds.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+};
+
+export const measureRenderedContentBounds = content => {
+  if (!content) return null;
+  // Editor indicators must not change the graph's fitted size or position.
+  return mergeSvgBounds(
+    ...Array.from(content.querySelectorAll('circle, path, polygon, rect, text'))
+      .filter(
+        element =>
+          !element.matches(
+            '[data-editor-decoration], [data-edge-hit-target-id]'
+          )
+      )
+      .map(element => {
+        try {
+          return element.getBBox?.() ?? null;
+        } catch {
+          return null;
+        }
+      })
+  );
 };

@@ -19,7 +19,7 @@ const legend = (title, entries) => ({
   entries,
   enabled: true,
   layout: 'compact',
-  position: 'top-left',
+  position: 'top-center',
 });
 const graph = (labels, points, edges, directed = false) => ({
   nodes: labels.map((label, id) => ({
@@ -27,6 +27,7 @@ const graph = (labels, points, edges, directed = false) => ({
     label,
     x: points[id][0],
     y: points[id][1],
+    annotationPlacement: 'below',
     visible: true,
   })),
   edges: edges.map(([from, to, label = ''], i) => ({
@@ -49,11 +50,12 @@ const timeline = g => {
     g.edges.map(e => [e.id, { status: 'default', color: C.edgeDefault }])
   );
   const steps = [];
-  const frame = description =>
+  const frame = (captionText, description) =>
     steps.push({
       id: `s${steps.length}`,
+      captionText,
       description,
-      durationMs: Math.min(3000, Math.max(1800, 600 + description.length * 45)),
+      durationMs: Math.min(3000, Math.max(1800, 600 + captionText.length * 45)),
       nodeOverrides: structuredClone(nodes),
       edgeOverrides: structuredClone(edges),
     });
@@ -71,29 +73,36 @@ const presentation = (g, t, key) => ({
   legend: key,
   settings: {
     nodeSize: 32,
-    nodeLabelFontSize: 18,
+    nodeLabelFontSize: 24,
     edgeWidth: 3,
-    edgeLabelFontSize: 18,
+    edgeLabelFontSize: 20,
     edgeCurvature: 0.3,
   },
   captionOverlay: {
     enabled: true,
-    position: { x: 0, y: 1 },
-    style: 'subtle',
+    position: { x: 0.5, y: 1 },
+    style: 'walkthrough',
     size: 'large',
-    fontSize: 18,
+    fontSize: 16,
   },
 });
-const tree = directed =>
+const incidentEdges = (g, id) =>
+  g.edges
+    .filter(e => e.from === id || (!e.directed && e.to === id))
+    .map(edge => ({ edge, next: edge.from === id ? edge.to : edge.from }));
+
+// Equal depth spacing, centered siblings, and a straight link to C's only child.
+// Both traversals use the same undirected tree so the queue/stack is the change.
+const tree = () =>
   graph(
     ['A', 'B', 'C', 'D', 'E', 'F'],
     [
-      [360, 80],
-      [200, 240],
-      [520, 240],
-      [80, 400],
-      [320, 400],
-      [600, 400],
+      [480, 100],
+      [300, 210],
+      [660, 210],
+      [180, 320],
+      [420, 320],
+      [660, 320],
     ],
     [
       [0, 1],
@@ -101,40 +110,51 @@ const tree = directed =>
       [1, 3],
       [1, 4],
       [2, 5],
-    ],
-    directed
+    ]
   );
 
 const bfs = () => {
-  const g = tree(false),
+  const g = tree(),
     t = timeline(g),
     queue = [0],
-    seen = new Set([0]);
+    seen = new Set([0]),
+    distance = [0];
   t.node(0, 'queued');
-  t.frame('BFS · Queue: A');
+  t.frame(
+    'Start at A · Queue: A',
+    'Put A in the queue at distance 0. BFS processes the front of this FIFO queue, so every node at one distance is visited before the next level.'
+  );
   while (queue.length) {
     const id = queue.shift();
     t.node(id, 'active');
     t.frame(
-      `Visit ${g.nodes[id].label} · Queue: ${queue.map(i => g.nodes[i].label).join(', ') || 'empty'}`
+      `Visit ${g.nodes[id].label} · Queue: ${queue.map(i => g.nodes[i].label).join(' → ') || 'empty'}`,
+      `Remove ${g.nodes[id].label} from the front of the queue. Its distance from A is ${distance[id]}; now inspect its neighbors and enqueue only those not discovered before.`
     );
     const discovered = [];
-    for (const e of g.edges.filter(e => e.from === id)) {
-      if (seen.has(e.to)) continue;
-      seen.add(e.to);
-      queue.push(e.to);
-      discovered.push(g.nodes[e.to].label);
-      t.node(e.to, 'queued');
-      t.edge(e.id, C.nodeActive, 'active');
+    const treeEdges = [];
+    for (const { edge, next } of incidentEdges(g, id)) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+      distance[next] = distance[id] + 1;
+      discovered.push(g.nodes[next].label);
+      treeEdges.push(edge);
+      t.node(next, 'queued');
+      t.edge(edge.id, C.nodeActive, 'active');
     }
     if (discovered.length)
-      t.frame(`Queue ${discovered.join(', ')} · FIFO order`);
+      t.frame(
+        `Queue ${discovered.join(', ')} · Distance from A: ${distance[id] + 1}`,
+        `Discover ${discovered.join(' and ')} from ${g.nodes[id].label} and mark them before enqueueing, so each enters the queue once. Queue, front first: ${queue.map(i => g.nodes[i].label).join(', ')}.`
+      );
     t.node(id, 'visited');
-    g.edges
-      .filter(e => e.from === id)
-      .forEach(e => t.edge(e.id, C.edgeCompleted, 'completed'));
+    treeEdges.forEach(e => t.edge(e.id, C.edgeCompleted, 'completed'));
   }
-  t.frame('BFS order: A, B, C, D, E, F');
+  t.frame(
+    'BFS complete · Order: A, B, C, D, E, F',
+    'The queue is empty. BFS visited A first, then B and C at distance 1, then D, E, and F at distance 2. Green edges form the breadth-first search tree.'
+  );
   return presentation(
     g,
     t,
@@ -148,32 +168,40 @@ const bfs = () => {
   );
 };
 const dfs = () => {
-  const g = tree(true),
+  const g = tree(),
     t = timeline(g),
     stack = [],
-    order = [];
-  const visit = id => {
+    order = [],
+    seen = new Set();
+  const visit = (id, parentEdge) => {
+    seen.add(id);
     stack.push(id);
     order.push(g.nodes[id].label);
     t.node(id, 'active');
     t.frame(
-      `Enter ${g.nodes[id].label} · Stack: ${stack.map(i => g.nodes[i].label).join(' → ')}`
+      `Enter ${g.nodes[id].label} · Stack: ${stack.map(i => g.nodes[i].label).join(' → ')}`,
+      `Push ${g.nodes[id].label} onto the recursion stack and record its first visit. Explore the next unvisited neighbor before returning; the active nodes show the entire current call path.`
     );
-    for (const e of g.edges.filter(e => e.from === id)) {
-      t.edge(e.id, C.nodeActive, 'active');
-      visit(e.to);
-      t.edge(e.id, C.edgeCompleted, 'completed');
+    for (const { edge, next } of incidentEdges(g, id)) {
+      if (seen.has(next)) continue;
+      t.edge(edge.id, C.nodeActive, 'active');
+      visit(next, edge);
     }
     stack.pop();
     t.node(id, 'visited');
+    if (parentEdge) t.edge(parentEdge.id, C.edgeCompleted, 'completed');
     t.frame(
       stack.length
-        ? `Return ${g.nodes[id].label} → ${g.nodes[stack.at(-1)].label}`
-        : 'Return from A · Stack empty'
+        ? `Return ${g.nodes[id].label} → ${g.nodes[stack.at(-1)].label} · Stack: ${stack.map(i => g.nodes[i].label).join(' → ')}`
+        : 'Finish A · Stack: empty',
+      `${g.nodes[id].label} has no unvisited neighbors left. Mark it finished and pop its call; ${stack.length ? `resume ${g.nodes[stack.at(-1)].label} to check its remaining neighbors.` : 'every reachable node has now finished.'}`
     );
   };
   visit(0);
-  t.frame(`DFS order: ${order.join(', ')}`);
+  t.frame(
+    `DFS complete · Order: ${order.join(', ')}`,
+    `First-visit order is ${order.join(', ')}. Unlike BFS, DFS completely explores B's subtree before returning to A and starting C's subtree. The edges are undirected; the recursion stack determines movement.`
+  );
   return presentation(
     g,
     t,
@@ -190,12 +218,13 @@ const dijkstra = extended => {
     ? graph(
         ['S', 'A', 'B', 'C', 'D', 'T'],
         [
-          [0, 180],
-          [220, 0],
-          [220, 360],
-          [460, 0],
-          [460, 360],
-          [680, 180],
+          [100, 240],
+          [300, 130],
+          // The lower row is offset enough that outgoing diagonals clear d=….
+          [440, 350],
+          [540, 130],
+          [680, 350],
+          [810, 240],
         ],
         [
           [0, 1, 2],
@@ -212,10 +241,10 @@ const dijkstra = extended => {
     : graph(
         ['A', 'B', 'C', 'D'],
         [
-          [0, 180],
-          [240, 0],
-          [240, 360],
-          [480, 180],
+          [160, 240],
+          [460, 130],
+          [320, 350],
+          [670, 240],
         ],
         [
           [0, 1, 4],
@@ -234,11 +263,14 @@ const dijkstra = extended => {
   const labels = () =>
     g.nodes.forEach(n => {
       t.nodes[n.id].annotation =
-        `${n.label}:${Number.isFinite(distance[n.id]) ? distance[n.id] : '∞'}`;
+        `d=${Number.isFinite(distance[n.id]) ? distance[n.id] : '∞'}`;
     });
   labels();
   t.node(0, 'queued');
-  t.frame(`Dijkstra · ${g.nodes[0].label}=0; others=∞`);
+  t.frame(
+    `Start at ${g.nodes[0].label} · Distance: 0; all others: ∞`,
+    `Set d(${g.nodes[0].label}) to 0 and all other tentative distances to infinity. The label below each node is its current distance estimate; arrows show the allowed travel direction and edge labels are nonnegative weights.`
+  );
   while (done.size < g.nodes.length) {
     const id = g.nodes
       .filter(n => !done.has(n.id))
@@ -246,7 +278,10 @@ const dijkstra = extended => {
     if (id === undefined || !Number.isFinite(distance[id])) break;
     t.node(id, 'active');
     if (parent.has(id)) t.edge(parent.get(id), C.edgeCompleted, 'completed');
-    t.frame(`Settle ${g.nodes[id].label} · Minimum distance ${distance[id]}`);
+    t.frame(
+      `Settle ${g.nodes[id].label} · Minimum distance: ${distance[id]}`,
+      `${g.nodes[id].label} has the smallest tentative distance among unsettled nodes. With nonnegative weights, this distance is final. Inspect its outgoing edges to improve the remaining estimates.`
+    );
     for (const e of g.edges.filter(e => e.from === id && !done.has(e.to))) {
       const next = distance[id] + Number(e.label),
         old = distance[e.to];
@@ -258,11 +293,13 @@ const dijkstra = extended => {
         t.edge(e.id, C.nodeActive, 'active');
         labels();
         t.frame(
-          `${g.nodes[id].label} → ${g.nodes[e.to].label}: ${distance[id]} + ${e.label} = ${next}${Number.isFinite(old) ? ` < ${old}` : ''}`
+          `Relax ${g.nodes[id].label} → ${g.nodes[e.to].label} · Distance: ${Number.isFinite(old) ? old : '∞'} → ${next}`,
+          `Going through ${g.nodes[id].label} costs ${distance[id]} + ${e.label} = ${next}, less than ${Number.isFinite(old) ? `the previous estimate ${old}` : 'infinity'}. Update ${g.nodes[e.to].label}'s tentative distance and remember this edge as its best parent so far.`
         );
-      } else if (next === old) {
+      } else {
         t.frame(
-          `${g.nodes[id].label} → ${g.nodes[e.to].label}: tie at ${old} · Keep first parent`
+          `Keep ${g.nodes[e.to].label}'s distance · ${next === old ? `Tie at ${old}` : `${next} is no better than ${old}`}`,
+          `The route through ${g.nodes[id].label} costs ${distance[id]} + ${e.label} = ${next}. ${next === old ? 'An equal-length route does not improve the answer; keep the first parent for a stable shortest-path tree.' : `Keep the smaller distance ${old} and its existing parent edge.`}`
         );
       }
     }
@@ -270,12 +307,15 @@ const dijkstra = extended => {
     t.node(id, 'visited');
   }
   t.frame(
-    extended ? 'Shortest paths from S · T = 8' : 'Shortest paths from A · D = 4'
+    extended
+      ? 'Shortest paths complete · S → T costs 8'
+      : 'Shortest paths complete · A → D costs 4',
+    `All reachable nodes are settled. Green edges form one shortest-path tree from ${g.nodes[0].label}. Final distances: ${g.nodes.map(n => `${n.label}=${distance[n.id]}`).join(', ')}.`
   );
   return presentation(
     g,
     t,
-    legend('Dijkstra · node:distance', [
+    legend('Dijkstra · d = distance', [
       nodeKey('Current', 'active'),
       nodeKey('Candidate', 'queued'),
       nodeKey('Settled', 'visited'),
@@ -288,12 +328,12 @@ const kruskal = () => {
   const g = graph(
     ['A', 'B', 'C', 'D', 'E', 'F'],
     [
-      [0, 0],
-      [100, 230],
-      [280, 0],
-      [380, 230],
-      [560, 0],
-      [560, 400],
+      [140, 130],
+      [260, 330],
+      [380, 130],
+      [500, 330],
+      [620, 130],
+      [740, 330],
     ],
     [
       [0, 1, 1],
@@ -312,7 +352,10 @@ const kruskal = () => {
   const find = id => (parent[id] === id ? id : find(parent[id]));
   let count = 0,
     total = 0;
-  t.frame('Kruskal · Try edges from lightest to heaviest');
+  t.frame(
+    'Start Kruskal · Consider weights in increasing order',
+    'Begin with six separate components and no chosen edges. Process undirected edges from smallest to largest weight; accept an edge only when it joins two different components.'
+  );
   for (const e of [...g.edges].sort(
     (a, b) => Number(a.label) - Number(b.label)
   )) {
@@ -320,12 +363,14 @@ const kruskal = () => {
     t.node(e.from, 'active');
     t.node(e.to, 'active');
     t.frame(
-      `Try ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Weight ${e.label}`
+      `Try ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Weight: ${e.label}`,
+      `This is the lightest unprocessed edge. Compare the components containing ${g.nodes[e.from].label} and ${g.nodes[e.to].label}; the highlighted endpoints identify the proposed connection.`
     );
     if (find(e.from) === find(e.to)) {
       t.edge(e.id, C.edgeRejected, 'rejected');
       t.frame(
-        `Reject ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Would form a cycle`
+        `Reject ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Same component: a cycle`,
+        `The accepted edges already connect ${g.nodes[e.from].label} and ${g.nodes[e.to].label}. Adding this edge would form a cycle, so leave the tree and total weight unchanged at ${total}.`
       );
     } else {
       parent[find(e.to)] = find(e.from);
@@ -333,14 +378,18 @@ const kruskal = () => {
       total += Number(e.label);
       t.edge(e.id, C.edgeCompleted, 'completed');
       t.frame(
-        `Accept ${g.nodes[e.from].label}–${g.nodes[e.to].label} · Total weight ${total}`
+        `Accept ${g.nodes[e.from].label}–${g.nodes[e.to].label} · ${count} of 5 edges; total weight: ${total}`,
+        `The endpoints belong to different components, so this edge joins them without a cycle. The forest now has ${g.nodes.length - count} components and ${count} accepted edges with total weight ${total}.`
       );
     }
     t.node(e.from, 'default');
     t.node(e.to, 'default');
     if (count === g.nodes.length - 1) break;
   }
-  t.frame(`MST complete · ${count} edges · Weight ${total}`);
+  t.frame(
+    `MST complete · ${count} edges; total weight: ${total}`,
+    `The ${count} accepted edges connect all six nodes without a cycle. Stop after n−1 edges; the remaining heavier edges need not be considered. This minimum spanning tree has total weight ${total}.`
+  );
   return presentation(
     g,
     t,
@@ -357,12 +406,12 @@ const topological = () => {
   const g = graph(
     ['A', 'B', 'C', 'D', 'E', 'F'],
     [
-      [0, 0],
-      [0, 260],
-      [230, 130],
-      [460, 0],
-      [460, 260],
-      [690, 130],
+      [140, 130],
+      [140, 330],
+      [360, 230],
+      [580, 130],
+      [580, 330],
+      [800, 230],
     ],
     [
       [0, 2],
@@ -380,7 +429,7 @@ const topological = () => {
     order = [];
   const labels = () =>
     g.nodes.forEach(n => {
-      t.nodes[n.id].annotation = `${n.label}:${indegree[n.id]}`;
+      t.nodes[n.id].annotation = `in=${indegree[n.id]}`;
     });
   g.nodes
     .filter(n => indegree[n.id] === 0)
@@ -389,15 +438,24 @@ const topological = () => {
       t.node(n.id, 'queued');
     });
   labels();
-  t.frame('Kahn’s algorithm · A and B have indegree 0');
+  t.frame(
+    'Start Kahn’s algorithm · Ready: A, B',
+    'Count each node’s incoming edges; the value below it is its remaining indegree. A and B have indegree 0, so both can enter the ready queue. Every arrow points from a prerequisite toward a dependent node.'
+  );
   while (queue.length) {
     const id = queue.shift();
     t.node(id, 'active');
     order.push(g.nodes[id].label);
-    t.frame(`Output ${g.nodes[id].label} · Order: ${order.join(', ')}`);
+    t.frame(
+      `Output ${g.nodes[id].label} · Order: ${order.join(', ')}`,
+      `${g.nodes[id].label} has no remaining prerequisites. Remove it from the ready queue and append it to the order, then remove its outgoing edges from the remaining graph.`
+    );
+    const updates = [];
     for (const e of g.edges.filter(e => e.from === id)) {
       t.edge(e.id, C.edgeCompleted, 'completed');
+      const previous = indegree[e.to];
       indegree[e.to]--;
+      updates.push(`${g.nodes[e.to].label}: ${previous} → ${indegree[e.to]}`);
       if (indegree[e.to] === 0) {
         queue.push(e.to);
         t.node(e.to, 'queued');
@@ -407,14 +465,18 @@ const topological = () => {
     t.node(id, 'visited');
     if (queue.length)
       t.frame(
-        `Remove outgoing edges · Ready: ${queue.map(i => g.nodes[i].label).join(', ')}`
+        `Remove ${g.nodes[id].label}'s outgoing edges · Ready: ${queue.map(i => g.nodes[i].label).join(', ')}`,
+        `${updates.length ? `Remaining indegrees change: ${updates.join('; ')}.` : `${g.nodes[id].label} has no outgoing edges.`} A node enters the ready queue exactly when its remaining indegree becomes 0.`
       );
   }
-  t.frame(`Topological order: ${order.join(', ')}`);
+  t.frame(
+    'Topological order complete · A, B, C, D, E, F',
+    `Every node was output, so the graph is acyclic. In the order ${order.join(', ')}, each directed edge goes from an earlier node to a later one. Other valid orders are possible when multiple nodes are ready.`
+  );
   return presentation(
     g,
     t,
-    legend('Topological sort · node:indegree', [
+    legend('Kahn · in = indegree', [
       nodeKey('Ready', 'queued'),
       nodeKey('Current', 'active'),
       nodeKey('Output', 'visited'),
@@ -424,16 +486,17 @@ const topological = () => {
 };
 const componentColors = ['#BFDBFE', '#FED7AA', '#DDD6FE'];
 const dsu = () => {
-  // The cycle edge clears node 1; it must not look like two adjacent edges.
+  // Two compact rows show the sets before their connecting request is processed.
+  // Node 1 sits above the closing 0–2 edge, so that cycle is a clear triangle.
   const g = graph(
     ['0', '1', '2', '3', '4', '5'],
     [
-      [0, 0],
-      [220, -100],
-      [440, 0],
-      [0, 260],
-      [220, 360],
-      [440, 260],
+      [120, 160],
+      [320, 80],
+      [520, 160],
+      [240, 300],
+      [440, 300],
+      [640, 300],
     ],
     [
       [0, 1],
@@ -452,7 +515,7 @@ const dsu = () => {
       const root = find(n.id),
         members = g.nodes.filter(m => find(m.id) === root).length;
       t.node(n.id, 'default', {
-        annotation: `${n.id}:${root}`,
+        annotation: `root=${root}`,
         color:
           members === 1
             ? C.nodeDefault
@@ -462,25 +525,37 @@ const dsu = () => {
       });
     });
   mark();
-  t.frame('DSU · Each node starts in its own set');
+  t.frame(
+    'Six separate sets · Below each node: root',
+    'Each node begins as its own representative. Gray edges are upcoming union requests in the input graph, not DSU parent pointers. The annotation shows find(node), and matching colors show sets already merged.'
+  );
   for (const e of g.edges) {
     const a = find(e.from),
       b = find(e.to);
     if (a === b) {
       t.edge(e.id, C.edgeRejected, 'rejected');
-      t.frame(`${e.from} and ${e.to}: same root ${a} · Reject cycle`);
+      t.frame(
+        `Skip ${e.from}–${e.to} · Both already have root ${a}`,
+        `find(${e.from}) = find(${e.to}) = ${a}, so this union changes nothing. Adding this input edge to the accepted connections would close a cycle; the red edge shows that redundant request.`
+      );
     } else {
       parent[b] = a;
       mark();
       t.edge(e.id, C.edgeCompleted, 'completed');
-      t.frame(`Union(${e.from}, ${e.to}) · Merge roots ${a} and ${b}`);
+      t.frame(
+        `Union ${e.from}, ${e.to} · Merge roots ${a} and ${b}`,
+        `find(${e.from}) is ${a} and find(${e.to}) is ${b}. Attach representative ${b} to ${a}; every member of the merged set now reports root ${a}. The green edge records the successful union request.`
+      );
     }
   }
-  t.frame('One set · All nodes have root 0');
+  t.frame(
+    'One set remains · All six nodes have root 0',
+    'Five successful unions connected all six nodes. The last request joined nodes already in the same set, so it did not change any representative. This example illustrates union and find without rank balancing or path compression.'
+  );
   return presentation(
     g,
     t,
-    legend('DSU · node:root', [
+    legend('Disjoint sets', [
       nodeKey('Root 0', 'default', componentColors[0]),
       nodeKey('Root 3', 'default', componentColors[1]),
       edgeKey('Union', C.edgeCompleted, 'completed'),
@@ -492,14 +567,14 @@ const components = () => {
   const g = graph(
     ['0', '1', '2', '3', '4', '5', '6', '7'],
     [
-      [0, 80],
-      [160, 0],
-      [160, 170],
-      [390, 0],
-      [560, 0],
-      [390, 250],
-      [560, 170],
-      [710, 250],
+      [160, 230],
+      [280, 140],
+      [280, 320],
+      [430, 230],
+      [550, 230],
+      [700, 140],
+      [820, 230],
+      [700, 320],
     ],
     [
       [0, 1],
@@ -518,14 +593,17 @@ const components = () => {
     const queue = [start.id];
     seen.add(start.id);
     t.node(start.id, 'queued');
-    t.frame(`Component ${component} · Start at ${start.label}`);
+    t.frame(
+      `Start component ${component} · Seed: ${start.label}`,
+      `${start.label} has not been reached by any previous search. Start a fresh BFS here; every node reached by this search belongs to component ${component}. The separated clusters make the absence of connecting edges visible.`
+    );
     const members = [];
     while (queue.length) {
       const id = queue.shift();
       members.push(id);
       t.node(id, 'default', {
         color: componentColors[component - 1],
-        annotation: `${id}:${component}`,
+        annotation: `group=${component}`,
       });
       for (const e of g.edges.filter(e => e.from === id || e.to === id)) {
         const next = e.from === id ? e.to : e.from;
@@ -535,14 +613,20 @@ const components = () => {
         t.node(next, 'queued');
         t.edge(e.id, C.edgeCompleted, 'completed');
       }
-      t.frame(`Component ${component} · Found ${members.join(', ')}`);
+      t.frame(
+        `Explore ${id} · Group ${component}: ${members.join(', ')}; queue: ${queue.join(', ') || 'empty'}`,
+        `Assign node ${id} to component ${component} and inspect all its undirected neighbors. Newly discovered neighbors enter this search's queue. ${queue.length ? 'Continue until this component’s queue is empty.' : 'The queue is empty; scan for the next unvisited node.'}`
+      );
     }
   }
-  t.frame('3 components · {0,1,2}  {3,4}  {5,6,7}');
+  t.frame(
+    'Three components · {0,1,2}  {3,4}  {5,6,7}',
+    'Every node has a component number. Nodes within a group are connected by paths, and there is no path between different groups. Three BFS launches were needed, one for each connected component.'
+  );
   return presentation(
     g,
     t,
-    legend('Components · node:group', [
+    legend('Connected components', [
       ...componentColors.map((c, i) => nodeKey(`Group ${i + 1}`, 'default', c)),
       nodeKey('Frontier', 'queued'),
       edgeKey('Tree edge', C.edgeCompleted, 'completed'),
@@ -553,9 +637,9 @@ const multigraph = () => {
   const g = graph(
     ['A', 'B', 'C'],
     [
-      [0, 0],
-      [360, 0],
-      [180, 280],
+      [200, 170],
+      [680, 170],
+      [440, 350],
     ],
     [
       [0, 1, 'e1'],
@@ -569,26 +653,44 @@ const multigraph = () => {
   );
   const t = timeline(g);
   t.node(0, 'active');
-  t.frame('Multigraph · Three distinct edges join A → B');
+  t.frame(
+    'Start at A · Three distinct edges lead to B',
+    'The edge labels e1, e2, and e3 identify three separate directed edges with the same endpoints A and B. These labels are names, not weights; the curved lanes keep their identities visible.'
+  );
   ['e0', 'e1', 'e2'].forEach(id => t.edge(id, C.nodeActive, 'active'));
-  t.frame('Parallel edges share endpoints, not identity');
+  t.frame(
+    'Inspect parallel edges · e1, e2, e3 all connect A → B',
+    'Each highlighted lane is an independent edge. Choosing, deleting, or changing one edge does not change the others, even though their source and target are identical.'
+  );
   t.edge('e0', C.edgeDefault);
   t.edge('e2', C.edgeDefault);
   t.edge('e1', C.edgeCompleted, 'completed');
   t.node(0, 'visited');
   t.node(1, 'active');
-  t.frame('Choose e2 · No weights imply no “best” edge');
+  t.frame(
+    'Follow e2 · Move from A to B',
+    'Choose the middle edge e2 as one possible move. All three edges reach B, and no weight has been assigned to compare their costs. This is a walk demonstration, not an optimization algorithm.'
+  );
   t.edge('e3', C.nodeActive, 'active');
-  t.frame('Self-loop · B → B stays at the same node');
+  t.frame(
+    'Inspect B’s self-loop · Source and target are both B',
+    'The loop is a real directed edge from B back to B. Traversing it adds one edge to a walk while leaving the current vertex unchanged.'
+  );
   t.edge('e3', C.edgeDefault);
   t.edge('e4', C.edgeCompleted, 'completed');
   t.node(1, 'visited');
   t.node(2, 'active');
-  t.frame('Follow B → C');
+  t.frame(
+    'Follow B → C · Current node: C',
+    'Continue along the arrow from B to C. The chosen A-to-B lane stays green as part of the walk; the self-loop is no longer highlighted.'
+  );
   t.edge('e5', C.edgeCompleted, 'completed');
   t.node(2, 'visited');
   t.node(0, 'active');
-  t.frame('Return C → A · A directed cycle');
+  t.frame(
+    'Return C → A · The walk closes a directed cycle',
+    'The chosen edges A → B, B → C, and C → A return to the starting node. They form a directed cycle; the unused parallel edges and B’s self-loop remain separate graph objects.'
+  );
   return presentation(
     g,
     t,

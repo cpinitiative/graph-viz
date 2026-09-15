@@ -1141,6 +1141,8 @@ const GraphStudioVisualizer = ({ snapshot }) => {
       baseCaptionOverlay: normalizedCaptionOverlay,
       setCaptionOverlay,
       captionText: resolveStepCaptionText(steps[currentFrame]),
+      captionFrame: currentFrame,
+      captionFrameCount: steps.length,
     },
     property: {
       selectedNode,
@@ -1219,6 +1221,7 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         }),
       captionEnabled: currentCaptionOverlay.enabled,
       captionStyle: normalizedCaptionOverlay.style,
+      captionPosition: normalizedCaptionOverlay.position,
       captionSize: normalizedCaptionOverlay.size,
       captionFontSize: normalizedCaptionOverlay.fontSize,
       hasCaptionVisibleOverride,
@@ -1232,6 +1235,12 @@ const GraphStudioVisualizer = ({ snapshot }) => {
         updateCaptionAppearance(prev => ({
           ...normalizeCaptionOverlay(prev),
           style,
+          ...(style === 'walkthrough' ? { position: { x: 0.5, y: 1 } } : {}),
+        })),
+      onCaptionPositionChange: position =>
+        updateCaptionAppearance(prev => ({
+          ...normalizeCaptionOverlay(prev),
+          position,
         })),
       onCaptionSizeChange: size =>
         updateCaptionAppearance(prev => {

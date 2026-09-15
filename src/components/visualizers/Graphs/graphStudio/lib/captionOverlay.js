@@ -10,6 +10,7 @@ export const DEFAULT_CAPTION_OVERLAY = {
 };
 
 export const CAPTION_STYLE_OPTIONS = [
+  { value: 'walkthrough', label: 'Walkthrough' },
   { value: 'subtle', label: 'Subtle' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -20,6 +21,15 @@ export const CAPTION_SIZE_OPTIONS = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
+];
+
+export const CAPTION_POSITIONS = [
+  { value: 'bottom-center', label: 'Bottom center', x: 0.5, y: 1 },
+  { value: 'top-center', label: 'Top center', x: 0.5, y: 0 },
+  { value: 'bottom-left', label: 'Bottom left', x: 0, y: 1 },
+  { value: 'bottom-right', label: 'Bottom right', x: 1, y: 1 },
+  { value: 'top-left', label: 'Top left', x: 0, y: 0 },
+  { value: 'top-right', label: 'Top right', x: 1, y: 0 },
 ];
 
 export const CAPTION_FONT_SIZE_RANGE = {

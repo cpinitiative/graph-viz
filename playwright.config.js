@@ -31,7 +31,7 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testMatch: /graph-viz\.spec\.js/,
+      testMatch: /(graph-viz|preset-presentation)\.spec\.js/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
