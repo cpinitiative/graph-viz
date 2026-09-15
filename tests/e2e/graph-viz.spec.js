@@ -989,10 +989,10 @@ test.describe('Graph Studio desktop smoke', () => {
     );
     const modeGuidance = page.getByTestId('tool-mode-guidance');
     const editScope = page.getByTestId('timeline-edit-scope');
-    await expect(page.getByTestId('canvas-hud-stack')).toBeVisible();
+    await expect(page.getByTestId('canvas-hud-stack')).toHaveCount(0);
     await expect(
       page.getByText('Shift-click to select multiple nodes', { exact: true })
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(page.getByTestId('canvas-mode-indicator')).toHaveCount(0);
     await expect(modeGuidance).toHaveCount(0);
     await expect(editScope).toHaveCount(0);

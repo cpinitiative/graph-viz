@@ -260,16 +260,11 @@ const MobileOverlay = ({ side, closeLabel, onClose, children }) => {
 
 const CanvasStage = ({ canvas, status, presenceRecovery, legendTruncated }) => (
   <div className="flex h-full min-h-0 flex-col">
-    <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
-      <span className="my-auto min-w-0 flex-1 truncate pr-2 text-[11px] text-[#475569] dark:text-[#CBD5E1]">
-        {getModeGuidance(canvas)?.accessibleAction ??
-          getModeGuidance(canvas)?.action ??
-          'Shift-click to select multiple nodes'}
-      </span>
-      {Boolean(presenceRecovery?.entries?.length) && (
+    {Boolean(presenceRecovery?.entries?.length) && (
+      <div className={canvasHudStackClass} data-testid="canvas-hud-stack">
         <PresenceRecoveryAffordance recovery={presenceRecovery} />
-      )}
-    </div>
+      </div>
+    )}
     <div className="relative min-h-0 flex-1">
       <GraphCanvas {...canvas} />
     </div>
